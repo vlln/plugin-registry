@@ -129,6 +129,30 @@ dsh plugin uninstall acme/cool-tool
 
 单元测试 75+ 项、覆盖率 100%（语句/分支/函数/行）；端到端（创建 → 安装 → 启用 → 卸载）跑通；typecheck / lint / 文档与配置门禁全绿。
 
+## 与 pi-mono 插件的对比
+
+参考 [pi-mono](https://github.com/pi-mono)（`@earendil-works/pi-coding-agent`）的扩展机制做的横向对比。pi 的插件是 **Harness Extensions**（`harness-v2.md`：events 观察 + hooks 拦截，可改 context/请求/工具/run 边界）+ `.pi/extensions/*.ts` 本地脚本（放文件即加载，无管理）。
+
+### 能力对比
+
+| 维度 | pi-mono 扩展 | plugin-registry |
+|---|---|---|
+| 形态 | `.pi/extensions/*.ts` 本地脚本 | `dsh.plugin.json` 清单 + Cordis 插件入口 |
+| 接入机制 | harness events + hooks | Cordis 插件：inject 服务 + 注册工具/事件/服务/命令 |
+| 事件/钩子拦截 | ✅ events 观察、hooks 拦截（请求/工具/边界） | ✅ `agent/*`、`tools/*` waterfall 事件（等价） |
+| 工具/命令/提示词 | ✅ 可加 | ✅ `ctx.tools`/`ctx.commands`/`ctx.systemPrompt` |
+| **TUI 修改** | ✅ **开放 pi-tui 组件树**（`ctx.ui.custom` 拿 tui 实例、注入自定义组件、`ui.notify`） | ⚠️ **受限覆盖层**（`ctx.tui.openOverlay()` 只给 viewport/主题/重绘/关闭，不给底层树——安全取舍） |
+| 安装/发现 | 放文件即生效（无管理） | ✅ `install/list/enable/disable/uninstall` + Web 面板 |
+| 校验/兼容 | 无 | ✅ contributes 校验 + engines 兼容范围 |
+| 启停 | 无 | ✅ 默认禁用 + 显式启用 + 实时热挂载 |
+| 信任边界 | 直接执行 | ✅ 默认禁用 = 显式信任 |
+
+### 结论
+
+- **能力面**：plugin-registry 在事件/钩子/工具/命令上覆盖 pi，且补上了 pi 没有的**安装-启停-校验-分发管理**
+- **TUI 表面**：pi 开放组件树（改主 UI/注入组件），dsh 是受限覆盖层（安全设计）——命令与事件驱动的 UI 平齐，改主 UI 布局不如 pi 开放
+- **本质不同**：pi 是"代码扩展点"（零协议、放文件即用），plugin-registry 是"带生命周期的分发生态"（清单协议 + 管理，换取安全与可控）
+
 ## 版权
 
 本仓库代码版权归作者所有，供 dsh 内测成员在 dsh-external 组织内使用与协作；官方不保证公开发布后该组织仍然存在，请自行保留副本。未经作者许可请勿公开分发。
