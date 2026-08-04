@@ -25,14 +25,12 @@ Web 设置页「插件」面板：
 
 ## 与 cordis.yml 插件的关系（层次与边界）
 
-dsh 里有两层插件，机制相同（都是 Cordis 插件：函数/类/带 apply 的对象 + inject/effect），**管理权不同**，本仓库只管第二层：
+本仓库（plugin-registry）在 dsh 的 cordis.yml 官方插件树之上**提供第二层插件**。两层机制相同（都是 Cordis 插件：函数/类/带 apply 的对象 + inject/effect），**管理权不同**：
 
 | 层次 | 定义 | 加载 | 管理 |
 |---|---|---|---|
 | **cordis.yml 官方插件** | dsh 产品随发布固定的组合（agent-loop、llm、tools、fs、skill-local、ui-* 等） | Loader 按配置树启动时静态加载 | 产品结构，随版本发布 |
 | **第三方插件（本仓库）** | 用户安装的带 `dsh.plugin.json` 的插件（`dsh plugin install`） | `plugin-local` 扫描 `<dshHome>/plugins` 索引，运行时动态挂载到 group fiber | 用户通过 `dsh plugin` / Web 面板安装、启停、卸载 |
-
-边界：
 
 边界：
 
