@@ -1,0 +1,99 @@
+/* Plugin manager settings panel: layout and status badges; inputs/buttons use
+ * the shared ui-primitives atoms (capsule radius, matching the models page).
+ * Enabled uses the semantic success family (tertiary fill + primary text —
+ * the same pairing the trajectory tags use, legible in both themes);
+ * disabled/not-installed stay neutral. */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+.row:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.rowText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+.meta {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Status badges: explicit full styles (no composes — the composed radius was
+ * lost in the bundle), capsule radius to match the button family. */
+.badgeOn {
+  font-size: 12px;
+  line-height: 18px;
+  padding: 0 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: var(--dsw-alias-state-success-tertiary);
+  color: var(--dsw-alias-state-success-primary);
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-success-primary) 35%, transparent);
+}
+
+.badgeOff {
+  font-size: 12px;
+  line-height: 18px;
+  padding: 0 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-tertiary);
+  border: 1px solid var(--dsw-alias-border-l2);
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Uninstall is destructive: the shared danger hover surface, applied over the
+ * ghost button family. */
+.danger:hover {
+  background: var(--dsw-alias-interactive-bg-hover-danger);
+}
+
+.empty {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  text-align: center;
+  padding: 24px 0;
+}
