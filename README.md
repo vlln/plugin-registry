@@ -23,6 +23,21 @@ Web 设置页「插件」面板：
 
 插件操作后状态：启用实时生效（徽章变绿胶囊）、禁用与卸载的反馈。
 
+## 与 cordis.yml 插件的关系（层次与边界）
+
+dsh 里有两层插件，机制相同（都是 Cordis 插件：函数/类/带 apply 的对象 + inject/effect），**管理权不同**，本仓库只管第二层：
+
+| 层次 | 定义 | 加载 | 管理 |
+|---|---|---|---|
+| **cordis.yml 官方插件** | dsh 产品随发布固定的组合（agent-loop、llm、tools、fs、skill-local、ui-* 等） | Loader 按配置树启动时静态加载 | 产品结构，随版本发布 |
+| **第三方插件（本仓库）** | 用户安装的带 `dsh.plugin.json` 的插件（`dsh plugin install`） | `plugin-local` 扫描 `<dshHome>/plugins` 索引，运行时动态挂载到 group fiber | 用户通过 `dsh plugin` / Web 面板安装、启停、卸载 |
+
+边界：
+
+- 本仓库**不管理、不替换** cordis.yml 官方插件树——那是产品声明式组合，保持 Loader 静态加载
+- registry 挂载的插件与官方插件**互相可见**：第三方插件可以 `inject` cordis.yml 里的服务（`tools`、`skills`、`commands`…）
+- 有意不做的"统一管理"（registry 也管官方插件）：版本/更新语义、组合顺序、跨 surface 差异都属于产品层，纳入统一管理会混淆产品结构与生态层，且与在线市场路线重叠——如未来需要，另行设计
+
 ## 能力一览
 
 - **清单协议**：插件根目录携带 `dsh.plugin.json`，声明身份（publisher/name）、版本、入口、兼容的 harness 版本范围、贡献声明（工具/技能）
