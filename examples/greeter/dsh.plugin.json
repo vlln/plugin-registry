@@ -1,0 +1,8 @@
+{
+  "id": "acme/greeter",
+  "version": "0.1.0",
+  "main": "./index.mjs",
+  "description": "示例插件：注册一个 greet 工具",
+  "engines": { "dsh": ">=0.0.1" },
+  "contributes": { "tools": ["greet"], "skills": [] }
+}
