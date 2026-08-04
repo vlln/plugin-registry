@@ -1,0 +1,1067 @@
+diff --git a/apps/cli/config/base.cordis.yml b/apps/cli/config/base.cordis.yml
+index b7860e2e..a4c9fae8 100644
+--- a/apps/cli/config/base.cordis.yml
++++ b/apps/cli/config/base.cordis.yml
+@@ -374,6 +374,12 @@
+ - id: tools
+   name: '@deepseek-ai/dsh-tools'
+ 
++# The local plugin registry: provides ctx.plugins for every surface (web panel,
++# TUI, headless). Installed plugins stay disabled until explicitly enabled, so
++# the default composition executes no third-party code.
++- id: plugin-local
++  name: '@deepseek-ai/dsh-plugin'
++
+ # The deployment persona is a surface choice; plan-mode and tool plugins own
+ # their own prompt sections.
+ - id: system-prompt
+diff --git a/apps/cli/config/web.cordis.yml b/apps/cli/config/web.cordis.yml
+index daf59791..b517bc31 100644
+--- a/apps/cli/config/web.cordis.yml
++++ b/apps/cli/config/web.cordis.yml
+@@ -135,6 +135,9 @@
+     - id: ui-settings-general
+       name: '@deepseek-ai/dsh-client-ui-settings-general'
+ 
++    - id: ui-plugin-manager
++      name: '@deepseek-ai/dsh-client-ui-plugin-manager'
++
+     - id: ui-models
+       name: '@deepseek-ai/dsh-client-ui-models'
+ 
+diff --git a/apps/cli/package.json b/apps/cli/package.json
+index 8c482ac3..2932ea02 100644
+--- a/apps/cli/package.json
++++ b/apps/cli/package.json
+@@ -38,6 +38,7 @@
+     "@deepseek-ai/dsh-client-ui-permission": "workspace:^",
+     "@deepseek-ai/dsh-client-ui-plan": "workspace:^",
+     "@deepseek-ai/dsh-client-ui-question": "workspace:^",
++    "@deepseek-ai/dsh-client-ui-plugin-manager": "workspace:^",
+     "@deepseek-ai/dsh-client-ui-settings": "workspace:^",
+     "@deepseek-ai/dsh-client-ui-settings-general": "workspace:^",
+     "@deepseek-ai/dsh-client-ui-sidebar": "workspace:^",
+@@ -74,6 +75,7 @@
+     "@deepseek-ai/dsh-paths": "workspace:^",
+     "@deepseek-ai/dsh-permission": "workspace:^",
+     "@deepseek-ai/dsh-plan-mode": "workspace:^",
++    "@deepseek-ai/dsh-plugin": "workspace:^",
+     "@deepseek-ai/dsh-repeat-tool-guard": "workspace:^",
+     "@deepseek-ai/dsh-pty": "workspace:^",
+     "@deepseek-ai/dsh-pty-local": "workspace:^",
+diff --git a/apps/cli/src/args.ts b/apps/cli/src/args.ts
+index 19bc58cc..0925c858 100644
+--- a/apps/cli/src/args.ts
++++ b/apps/cli/src/args.ts
+@@ -86,6 +86,17 @@ interface WebInvocation {
+   trustedHosts?: string[]
+ }
+ 
++/** Plugin registry management: `dsh plugin <action>`. */
++export interface PluginInvocation {
++  mode: 'plugin'
++  /** The registry action to run. */
++  action: 'install' | 'list' | 'enable' | 'disable' | 'uninstall' | 'create'
++  /** Local directory containing `dsh.plugin.json`, for `install`; the scaffold target for `create`. */
++  path?: string
++  /** Installed plugin id for enable/disable/uninstall, or the id to scaffold for `create`. */
++  id?: string
++}
++
+ /** The resolved `dsh` invocation: exactly one mode. `--help`/`--version`/errors exit inside {@link parseDshArgs}. */
+ export type DshInvocation =
+   | TuiInvocation
+@@ -94,6 +105,7 @@ export type DshInvocation =
+   | MetaInvocation
+   | SkillSessionInvocation
+   | WebInvocation
++  | PluginInvocation
+ 
+ /** Raw web-subcommand options straight from Commander. */
+ interface WebOptions {
+@@ -300,6 +312,50 @@ Examples:
+       resolved = resolveWeb(options)
+     })
+ 
++  const plugin = program.command('plugin').description('manage locally installed plugins')
++  plugin
++    .command('install <path>')
++    .description('install a plugin from a local directory (disabled by default)')
++    .action((path: string) => {
++      rejectParentOptions('plugin install')
++      resolved = { mode: 'plugin', action: 'install', path }
++    })
++  plugin
++    .command('create <id>')
++    .description('scaffold a new plugin root (dsh.plugin.json + entry + README) in the current directory')
++    .action((id: string) => {
++      rejectParentOptions('plugin create')
++      resolved = { mode: 'plugin', action: 'create', id }
++    })
++  plugin
++    .command('list')
++    .description('list installed plugins and their enabled state')
++    .action(() => {
++      rejectParentOptions('plugin list')
++      resolved = { mode: 'plugin', action: 'list' }
++    })
++  plugin
++    .command('enable <id>')
++    .description('enable an installed plugin so the next load mounts it')
++    .action((id: string) => {
++      rejectParentOptions('plugin enable')
++      resolved = { mode: 'plugin', action: 'enable', id }
++    })
++  plugin
++    .command('disable <id>')
++    .description('disable an installed plugin so the next load skips it')
++    .action((id: string) => {
++      rejectParentOptions('plugin disable')
++      resolved = { mode: 'plugin', action: 'disable', id }
++    })
++  plugin
++    .command('uninstall <id>')
++    .description('remove an installed plugin and its registry record')
++    .action((id: string) => {
++      rejectParentOptions('plugin uninstall')
++      resolved = { mode: 'plugin', action: 'uninstall', id }
++    })
++
+   program
+     .command('meta')
+     .description('work on the dsh source that runs this command, from any directory (experimental)')
+diff --git a/apps/cli/src/bin.ts b/apps/cli/src/bin.ts
+index 58045f48..ed52d8d1 100644
+--- a/apps/cli/src/bin.ts
++++ b/apps/cli/src/bin.ts
+@@ -59,6 +59,11 @@ switch (invocation.mode) {
+     await runTui(undefined, undefined, undefined, `dsh-${invocation.mode}`)
+     break
+   }
++  case 'plugin': {
++    const { runPlugin } = await import('./plugin.ts')
++    await runPlugin(invocation, readVersion())
++    break
++  }
+   default:
+     invocation satisfies never
+     throw new Error(`dsh: unhandled invocation mode ${JSON.stringify(invocation)}`)
+diff --git a/apps/cli/src/plugin.ts b/apps/cli/src/plugin.ts
+new file mode 100644
+index 00000000..57dfce62
+--- /dev/null
++++ b/apps/cli/src/plugin.ts
+@@ -0,0 +1,90 @@
++/**
++ * `dsh plugin` — manage the local plugin registry: install from a directory,
++ * list, enable/disable, and uninstall. Pure filesystem operations against the
++ * registry under `$DSH_HOME/plugins`; no harness boot.
++ * @module @deepseek-ai/dsh/plugin
++ */
++
++import { resolveDshHome } from '@deepseek-ai/dsh-paths'
++import {
++  installFromTarball,
++  installPlugin,
++  isTarball,
++  listPlugins,
++  requireDirectory,
++  scaffoldPlugin,
++  setEnabled,
++  uninstallPlugin,
++} from '@deepseek-ai/dsh-plugin'
++import { join } from 'node:path'
++import type { PluginInvocation } from './args.ts'
++
++/**
++ * Run one plugin-registry action and print its outcome. Domain failures print
++ * to stderr and set the exit code instead of throwing, so a mistyped id or a
++ * bad manifest never surfaces a stack trace.
++ * @param invocation - the resolved plugin subcommand.
++ * @param harnessVersion - the running dsh version, checked against `engines.dsh` at install.
++ */
++export async function runPlugin(invocation: PluginInvocation, harnessVersion: string): Promise<void> {
++  try {
++    const dshHome = resolveDshHome()
++    switch (invocation.action) {
++      case 'install': {
++        if (invocation.path === undefined) throw new Error('dsh plugin install needs a plugin directory or tarball')
++        const installed = isTarball(invocation.path)
++          ? await installFromTarball(invocation.path, { dshHome, harnessVersion })
++          : await (async () => {
++            await requireDirectory(invocation.path as string)
++            return installPlugin(invocation.path as string, { dshHome, harnessVersion })
++          })()
++        console.log(`installed ${installed.id}@${installed.record.version} (disabled; run \`dsh plugin enable ${installed.id}\` to activate)`)
++        break
++      }
++      case 'create': {
++        if (invocation.id === undefined) throw new Error('dsh plugin create needs a plugin id (publisher/name)')
++        const name = invocation.id.split('/').at(-1) ?? invocation.id
++        const dir = await scaffoldPlugin({ id: invocation.id, dir: join(process.cwd(), name) })
++        console.log(`created plugin ${invocation.id} in ${dir}; run \`dsh plugin install ${dir}\` to install it`)
++        break
++      }
++      case 'list': {
++        const listed = await listPlugins(dshHome)
++        if (listed.length === 0) {
++          console.log('no plugins installed')
++          break
++        }
++        for (const plugin of listed) {
++          const state = plugin.record.enabled ? 'enabled ' : 'disabled'
++          const summary = plugin.manifest.description ? ` — ${plugin.manifest.description}` : ''
++          console.log(`${state} ${plugin.id}@${plugin.record.version}${summary}`)
++        }
++        break
++      }
++      case 'enable': {
++        if (invocation.id === undefined) throw new Error('dsh plugin enable needs a plugin id')
++        await setEnabled(dshHome, invocation.id, true)
++        console.log(`enabled ${invocation.id}`)
++        break
++      }
++      case 'disable': {
++        if (invocation.id === undefined) throw new Error('dsh plugin disable needs a plugin id')
++        await setEnabled(dshHome, invocation.id, false)
++        console.log(`disabled ${invocation.id}`)
++        break
++      }
++      case 'uninstall': {
++        if (invocation.id === undefined) throw new Error('dsh plugin uninstall needs a plugin id')
++        await uninstallPlugin(dshHome, invocation.id)
++        console.log(`uninstalled ${invocation.id}`)
++        break
++      }
++      default:
++        invocation.action satisfies never
++    }
++  } catch (error) {
++    const message = error instanceof Error ? error.message : String(error)
++    console.error(`dsh plugin ${invocation.action}: ${message}`)
++    process.exitCode = 1
++  }
++}
+diff --git a/apps/cli/tests/args.spec.ts b/apps/cli/tests/args.spec.ts
+index 5b0e7632..b0ab8c19 100644
+--- a/apps/cli/tests/args.spec.ts
++++ b/apps/cli/tests/args.spec.ts
+@@ -43,6 +43,13 @@ describe('parseDshArgs', () => {
+     // Guided fresh-session entries carry nothing: bare mode discriminant only.
+     expect(parse(['upgrade', '--experimental'])).toEqual({ mode: 'upgrade' })
+     expect(parse(['upgrade'], true)).toEqual({ mode: 'upgrade' })
++    // Plugin registry subcommands carry their action and one argument.
++    expect(parse(['plugin', 'install', '/tmp/demo'])).toEqual({ mode: 'plugin', action: 'install', path: '/tmp/demo' })
++    expect(parse(['plugin', 'create', 'acme/tool'])).toEqual({ mode: 'plugin', action: 'create', id: 'acme/tool' })
++    expect(parse(['plugin', 'list'])).toEqual({ mode: 'plugin', action: 'list' })
++    expect(parse(['plugin', 'enable', 'acme/tool'])).toEqual({ mode: 'plugin', action: 'enable', id: 'acme/tool' })
++    expect(parse(['plugin', 'disable', 'acme/tool'])).toEqual({ mode: 'plugin', action: 'disable', id: 'acme/tool' })
++    expect(parse(['plugin', 'uninstall', 'acme/tool'])).toEqual({ mode: 'plugin', action: 'uninstall', id: 'acme/tool' })
+     // --trusted-host is variadic and repeatable; authorities pass through unvalidated.
+     expect(parse(['web', '--trusted-host', 'harness.internal:3080', 'lab.internal', '--trusted-host', '10.0.0.9']))
+       .toEqual({ mode: 'web', dev: false, trustedHosts: ['harness.internal:3080', 'lab.internal', '10.0.0.9'] })
+@@ -102,6 +109,12 @@ describe('parseDshArgs', () => {
+     expect(exitCode(['upgrade', '--experimental', '--resume', 's'])).toBe(1)
+     expect(exitCode(['upgrade', '--experimental', '--config', 'c.yml'])).toBe(1)
+     expect(exitCode(['-p', 'task', 'upgrade', '--experimental'])).toBe(1)
++    // `plugin` needs its one argument and shares none of the default surface.
++    expect(exitCode(['plugin', 'install'])).toBe(1)
++    expect(exitCode(['plugin', 'create'])).toBe(1)
++    expect(exitCode(['plugin', 'list', '-p', 'task'])).toBe(1)
++    expect(exitCode(['plugin', 'enable'])).toBe(1)
++    expect(exitCode(['plugin', '--config', 'c.yml', 'list'])).toBe(1)
+     // The pre-release command names have no compatibility aliases.
+     expect(exitCode(['experimental-meta'])).toBe(1)
+     expect(exitCode(['experimental-upgrade'])).toBe(1)
+diff --git a/apps/cli/tsconfig.json b/apps/cli/tsconfig.json
+index 2f995abf..ec20d7ea 100644
+--- a/apps/cli/tsconfig.json
++++ b/apps/cli/tsconfig.json
+@@ -32,6 +32,9 @@
+     {
+       "path": "../../packages/util/paths"
+     },
++    {
++      "path": "../../packages/plugin/plugin"
++    },
+     {
+       "path": "../../packages/session-query/session-query-sqlite"
+     },
+diff --git a/packages/README.i18n.yaml b/packages/README.i18n.yaml
+index 5491ce54..07e91b5a 100644
+--- a/packages/README.i18n.yaml
++++ b/packages/README.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write packages/README.md
+-README.md: c8984bfa652a0ad7e12bc1f2001618df452bc863
+-README.zh.md: 2a59a63d22cdb2e5c0de53cd1dcfce1296882c01
++README.md: 491283f794b6cafdf19c9c8105989fc50c662938
++README.zh.md: ec6dec1cadd2699cf9e2ab21af5b8f291b938793
+diff --git a/packages/README.md b/packages/README.md
+index c8984bfa..491283f7 100644
+--- a/packages/README.md
++++ b/packages/README.md
+@@ -17,27 +17,28 @@ Packages live at `packages/<group>/<pkg>/`; groups are containers, while names r
+ | [`subprocess/`](subprocess/README.md) | Subprocess capability family: spawn seam + local process-tree implementation | Product — stable surface |
+ | [`bash/`](bash/README.md) | Bash capability family: executor seam, local impl, model-facing tool | Product — stable surface |
+ | [`pty/`](pty/README.md) | Persistent PTY capability family: owner-scoped sessions, local implementation, and model-facing tools | Product — stable surface |
+-| [`code-runtime/`](code-runtime/README.md) | Code-execution capability family: the runtime seam for model-written programs + a worker-thread backend | Product — stable surface |
++| [`code-runtime/`](code-runtime/README.md) | Code-execution family: runtime seam for model-written programs + worker-thread backend | Product — stable surface |
+ | [`sandbox/`](sandbox/README.md) | Process-confinement seam; bwrap/Landlock/Seatbelt backends | Product — stable surface |
+ | [`fs/`](fs/README.md) | Filesystem capability family: seam, local impl, model-facing file tools, bash-backed discovery tools | Product — stable surface |
+ | [`lsp/`](lsp/README.md) | LSP capability family: seam, generic stdio provider, and the `lsp` tool | Product — stable surface |
+ | [`skill/`](skill/README.md) | Skill capability family: the provider registry, local provider, and model-facing catalog/loader | Product — stable surface |
+-| [`compact/`](compact/README.md) | Compaction capability family: the abstract seam + a basic backend (tool deferred) | Product — stable surface |
++| [`compact/`](compact/README.md) | Compaction family: abstract seam + basic backend (tool deferred) | Product — stable surface |
+ | [`context/`](context/README.md) | Model-visible request context, including workspace instructions and time context | Product — stable surface |
+ | [`subagent/`](subagent/README.md) | Subagent capability family: the provider-registry seam and the model-facing delegation tool | Product — stable surface |
+ | [`tasks/`](tasks/README.md) | Generic background-task runtime and model-facing `task_*` control tools | Product — stable surface |
+-| [`workflow/`](workflow/README.md) | Workflow capability family: the script-engine seam, worker-thread engine, and model-facing `workflow` and fresh-agent `ralph` tools | Product — stable surface |
++| [`workflow/`](workflow/README.md) | Workflow family: script-engine seam, worker-thread engine, model-facing `workflow` and fresh-agent `ralph` tools | Product — stable surface |
+ | [`web/`](web/README.md) | Web capability family: seam, search/fetch provider impls, and the model-facing web tools | Product — stable surface |
+ | [`spill/`](spill/README.md) | Spill capability family: storage seam, local impl, tool-result spill policy | Product — stable surface |
+ | [`todo/`](todo/README.md) | The model-facing `todo_write` tool | Product — stable surface |
++| [`plugin/`](plugin/README.md) | Local plugin registry: manifest protocol, install/enable CLI, runtime mount | Product — stable surface |
+ | [`plan/`](plan/README.md) | Plan collaboration state with a direct entry command and reviewed exit | Product — stable surface |
+ | [`timeout/`](timeout/README.md) | Tool-call timeout policy: the `tools/execute` deadline enforcer | Product — stable surface |
+ | [`guard/`](guard/README.md) | Loop-hygiene guards: advisory repeat-call reminders | Product — stable surface |
+-| [`cordis/`](cordis/README.md) | Cordis runtime integration: self-inspection/model-written temporary Plugins and restricted repository Plugin loading | Product — stable surface |
++| [`cordis/`](cordis/README.md) | Self-referential runtime toolset: inspect the live runtime, mount/unmount model-written plugins ([design](../.agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.md)) | Product — stable surface |
+ | [`hooks/`](hooks/README.md) | Hook bridges + the shared Claude Code / Codex wire-protocol library | Product — stable surface |
+ | [`session-persistence/`](session-persistence/README.md) | Persistence seam + JSONL/SQLite backends | Product — stable surface |
+ | [`session-projection/`](session-projection/README.md) | Projection seam: domain fold units serve whole values | Product — stable surface |
+-| [`session-query/`](session-query/README.md) | Session retrieval family: logical corpus, bounded reads, lineage, event relationships, semantic filtering, and SQLite full-text search | Product — stable surface |
++| [`session-query/`](session-query/README.md) | Session retrieval family: logical corpus, bounded reads, lineage, events, semantic filtering, SQLite full-text search | Product — stable surface |
+ | [`session-title/`](session-title/README.md) | Log-backed session titles: fallback service and opt-in LLM providers | Product — stable surface |
+ | [`settings/`](settings/README.md) | User-settings seam + file-backed provider | Product — stable surface |
+ | [`credentials/`](credentials/README.md) | Credential-reference seam + env-over-`.env` provider | Product — stable surface |
+diff --git a/packages/README.zh.md b/packages/README.zh.md
+index 2a59a63d..ec6dec1c 100644
+--- a/packages/README.zh.md
++++ b/packages/README.zh.md
+@@ -30,6 +30,7 @@
+ | [`web/`](web/README.md) | Web 能力系列：seam、搜索／获取提供方实现和面向模型的 Web 工具 | 产品：稳定表面 |
+ | [`spill/`](spill/README.md) | 溢出能力系列：存储 seam、本地实现、工具结果溢出策略 | 产品：稳定表面 |
+ | [`todo/`](todo/README.md) | 面向模型的 `todo_write` 工具 | 产品：稳定表面 |
++| [`plugin/`](plugin/README.md) | 本地第三方插件注册表：清单协议、安装/启用 CLI、运行时挂载 | 产品：稳定表面 |
+ | [`plan/`](plan/README.md) | Plan 协作状态，提供直接进入命令与经评审的退出 | 产品：稳定表面 |
+ | [`timeout/`](timeout/README.md) | 工具调用超时策略：`tools/execute` 截止时间强制执行器 | 产品：稳定表面 |
+ | [`guard/`](guard/README.md) | 循环卫生守卫：建议性重复调用提醒 | 产品：稳定表面 |
+diff --git a/packages/client/connection/src/client/fixture.ts b/packages/client/connection/src/client/fixture.ts
+index 801dc69c..bb34abc3 100644
+--- a/packages/client/connection/src/client/fixture.ts
++++ b/packages/client/connection/src/client/fixture.ts
+@@ -2350,6 +2350,13 @@ export function createFixtureApi(options: FixtureOptions = {}): ApiProxy {
+       }),
+       models: request => ok(request, { groups: fixtureModelGroups(), failures: [] }),
+     },
++    plugins: {
++      list: request => ok(request, { plugins: [] }),
++      install: request => ok(request, { id: request.payload.id }),
++      enable: request => ok(request, { id: request.payload.id }),
++      disable: request => ok(request, { id: request.payload.id }),
++      uninstall: request => ok(request, { id: request.payload.id }),
++    },
+     respond(message: ClientResponse): Promise<RpcReceipt> {
+       // Same routing discipline as the host: rpcId first, then the payload's
+       // audit correlation; a settled or unknown id is not-pending.
+@@ -2465,6 +2472,11 @@ export class FixtureApiClient extends AbstractApiClient {
+       case 'credentials.unset': return this.api.credentials.unset(request)
+       case 'llm.providers': return this.api.llm.providers(request)
+       case 'llm.models': return this.api.llm.models(request)
++      case 'plugin.list': return this.api.plugins.list(request)
++      case 'plugin.install': return this.api.plugins.install(request)
++      case 'plugin.enable': return this.api.plugins.enable(request)
++      case 'plugin.disable': return this.api.plugins.disable(request)
++      case 'plugin.uninstall': return this.api.plugins.uninstall(request)
+     }
+   }
+ 
+diff --git a/packages/client/connection/tests/fake-api.ts b/packages/client/connection/tests/fake-api.ts
+index a612494f..7313aa5a 100644
+--- a/packages/client/connection/tests/fake-api.ts
++++ b/packages/client/connection/tests/fake-api.ts
+@@ -198,6 +198,14 @@ export class FakeApiClient implements IApiClient {
+     models: payload => this.record('llm.models', payload, Promise.resolve(ok({ groups: [], failures: [] }))),
+   }
+ 
++  readonly plugins: IApiClient['plugins'] = {
++    list: payload => this.record('plugin.list', payload, Promise.resolve(ok({ plugins: [] }))),
++    install: payload => this.record('plugin.install', payload, Promise.resolve(ok({ id: payload.id }))),
++    enable: payload => this.record('plugin.enable', payload, Promise.resolve(ok({ id: payload.id }))),
++    disable: payload => this.record('plugin.disable', payload, Promise.resolve(ok({ id: payload.id }))),
++    uninstall: payload => this.record('plugin.uninstall', payload, Promise.resolve(ok({ id: payload.id }))),
++  }
++
+   /** When true, streams never fire onOpen (misbehaving-carrier material for the handshake timeout guard). */
+   suppressStreamOpen = false
+ 
+diff --git a/packages/client/runtime/tests/fake-api.ts b/packages/client/runtime/tests/fake-api.ts
+index 3c0b86fe..05a0efbb 100644
+--- a/packages/client/runtime/tests/fake-api.ts
++++ b/packages/client/runtime/tests/fake-api.ts
+@@ -233,6 +233,14 @@ export class FakeApiClient implements IApiClient {
+     models: payload => this.record('llm.models', payload, Promise.resolve(ok({ groups: [], failures: [] }))),
+   }
+ 
++  readonly plugins: IApiClient['plugins'] = {
++    list: payload => this.record('plugin.list', payload, Promise.resolve(ok({ plugins: [] }))),
++    install: payload => this.record('plugin.install', payload, Promise.resolve(ok({ id: payload.id }))),
++    enable: payload => this.record('plugin.enable', payload, Promise.resolve(ok({ id: payload.id }))),
++    disable: payload => this.record('plugin.disable', payload, Promise.resolve(ok({ id: payload.id }))),
++    uninstall: payload => this.record('plugin.uninstall', payload, Promise.resolve(ok({ id: payload.id }))),
++  }
++
+   /** When true, streams never fire onOpen (misbehaving-carrier material for the handshake timeout guard). */
+   suppressStreamOpen = false
+ 
+diff --git a/packages/host/apiproxy/package.json b/packages/host/apiproxy/package.json
+index 03f31c6a..80c1228e 100644
+--- a/packages/host/apiproxy/package.json
++++ b/packages/host/apiproxy/package.json
+@@ -48,6 +48,7 @@
+     "@deepseek-ai/dsh-host-directory-picker": "workspace:^",
+     "@deepseek-ai/dsh-llm": "workspace:^",
+     "@deepseek-ai/dsh-native-command": "workspace:^",
++    "@deepseek-ai/dsh-plugin": "workspace:^",
+     "@deepseek-ai/dsh-session": "workspace:^",
+     "@deepseek-ai/dsh-session-persistence": "workspace:^",
+     "@deepseek-ai/dsh-session-projection": "workspace:^",
+diff --git a/packages/host/apiproxy/src/api-proxy.ts b/packages/host/apiproxy/src/api-proxy.ts
+index 47b92f8b..627d8071 100644
+--- a/packages/host/apiproxy/src/api-proxy.ts
++++ b/packages/host/apiproxy/src/api-proxy.ts
+@@ -45,6 +45,7 @@ import type {} from '@deepseek-ai/dsh-session-projection-cache'
+ // GoalError narrows domain rejections to their stable codes at the wire boundary.
+ import { GoalError } from '@deepseek-ai/dsh-goal'
+ import type { GoalRef as CoreGoalRef } from '@deepseek-ai/dsh-goal'
++import type { PluginLocalService } from '@deepseek-ai/dsh-plugin'
+ // Type-only edges: resolve `ctx.get('commands')`, the `commands/change` event, and `ctx.get('skills')`.
+ import type {} from '@deepseek-ai/dsh-commands'
+ import type {} from '@deepseek-ai/dsh-skill'
+@@ -1407,6 +1408,21 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
+     return { code: 'internal', message: 'credentials service is absent: this deployment does not mount a credential provider (e.g. @deepseek-ai/dsh-credentials-local) in its composition', details: {} }
+   }
+ 
++  /** Missing-service report shared by the plugins domain. */
++  function pluginsAbsent(): RpcError {
++    return { code: 'internal', message: 'plugin registry is absent: this deployment does not mount @deepseek-ai/dsh-plugin in its composition (cordis.yml or explicit assembly)', details: {} }
++  }
++
++  /**
++   * Resolve the plugin registry service. The plugins domain keeps the same
++   * stance as settings/skills: a deployment without `ctx.plugins` is a
++   * composition gap, not an empty catalog.
++   * @returns the registry service, or undefined when absent.
++   */
++  function pluginRegistry(): PluginLocalService | undefined {
++    return ctx.get('plugins')
++  }
++
+   /** Map one redacted seam descriptor to its wire view. */
+   function namespaceView(descriptor: SettingsDescriptor): SettingsNamespaceView {
+     return {
+@@ -2438,6 +2454,62 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
+       },
+     },
+ 
++    plugins: {
++      async list(request) {
++        const registry = pluginRegistry()
++        if (registry === undefined) return err(request, pluginsAbsent())
++        try {
++          return ok(request, { plugins: await registry.list() })
++        } catch (error: unknown) {
++          return err(request, { code: 'internal', message: `plugin listing failed: ${String(error)}`, details: {} })
++        }
++      },
++
++      async install(request) {
++        const registry = pluginRegistry()
++        if (registry === undefined) return err(request, pluginsAbsent())
++        try {
++          const installed = await registry.install(request.payload.id)
++          return ok(request, { id: installed.id })
++        } catch (error: unknown) {
++          return err(request, { code: 'internal', message: `plugin install failed: ${String(error)}`, details: {} })
++        }
++      },
++
++      async enable(request) {
++        const registry = pluginRegistry()
++        if (registry === undefined) return err(request, pluginsAbsent())
++        try {
++          await registry.enable(request.payload.id)
++          return ok(request, { id: request.payload.id })
++        } catch (error: unknown) {
++          return err(request, { code: 'internal', message: `plugin enable failed: ${String(error)}`, details: {} })
++        }
++      },
++
++      async disable(request) {
++        const registry = pluginRegistry()
++        if (registry === undefined) return err(request, pluginsAbsent())
++        try {
++          await registry.disable(request.payload.id)
++          return ok(request, { id: request.payload.id })
++        } catch (error: unknown) {
++          return err(request, { code: 'internal', message: `plugin disable failed: ${String(error)}`, details: {} })
++        }
++      },
++
++      async uninstall(request) {
++        const registry = pluginRegistry()
++        if (registry === undefined) return err(request, pluginsAbsent())
++        try {
++          await registry.uninstall(request.payload.id)
++          return ok(request, { id: request.payload.id })
++        } catch (error: unknown) {
++          return err(request, { code: 'internal', message: `plugin uninstall failed: ${String(error)}`, details: {} })
++        }
++      },
++    },
++
+     settings: {
+       describe(request) {
+         const settings = ctx.get('settings')
+diff --git a/packages/host/apiproxy/src/api/index.ts b/packages/host/apiproxy/src/api/index.ts
+index 7f2f55cb..2e826526 100644
+--- a/packages/host/apiproxy/src/api/index.ts
++++ b/packages/host/apiproxy/src/api/index.ts
+@@ -14,6 +14,7 @@ import type { EventsApi } from './events.ts'
+ import type { GoalsApi } from './goals.ts'
+ import type { SettingsApi } from './settings.ts'
+ import type { CredentialsApi } from './credentials.ts'
++import type { PluginsApi } from './plugins.ts'
+ import type { LlmApi } from './llm.ts'
+ import type { ClientResponse, RpcReceipt } from './rpc.ts'
+ 
+@@ -30,6 +31,7 @@ export interface ApiProxy {
+   settings: SettingsApi
+   credentials: CredentialsApi
+   llm: LlmApi
++  plugins: PluginsApi
+   /** Response entry for server-requests (client-response, echoing their rpcId); not a domain method (four-quadrant model). */
+   respond(message: ClientResponse): Promise<RpcReceipt>
+ }
+@@ -51,6 +53,7 @@ export type { EventsApi, MuxFrame, HostFrame, QueuedInboxItem, ToolCallView, Too
+ export type { GoalsApi, GoalId, GoalRef } from './goals.ts'
+ export type { SettingsApi, SettingsNamespaceView, SettingsPathOpView, SettingsSecretView } from './settings.ts'
+ export type { CredentialsApi, CredentialView } from './credentials.ts'
++export type { PluginEntryView, PluginsApi } from './plugins.ts'
+ export type { ConfigurableProviderView, LlmApi } from './llm.ts'
+ export type { ApprovalResponsePayload } from './approvals.ts'
+ export type { QuestionResponsePayload } from './questions.ts'
+diff --git a/packages/host/apiproxy/src/api/plugins.schema.ts b/packages/host/apiproxy/src/api/plugins.schema.ts
+new file mode 100644
+index 00000000..6ca14a7f
+--- /dev/null
++++ b/packages/host/apiproxy/src/api/plugins.schema.ts
+@@ -0,0 +1,36 @@
++/**
++ * plugins domain zod schemas (names derived from map keys: pluginListRequestSchema /
++ * pluginListValueSchema / pluginInstall* / pluginEnable* / pluginDisable* / pluginUninstall*).
++ */
++
++import { z } from 'zod'
++import type { RequestPayload, ResponseValue } from './rpc-map.ts'
++import type { Wire } from './rpc.schema.ts'
++import type { PluginEntryView } from './plugins.ts'
++
++/** One plugin browse row. */
++export const pluginEntryViewSchema = z.object({
++  id: z.string().min(1),
++  version: z.string().min(1),
++  description: z.string(),
++  installed: z.boolean(),
++  enabled: z.boolean(),
++}) satisfies z.ZodType<Wire<PluginEntryView>>
++
++/** plugin.list request payload. */
++export const pluginListRequestSchema = z.object({}) satisfies z.ZodType<Wire<RequestPayload<'plugin.list'>>>
++
++/** plugin.list response value. */
++export const pluginListValueSchema = z.object({
++  plugins: z.array(pluginEntryViewSchema),
++}) satisfies z.ZodType<Wire<ResponseValue<'plugin.list'>>>
++
++/** The id-addressed request payload shared by install/enable/disable/uninstall. */
++export const pluginIdRequestSchema = z.object({
++  id: z.string().min(1),
++}) satisfies z.ZodType<Wire<RequestPayload<'plugin.install'>>>
++
++/** The id echo shared by install/enable/disable/uninstall response values. */
++export const pluginIdValueSchema = z.object({
++  id: z.string().min(1),
++}) satisfies z.ZodType<Wire<ResponseValue<'plugin.install'>>>
+diff --git a/packages/host/apiproxy/src/api/plugins.ts b/packages/host/apiproxy/src/api/plugins.ts
+new file mode 100644
+index 00000000..32f4e406
+--- /dev/null
++++ b/packages/host/apiproxy/src/api/plugins.ts
+@@ -0,0 +1,43 @@
++/**
++ * plugins domain contract: the web face of the local plugin registry
++ * (`ctx.plugins`, provided by `@deepseek-ai/dsh-plugin`). Rows merge the local
++ * catalog (the browse list) with installed state; install/enable/disable/
++ * uninstall operate on the registry, and enable/disable keep the live mount
++ * set in sync — a toggled plugin mounts or unmounts immediately.
++ */
++
++import type { RpcRequest, RpcResponse } from './rpc.ts'
++
++/** One plugin browse row (wire projection of the registry's PluginEntryView). */
++export interface PluginEntryView {
++  /** Publisher-scoped plugin id. */
++  readonly id: string
++  /** Installed version when installed, else the catalog-advertised version. */
++  readonly version: string
++  /** One-line summary. */
++  readonly description: string
++  /** Whether the plugin is installed in the registry. */
++  readonly installed: boolean
++  /** Whether the installed plugin is mounted (and will mount on the next load). */
++  readonly enabled: boolean
++}
++
++/** One plugin id addressed by every mutating method. */
++export interface PluginIdPayload {
++  /** The plugin id. */
++  readonly id: string
++}
++
++/** Plugin-domain unary methods (the map keys plugin.* of RpcMethodMap). */
++export interface PluginsApi {
++  /** List every browse row: catalog entries merged with installed state, sorted by id. */
++  list(request: RpcRequest<{}>): Promise<RpcResponse<{ plugins: readonly PluginEntryView[] }>>
++  /** Install a catalog entry (disabled by default; not mounted). */
++  install(request: RpcRequest<PluginIdPayload>): Promise<RpcResponse<{ id: string }>>
++  /** Enable an installed plugin and mount it immediately. */
++  enable(request: RpcRequest<PluginIdPayload>): Promise<RpcResponse<{ id: string }>>
++  /** Unmount and disable an installed plugin. */
++  disable(request: RpcRequest<PluginIdPayload>): Promise<RpcResponse<{ id: string }>>
++  /** Unmount and remove an installed plugin from the registry. */
++  uninstall(request: RpcRequest<PluginIdPayload>): Promise<RpcResponse<{ id: string }>>
++}
+diff --git a/packages/host/apiproxy/src/api/rpc-map.ts b/packages/host/apiproxy/src/api/rpc-map.ts
+index efcbb87d..60616046 100644
+--- a/packages/host/apiproxy/src/api/rpc-map.ts
++++ b/packages/host/apiproxy/src/api/rpc-map.ts
+@@ -12,6 +12,7 @@ import type { SkillsApi } from './skills.ts'
+ import type { GoalsApi } from './goals.ts'
+ import type { SettingsApi } from './settings.ts'
+ import type { CredentialsApi } from './credentials.ts'
++import type { PluginsApi } from './plugins.ts'
+ import type { LlmApi } from './llm.ts'
+ import type { SubagentsApi } from './subagents.ts'
+ import type { RpcResponse } from './rpc.ts'
+@@ -65,6 +66,11 @@ export interface RpcMethodMap {
+   'credentials.unset': CredentialsApi['unset']
+   'llm.providers': LlmApi['providers']
+   'llm.models': LlmApi['models']
++  'plugin.list': PluginsApi['list']
++  'plugin.install': PluginsApi['install']
++  'plugin.enable': PluginsApi['enable']
++  'plugin.disable': PluginsApi['disable']
++  'plugin.uninstall': PluginsApi['uninstall']
+ }
+ 
+ /** Business request payload of method K (reaches through the RpcRequest narrow form to payload). */
+diff --git a/packages/host/apiproxy/src/fetch/client.ts b/packages/host/apiproxy/src/fetch/client.ts
+index 758fe638..c48bf224 100644
+--- a/packages/host/apiproxy/src/fetch/client.ts
++++ b/packages/host/apiproxy/src/fetch/client.ts
+@@ -60,6 +60,7 @@ import {
+   subagentListValueSchema,
+   subagentPromptValueSchema,
+ } from '../api/subagents.schema.ts'
++import { pluginIdValueSchema, pluginListValueSchema } from '../api/plugins.schema.ts'
+ 
+ /**
+  * Client consumption face of the contract (shape a): same domain tree as ApiProxy, but unary
+@@ -145,6 +146,13 @@ export interface IApiClient {
+     providers(payload: RequestPayload<'llm.providers'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'llm.providers'>>>
+     models(payload: RequestPayload<'llm.models'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'llm.models'>>>
+   }
++  plugins: {
++    list(payload: RequestPayload<'plugin.list'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'plugin.list'>>>
++    install(payload: RequestPayload<'plugin.install'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'plugin.install'>>>
++    enable(payload: RequestPayload<'plugin.enable'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'plugin.enable'>>>
++    disable(payload: RequestPayload<'plugin.disable'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'plugin.disable'>>>
++    uninstall(payload: RequestPayload<'plugin.uninstall'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'plugin.uninstall'>>>
++  }
+   /** client-response passthrough (rpcId is a backfill of the server-request's id — never minted here). */
+   respond(message: ClientResponse, signal?: AbortSignal): Promise<RpcReceipt>
+ }
+@@ -197,6 +205,11 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
+   'credentials.unset': credentialsUnsetValueSchema,
+   'llm.providers': llmProvidersValueSchema,
+   'llm.models': llmModelsValueSchema,
++  'plugin.list': pluginListValueSchema,
++  'plugin.install': pluginIdValueSchema,
++  'plugin.enable': pluginIdValueSchema,
++  'plugin.disable': pluginIdValueSchema,
++  'plugin.uninstall': pluginIdValueSchema,
+ }
+ 
+ /** Default timeout for bounded unary calls (rpc-compare 2026-07-19: a hung host must not leave callers pending forever). */
+@@ -465,6 +478,14 @@ export abstract class AbstractApiClient implements IApiClient {
+     models: (payload, signal) => this.callUnary('llm.models', payload, signal),
+   }
+ 
++  readonly plugins: IApiClient['plugins'] = {
++    list: (payload, signal) => this.callUnary('plugin.list', payload, signal),
++    install: (payload, signal) => this.callUnary('plugin.install', payload, signal),
++    enable: (payload, signal) => this.callUnary('plugin.enable', payload, signal),
++    disable: (payload, signal) => this.callUnary('plugin.disable', payload, signal),
++    uninstall: (payload, signal) => this.callUnary('plugin.uninstall', payload, signal),
++  }
++
+   readonly events: IApiClient['events'] = {
+     mux: (payload, signal, onOpen) => this.openMux(payload, signal, onOpen),
+     host: (payload, signal, onOpen) => this.openHost(payload, signal, onOpen),
+diff --git a/packages/host/apiproxy/src/fetch/handler.ts b/packages/host/apiproxy/src/fetch/handler.ts
+index 0c0485f5..c467af7d 100644
+--- a/packages/host/apiproxy/src/fetch/handler.ts
++++ b/packages/host/apiproxy/src/fetch/handler.ts
+@@ -62,6 +62,9 @@ import {
+   subagentListRequestSchema,
+   subagentPromptRequestSchema,
+ } from '../api/subagents.schema.ts'
++import {
++  pluginIdRequestSchema, pluginListRequestSchema,
++} from '../api/plugins.schema.ts'
+ 
+ /**
+  * Unary dispatch table, keyed by (and compiler-locked to) RpcMethodMap: a map row without a
+@@ -124,6 +127,11 @@ const UNARY_ROUTES: UnaryRoutes = {
+   'credentials.unset': { schema: credentialsUnsetRequestSchema, invoke: (api, r) => api.credentials.unset(r) },
+   'llm.providers': { schema: llmProvidersRequestSchema, invoke: (api, r) => api.llm.providers(r) },
+   'llm.models': { schema: llmModelsRequestSchema, invoke: (api, r) => api.llm.models(r) },
++  'plugin.list': { schema: pluginListRequestSchema, invoke: (api, r) => api.plugins.list(r) },
++  'plugin.install': { schema: pluginIdRequestSchema, invoke: (api, r) => api.plugins.install(r) },
++  'plugin.enable': { schema: pluginIdRequestSchema, invoke: (api, r) => api.plugins.enable(r) },
++  'plugin.disable': { schema: pluginIdRequestSchema, invoke: (api, r) => api.plugins.disable(r) },
++  'plugin.uninstall': { schema: pluginIdRequestSchema, invoke: (api, r) => api.plugins.uninstall(r) },
+ }
+ 
+ /** Route lookup that narrows an arbitrary path segment to a map key (single cast point for the string→key refinement). */
+diff --git a/packages/host/apiproxy/src/index.ts b/packages/host/apiproxy/src/index.ts
+index 21330079..92a4f366 100644
+--- a/packages/host/apiproxy/src/index.ts
++++ b/packages/host/apiproxy/src/index.ts
+@@ -66,6 +66,7 @@ export class ApiProxyService extends Service implements ApiProxy {
+   readonly settings: ApiProxy['settings']
+   readonly credentials: ApiProxy['credentials']
+   readonly llm: ApiProxy['llm']
++  readonly plugins: ApiProxy['plugins']
+   readonly events: ApiProxy['events']
+   readonly respond: ApiProxy['respond']
+ 
+@@ -88,6 +89,7 @@ export class ApiProxyService extends Service implements ApiProxy {
+     this.settings = api.settings
+     this.credentials = api.credentials
+     this.llm = api.llm
++    this.plugins = api.plugins
+     this.events = api.events
+     // createApiProxy returns closures (no `this` capture); bind only satisfies
+     // the unbound-method lint without changing behavior.
+diff --git a/packages/host/apiproxy/tests/api-proxy-plugins.spec.ts b/packages/host/apiproxy/tests/api-proxy-plugins.spec.ts
+new file mode 100644
+index 00000000..8ad8836b
+--- /dev/null
++++ b/packages/host/apiproxy/tests/api-proxy-plugins.spec.ts
+@@ -0,0 +1,150 @@
++/**
++ * plugins-domain handler tests: browse list, install, enable (with live
++ * mount), disable (with live unmount), and uninstall against a real
++ * `ctx.plugins` service on a temp harness home.
++ */
++
++import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
++import { tmpdir } from 'node:os'
++import { join } from 'node:path'
++import { afterEach, beforeEach, describe, expect, it } from 'vitest'
++import { Context } from 'cordis'
++import AgentRegistry from '@deepseek-ai/dsh-agent'
++import SessionStore from '@deepseek-ai/dsh-session'
++import UserInteractionService from '@deepseek-ai/dsh-user-interaction'
++import { createApiProxy } from '../src/api-proxy.ts'
++import { RpcId, type RpcRequest, type RpcResponse } from '../src/api/rpc.ts'
++import { MANIFEST_FILE_NAME, PluginLocalService } from '@deepseek-ai/dsh-plugin'
++
++declare module 'cordis' {
++  interface Events {
++    'plugin/api-test'(value: string): void
++  }
++}
++
++let nextRpc = 1
++
++function request<P>(payload: P): RpcRequest<P> {
++  return { rpcId: RpcId(`req-${String(nextRpc++)}`), payload }
++}
++
++function expectOk<T>(response: RpcResponse<T>): T {
++  expect(response.result.ok).toBe(true)
++  if (!response.result.ok) throw new Error('unreachable')
++  return response.result.value
++}
++
++function expectErr(response: RpcResponse<unknown>): string {
++  expect(response.result.ok).toBe(false)
++  if (response.result.ok) throw new Error('unreachable')
++  return response.result.error.message
++}
++
++const ENTRY = `
++export default {
++  name: 'api-entry',
++  apply(ctx) {
++    ctx.on('plugin/api-test', (value) => { globalThis.__dshPluginApiTest = value })
++  },
++}
++`
++
++let tempDir: string
++let dshHome: string
++let ctx: Context
++let api: ReturnType<typeof createApiProxy>
++let dispose: () => Promise<void>
++let sequence = 0
++
++async function writeSource(root: string, id: string): Promise<void> {
++  await mkdir(root, { recursive: true })
++  await writeFile(join(root, MANIFEST_FILE_NAME), JSON.stringify({ id, version: '0.1.0', main: './index.mjs' }))
++  await writeFile(join(root, 'index.mjs'), ENTRY)
++}
++
++beforeEach(async () => {
++  tempDir = await mkdtemp(join(tmpdir(), 'dsh-apiproxy-plugin-'))
++  dshHome = join(tempDir, 'home')
++  await mkdir(dshHome, { recursive: true })
++  sequence += 1
++
++  ctx = new Context()
++  await ctx.plugin(SessionStore)
++  await ctx.plugin(UserInteractionService)
++  await ctx.plugin(AgentRegistry)
++  const service = new PluginLocalService(ctx, dshHome, '0.2.0')
++  api = createApiProxy(ctx, { provider: 'p', model: 'm', cwd: '/tmp', workspaceRoot: '/tmp' })
++  dispose = () => service.dispose()
++})
++
++afterEach(async () => {
++  delete (globalThis as Record<string, unknown>).__dshPluginApiTest
++  await dispose()
++  await rm(tempDir, { recursive: true, force: true })
++})
++
++async function writeCatalog(entries: Array<{ id: string; description?: string; version?: string; source: string }>): Promise<void> {
++  await writeFile(join(dshHome, 'plugins-catalog.json'), JSON.stringify(entries))
++}
++
++describe('plugins.list', () => {
++  it('lists catalog rows with install and enable state', async () => {
++    const id = `acme/listed-${sequence}`
++    const source = join(tempDir, 'src-listed')
++    await writeSource(source, id)
++    await writeCatalog([{ id, description: 'listed', version: '0.1.0', source }])
++
++    const value = expectOk(await api.plugins.list(request({})))
++    expect(value.plugins).toEqual([
++      { id, version: '0.1.0', description: 'listed', installed: false, enabled: false },
++    ])
++  })
++
++  it('reports a missing registry service as a composition gap', async () => {
++    const bareCtx = new Context()
++    await bareCtx.plugin(SessionStore)
++    await bareCtx.plugin(UserInteractionService)
++    await bareCtx.plugin(AgentRegistry)
++    const bare = createApiProxy(bareCtx, { provider: 'p', model: 'm', cwd: '/tmp', workspaceRoot: '/tmp' })
++    const message = expectErr(await bare.plugins.list(request({})))
++    expect(message).toContain('does not mount @deepseek-ai/dsh-plugin')
++  })
++})
++
++describe('plugins install/enable/disable/uninstall', () => {
++  it('installs disabled, then enables with a live mount', async () => {
++    const id = `acme/live-${sequence}`
++    const source = join(tempDir, 'src-live')
++    await writeSource(source, id)
++    await writeCatalog([{ id, version: '0.1.0', source }])
++
++    expect(expectOk(await api.plugins.install(request({ id })))).toEqual({ id })
++    const listed = expectOk(await api.plugins.list(request({})))
++    expect(listed.plugins[0]).toMatchObject({ id, installed: true, enabled: false })
++
++    expect(expectOk(await api.plugins.enable(request({ id })))).toEqual({ id })
++    ctx.emit('plugin/api-test', 'mounted-live')
++    expect((globalThis as Record<string, unknown>).__dshPluginApiTest).toBe('mounted-live')
++
++    expect(expectOk(await api.plugins.disable(request({ id })))).toEqual({ id })
++    delete (globalThis as Record<string, unknown>).__dshPluginApiTest
++    ctx.emit('plugin/api-test', 'unmounted')
++    expect((globalThis as Record<string, unknown>).__dshPluginApiTest).toBeUndefined()
++
++    expect(expectOk(await api.plugins.uninstall(request({ id })))).toEqual({ id })
++    const after = expectOk(await api.plugins.list(request({})))
++    expect(after.plugins).toEqual([
++      { id, version: '0.1.0', description: '', installed: false, enabled: false },
++    ])
++  })
++
++  it('fails loud when enabling an unknown plugin', async () => {
++    const message = expectErr(await api.plugins.enable(request({ id: 'acme/ghost' })))
++    expect(message).toContain('not installed')
++  })
++
++  it('fails loud when installing an id absent from the catalog', async () => {
++    const message = expectErr(await api.plugins.install(request({ id: 'acme/ghost' })))
++    expect(message).toContain('not in the catalog')
++  })
++})
+diff --git a/packages/host/apiproxy/tests/client-handler.spec.ts b/packages/host/apiproxy/tests/client-handler.spec.ts
+index 4d8eaf4c..f52dc62b 100644
+--- a/packages/host/apiproxy/tests/client-handler.spec.ts
++++ b/packages/host/apiproxy/tests/client-handler.spec.ts
+@@ -28,6 +28,7 @@ function scriptedApi(overrides: {
+   settings?: Partial<ApiProxy['settings']>
+   credentials?: Partial<ApiProxy['credentials']>
+   llm?: Partial<ApiProxy['llm']>
++  plugins?: Partial<ApiProxy['plugins']>
+   respond?: ApiProxy['respond']
+ } = {}): ApiProxy {
+   async function *empty<F>(): AsyncGenerator<RpcRequest<F>> { /* no frames */ }
+@@ -113,6 +114,14 @@ function scriptedApi(overrides: {
+       models: r => ok(r, { groups: [], failures: [] }),
+       ...overrides.llm,
+     },
++    plugins: {
++      list: r => ok(r, { plugins: [] }),
++      install: err,
++      enable: err,
++      disable: err,
++      uninstall: err,
++      ...overrides.plugins,
++    },
+     events: { mux: () => empty<MuxFrame>(), host: () => empty<HostFrame>(), ...overrides.events },
+     respond: overrides.respond ?? (() => Promise.resolve({ accepted: false as const, reason: 'not-pending' as const })),
+   }
+diff --git a/packages/host/apiproxy/tests/fetch-carrier.spec.ts b/packages/host/apiproxy/tests/fetch-carrier.spec.ts
+index 2ca2f946..ee5773bd 100644
+--- a/packages/host/apiproxy/tests/fetch-carrier.spec.ts
++++ b/packages/host/apiproxy/tests/fetch-carrier.spec.ts
+@@ -251,6 +251,23 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
+         return { rpcId: request.rpcId, result: { ok: true, value: { groups: [], failures: [] } } }
+       },
+     },
++    plugins: {
++      async list(request) {
++        return { rpcId: request.rpcId, result: { ok: true, value: { plugins: [] } } }
++      },
++      async install(request) {
++        return { rpcId: request.rpcId, result: { ok: true, value: { id: request.payload.id } } }
++      },
++      async enable(request) {
++        return { rpcId: request.rpcId, result: { ok: true, value: { id: request.payload.id } } }
++      },
++      async disable(request) {
++        return { rpcId: request.rpcId, result: { ok: true, value: { id: request.payload.id } } }
++      },
++      async uninstall(request) {
++        return { rpcId: request.rpcId, result: { ok: true, value: { id: request.payload.id } } }
++      },
++    },
+     events: {
+       mux: (_request, signal) => stream(muxFrames, signal),
+       host: (_request, signal) => stream(hostFrames, signal),
+diff --git a/packages/host/apiproxy/tsconfig.json b/packages/host/apiproxy/tsconfig.json
+index c648d7a3..8784f0bf 100644
+--- a/packages/host/apiproxy/tsconfig.json
++++ b/packages/host/apiproxy/tsconfig.json
+@@ -62,6 +62,9 @@
+     {
+       "path": "../../skill/skill"
+     },
++    {
++      "path": "../../plugin/plugin"
++    },
+     {
+       "path": "../../ui/commands"
+     },
+diff --git a/scripts/verify-package-readme-model-experience.ts b/scripts/verify-package-readme-model-experience.ts
+index 20449b45..8a792f15 100644
+--- a/scripts/verify-package-readme-model-experience.ts
++++ b/scripts/verify-package-readme-model-experience.ts
+@@ -71,6 +71,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
+   'packages/client/ui-theme': { kind: 'none', reason: 'Browser-side UI plugin layer; registers no model surface.' },
+   'packages/client/ui-settings': { kind: 'none', reason: 'Browser-side UI plugin layer; registers no model surface.' },
+   'packages/client/ui-settings-general': { kind: 'none', reason: 'Browser-side UI plugin layer; registers no model surface.' },
++  'packages/client/ui-plugin-manager': { kind: 'none', reason: 'The browser-only panel manages the local plugin registry through the host plugins API and registers no model surface.' },
+   'packages/client/ui-models': { kind: 'none', reason: 'Browser-side UI plugin layer; registers no model surface.' },
+   'packages/client/locale': { kind: 'none', reason: 'Browser-side UI plugin layer; registers no model surface.' },
+   'packages/client/web': { kind: 'none', reason: 'Browser-side UI plugin layer; registers no model surface.' },
+@@ -110,6 +111,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
+   'packages/telemetry/session-telemetry-otel': { kind: 'none', reason: 'The backend forwards seam records into the OTel SDK pipeline and registers no model surface.' },
+   'packages/skill/skill': { kind: 'indirect', reason: 'The provider registry delegates model rendering to dsh-tool-skill.' },
+   'packages/skill/skill-local': { kind: 'indirect', reason: 'The provider backend delegates model rendering to dsh-tool-skill.' },
++  'packages/plugin/plugin': { kind: 'indirect', reason: 'The registry mounts enabled plugins whose tools join the request surface.' },
+   'packages/spill/spill': { kind: 'indirect', reason: 'The storage seam delegates model rendering to spill consumers.' },
+   'packages/spill/spill-local': { kind: 'indirect', reason: 'The storage backend delegates model rendering to spill consumers.' },
+   'packages/subagent/subagent': { kind: 'indirect', reason: 'The provider registry delegates parent-model rendering to dsh-tool-subagent.' },
+diff --git a/tsconfig.base.json b/tsconfig.base.json
+index 2e80649a..8fe76101 100644
+--- a/tsconfig.base.json
++++ b/tsconfig.base.json
+@@ -109,6 +109,7 @@
+         "./packages/examples/*/src/invariant.ts",
+         "./packages/util/*/src/invariant.ts",
+         "./packages/mcp/*/src/invariant.ts",
++        "./packages/plugin/*/src/invariant.ts",
+         "./packages/support/*/src/invariant.ts"
+       ],
+       // host/client package names prefix the group dir (dsh-client-<dir>), so
+@@ -154,6 +155,7 @@
+       "@deepseek-ai/dsh-client-ui-model": ["./packages/client/ui-model/src"],
+       "@deepseek-ai/dsh-client-ui-goal": ["./packages/client/ui-goal/src"],
+       "@deepseek-ai/dsh-client-ui-permission": ["./packages/client/ui-permission/src"],
++      "@deepseek-ai/dsh-client-ui-plugin-manager": ["./packages/client/ui-plugin-manager/src"],
+       "@deepseek-ai/dsh-client-ui-skill": ["./packages/client/ui-skill/src"],
+       "@deepseek-ai/dsh-client-ui-subagent": ["./packages/client/ui-subagent/src"],
+       "@deepseek-ai/dsh-client-ui-plan": ["./packages/client/ui-plan/src"],
+@@ -207,6 +209,7 @@
+         "./packages/examples/*/src",
+         "./packages/util/*/src",
+         "./packages/mcp/*/src",
++        "./packages/plugin/*/src",
+         "./packages/support/*/src",
+         "./packages/host/*/src",
+         "./packages/client/*/src"
+diff --git a/tsconfig.client.json b/tsconfig.client.json
+index e1d40880..3269aae9 100644
+--- a/tsconfig.client.json
++++ b/tsconfig.client.json
+@@ -65,6 +65,7 @@
+     { "path": "./packages/client/ui-model" },
+     { "path": "./packages/client/ui-permission" },
+     { "path": "./packages/client/ui-plan" },
++    { "path": "./packages/client/ui-plugin-manager" },
+     { "path": "./packages/client/ui-question" },
+     { "path": "./packages/client/ui-trajectory" },
+     { "path": "./packages/client/ui-theme" },
+diff --git a/tsconfig.host.json b/tsconfig.host.json
+index 82abd3cf..daf709f5 100644
+--- a/tsconfig.host.json
++++ b/tsconfig.host.json
+@@ -226,6 +226,7 @@
+     { "path": "./packages/lsp/lsp" },
+     { "path": "./packages/lsp/lsp-local" },
+     { "path": "./packages/lsp/tool-lsp" },
++    { "path": "./packages/plugin/plugin" },
+     { "path": "./apps/cli" }
+   ]
+ }

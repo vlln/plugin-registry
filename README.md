@@ -34,14 +34,36 @@ Web 设置页「插件」面板：
 
 ## 集成到 DeepSeek Harness
 
-本项目的两个包设计为在 dsh monorepo（workspace）内编译，依赖 dsh 内部包（`dsh-tools`、`dsh-paths`、`dsh-invariants`、`dsh-host-apiproxy`、`dsh-client-*` 等）与 vendored Cordis。集成步骤：
+前置条件：**DSH 源码环境**（官方 0803 快照 `20260803T142347Z` 或兼容布局，pnpm workspace）。集成方式与社区其他扩展一致：**复制包 + git apply 补丁 + 组合启用**。
 
-1. 将 `packages/plugin/`、`packages/ui-plugin-manager/` 拷贝到 dsh 仓库对应位置（`packages/plugin/`、`packages/client/ui-plugin-manager/`）
-2. 注册 tsconfig 与依赖（`tsconfig.base.json` / `tsconfig.host.json` / `tsconfig.client.json` 的 paths 与 references、对应 `package.json` 依赖）
-3. 在组合配置（`base.cordis.yml`）挂载 `plugin-local`（`@deepseek-ai/dsh-plugin`），Web 组合挂载 `ui-plugin-manager`
-4. apiproxy `plugins` 域（`plugin.list/install/enable/disable/uninstall`）暴露 Web wire——host 侧接线参考项目内 `packages/plugin` 的 service 实现与 README
+### 1. 放插件
 
-两个包各自的 README（`packages/plugin/plugin/README.md`、`packages/ui-plugin-manager/README.md`，含中文版）描述了完整配置、CLI、服务 API 与已知边界。
+把 `packages/plugin/`、`packages/ui-plugin-manager/` 整个目录复制到你的 DSH monorepo 对应路径（`packages/plugin/`、`packages/client/ui-plugin-manager/`）。
+
+### 2. 打接线补丁
+
+```sh
+git apply patches/dsh-plugin-registry.patch   # 在 DSH monorepo 根目录执行
+```
+
+补丁基于官方 0803 快照生成，改动 31 个文件（CLI plugin 子命令、apiproxy `plugins` 域、tsconfig paths/references、base/web 组合挂载、测试 fake 与 README），验证过可干净应用。若你的基线更新导致锚点漂移，可 `git apply --3way` 或手动对齐。
+
+### 3. 启用插件
+
+```yaml
+# base.cordis.yml（或你的组合）
+- id: plugin-local
+  name: '@deepseek-ai/dsh-plugin'
+```
+
+Web 组合再挂载面板：
+
+```yaml
+- id: ui-plugin-manager
+  name: '@deepseek-ai/dsh-client-ui-plugin-manager'
+```
+
+`pnpm install` 后即可使用 `dsh plugin` 命令与 Web 设置页插件面板。
 
 ## 使用
 
@@ -61,4 +83,4 @@ dsh plugin uninstall acme/cool-tool
 
 ## 版权
 
-本仓库代码版权归作者所有，供 dsh 内测成员在 dsh-external 组织内使用与协作。未经作者许可请勿公开分发。
+本仓库代码版权归作者所有，供 dsh 内测成员在 dsh-external 组织内使用与协作；官方不保证公开发布后该组织仍然存在，请自行保留副本。未经作者许可请勿公开分发。
