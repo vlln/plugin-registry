@@ -172,4 +172,4 @@ dsh plugin uninstall acme/cool-tool
 
 ## 版权
 
-本仓库代码版权归作者所有，供 dsh 内测成员在 dsh-external 组织内使用与协作；官方不保证公开发布后该组织仍然存在，请自行保留副本。未经作者许可请勿公开分发。
+本仓库代码版权归作者所有，供 dsh 内测成员在 dsh-external 组织内使用与协作。未经作者许可请勿公开分发。
