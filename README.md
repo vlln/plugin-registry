@@ -25,6 +25,40 @@ Web 设置页「插件」面板：
 
 操作后状态：启用实时生效（徽章变绿胶囊）、禁用与卸载的反馈。
 
+## 与 pi-mono 插件的对比
+
+参考 [pi-mono](https://github.com/pi-mono) 的扩展机制做横向对比。
+
+pi 的插件是：
+
+- **Harness Extensions**（`harness-v2.md`）：events 观察 + hooks 拦截，可改 context / 请求 / 工具 / run 边界
+- `.pi/extensions/*.ts` 本地脚本：放文件即加载，无管理
+
+### 能力对比
+
+| 维度 | pi-mono 扩展 | plugin-registry |
+|---|---|---|
+| 形态 | `.pi/extensions/*.ts` 本地脚本 | 清单 + Cordis 插件入口 |
+| 接入 | harness events + hooks | inject 服务 + 注册工具/事件/服务/命令 |
+| 事件/钩子拦截 | ✅ events + hooks | ✅ `agent/*`、`tools/*` waterfall（等价） |
+| 工具/命令/提示词 | ✅ | ✅ `ctx.tools`/`commands`/`systemPrompt` |
+| **TUI 修改** | ✅ 开放组件树 | ⚠️ 受限覆盖层 |
+| 安装/发现 | 放文件即生效 | ✅ 安装/启停 + Web 面板 |
+| 校验/兼容 | 无 | ✅ contributes 校验 + engines |
+| 启停 | 无 | ✅ 默认禁用 + 实时热挂载 |
+| 信任 | 直接执行 | ✅ 显式信任边界 |
+
+TUI 差异补充：
+
+- pi 开放 **pi-tui 组件树**（`ctx.ui.custom` 拿 tui 实例、注入组件、`ui.notify`）
+- dsh 是**受限覆盖层**（`ctx.tui.openOverlay()` 只给 viewport/主题/重绘/关闭，不给底层树）——命令与事件驱动 UI 平齐，改主 UI 布局不如 pi 开放（安全取舍）
+
+### 结论
+
+- **能力面**：事件/钩子/工具/命令覆盖 pi，且补上 pi 没有的**安装-启停-校验-分发管理**
+- **TUI 表面**：pi 开放组件树，dsh 受限覆盖层——命令与事件驱动平齐，改主 UI 不如 pi 开放
+- **本质不同**：pi 是"代码扩展点"（零协议、放文件即用）；plugin-registry 是"带生命周期的分发生态"（清单 + 管理，换安全可控）
+
 ## 与 cordis.yml 插件的关系
 
 本仓库在 dsh 的 cordis.yml 官方插件树之上**提供第二层插件**。
@@ -135,44 +169,6 @@ dsh plugin list                    # 列表
 dsh plugin disable acme/cool-tool
 dsh plugin uninstall acme/cool-tool
 ```
-
-## 验证
-
-单元测试 75+ 项、覆盖率 100%（语句/分支/函数/行）；端到端（创建 → 安装 → 启用 → 卸载）跑通；typecheck / lint / 文档与配置门禁全绿。
-
-## 与 pi-mono 插件的对比
-
-参考 [pi-mono](https://github.com/pi-mono) 的扩展机制做横向对比。
-
-pi 的插件是：
-
-- **Harness Extensions**（`harness-v2.md`）：events 观察 + hooks 拦截，可改 context / 请求 / 工具 / run 边界
-- `.pi/extensions/*.ts` 本地脚本：放文件即加载，无管理
-
-### 能力对比
-
-| 维度 | pi-mono 扩展 | plugin-registry |
-|---|---|---|
-| 形态 | `.pi/extensions/*.ts` 本地脚本 | 清单 + Cordis 插件入口 |
-| 接入 | harness events + hooks | inject 服务 + 注册工具/事件/服务/命令 |
-| 事件/钩子拦截 | ✅ events + hooks | ✅ `agent/*`、`tools/*` waterfall（等价） |
-| 工具/命令/提示词 | ✅ | ✅ `ctx.tools`/`commands`/`systemPrompt` |
-| **TUI 修改** | ✅ 开放组件树 | ⚠️ 受限覆盖层 |
-| 安装/发现 | 放文件即生效 | ✅ 安装/启停 + Web 面板 |
-| 校验/兼容 | 无 | ✅ contributes 校验 + engines |
-| 启停 | 无 | ✅ 默认禁用 + 实时热挂载 |
-| 信任 | 直接执行 | ✅ 显式信任边界 |
-
-TUI 差异补充：
-
-- pi 开放 **pi-tui 组件树**（`ctx.ui.custom` 拿 tui 实例、注入组件、`ui.notify`）
-- dsh 是**受限覆盖层**（`ctx.tui.openOverlay()` 只给 viewport/主题/重绘/关闭，不给底层树）——命令与事件驱动 UI 平齐，改主 UI 布局不如 pi 开放（安全取舍）
-
-### 结论
-
-- **能力面**：事件/钩子/工具/命令覆盖 pi，且补上 pi 没有的**安装-启停-校验-分发管理**
-- **TUI 表面**：pi 开放组件树，dsh 受限覆盖层——命令与事件驱动平齐，改主 UI 不如 pi 开放
-- **本质不同**：pi 是"代码扩展点"（零协议、放文件即用）；plugin-registry 是"带生命周期的分发生态"（清单 + 管理，换安全可控）
 
 ## 版权
 
