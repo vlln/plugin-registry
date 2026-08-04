@@ -2,10 +2,6 @@
 
 DeepSeek Harness 的本地插件系统：清单协议、安装/启停、Web 管理面板、声明校验、脚手架与 tarball 分发。
 
-> 本仓库为**独立插件项目**，版权归作者所有。
-> 仅包含本项目原创代码，不包含 DeepSeek Harness 官方仓库（dsh2026 org）的源码内容。
-> 设计对应官方 [issue #171](https://github.com/dsh-external/issues/issues/171)。
-
 ## 内容
 
 | 目录 | 说明 |
