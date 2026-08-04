@@ -1,8 +1,8 @@
 diff --git a/apps/cli/config/base.cordis.yml b/apps/cli/config/base.cordis.yml
-index b7860e2e..a4c9fae8 100644
+index 26f59fe4..e51f2f79 100644
 --- a/apps/cli/config/base.cordis.yml
 +++ b/apps/cli/config/base.cordis.yml
-@@ -374,6 +374,12 @@
+@@ -373,6 +373,12 @@
  - id: tools
    name: '@deepseek-ai/dsh-tools'
  
@@ -12,7 +12,7 @@ index b7860e2e..a4c9fae8 100644
 +- id: plugin-local
 +  name: '@deepseek-ai/dsh-plugin'
 +
- # The deployment persona is a surface choice; plan-mode and tool plugins own
+ # The deployment persona is a deployment choice; plan-mode and tool plugins own
  # their own prompt sections.
  - id: system-prompt
 diff --git a/apps/cli/config/web.cordis.yml b/apps/cli/config/web.cordis.yml
@@ -30,10 +30,10 @@ index daf59791..b517bc31 100644
        name: '@deepseek-ai/dsh-client-ui-models'
  
 diff --git a/apps/cli/package.json b/apps/cli/package.json
-index 8c482ac3..2932ea02 100644
+index 0ccf4b21..80422528 100644
 --- a/apps/cli/package.json
 +++ b/apps/cli/package.json
-@@ -38,6 +38,7 @@
+@@ -37,6 +37,7 @@
      "@deepseek-ai/dsh-client-ui-permission": "workspace:^",
      "@deepseek-ai/dsh-client-ui-plan": "workspace:^",
      "@deepseek-ai/dsh-client-ui-question": "workspace:^",
@@ -41,7 +41,7 @@ index 8c482ac3..2932ea02 100644
      "@deepseek-ai/dsh-client-ui-settings": "workspace:^",
      "@deepseek-ai/dsh-client-ui-settings-general": "workspace:^",
      "@deepseek-ai/dsh-client-ui-sidebar": "workspace:^",
-@@ -74,6 +75,7 @@
+@@ -72,6 +73,7 @@
      "@deepseek-ai/dsh-paths": "workspace:^",
      "@deepseek-ai/dsh-permission": "workspace:^",
      "@deepseek-ai/dsh-plan-mode": "workspace:^",
@@ -50,10 +50,10 @@ index 8c482ac3..2932ea02 100644
      "@deepseek-ai/dsh-pty": "workspace:^",
      "@deepseek-ai/dsh-pty-local": "workspace:^",
 diff --git a/apps/cli/src/args.ts b/apps/cli/src/args.ts
-index 19bc58cc..0925c858 100644
+index 18b31fc3..e8e7e92f 100644
 --- a/apps/cli/src/args.ts
 +++ b/apps/cli/src/args.ts
-@@ -86,6 +86,17 @@ interface WebInvocation {
+@@ -46,8 +46,19 @@ interface WebInvocation {
    trustedHosts?: string[]
  }
  
@@ -68,25 +68,20 @@ index 19bc58cc..0925c858 100644
 +  id?: string
 +}
 +
- /** The resolved `dsh` invocation: exactly one mode. `--help`/`--version`/errors exit inside {@link parseDshArgs}. */
- export type DshInvocation =
-   | TuiInvocation
-@@ -94,6 +105,7 @@ export type DshInvocation =
-   | MetaInvocation
-   | SkillSessionInvocation
-   | WebInvocation
-+  | PluginInvocation
+ /** The resolved `dsh` invocation. Help, version, and errors exit inside {@link parseDshArgs}. */
+-export type DshInvocation = ConfigInvocation | DumpConfigInvocation | HeadlessInvocation | WebInvocation
++export type DshInvocation = ConfigInvocation | DumpConfigInvocation | HeadlessInvocation | WebInvocation | PluginInvocation
  
  /** Raw web-subcommand options straight from Commander. */
  interface WebOptions {
-@@ -300,6 +312,50 @@ Examples:
+@@ -184,6 +195,50 @@ Examples:
        resolved = resolveWeb(options)
      })
  
 +  const plugin = program.command('plugin').description('manage locally installed plugins')
 +  plugin
 +    .command('install <path>')
-+    .description('install a plugin from a local directory (disabled by default)')
++    .description('install a plugin from a local directory or tarball (disabled by default)')
 +    .action((path: string) => {
 +      rejectParentOptions('plugin install')
 +      resolved = { mode: 'plugin', action: 'install', path }
@@ -107,14 +102,14 @@ index 19bc58cc..0925c858 100644
 +    })
 +  plugin
 +    .command('enable <id>')
-+    .description('enable an installed plugin so the next load mounts it')
++    .description('enable an installed plugin so the runtime mounts it immediately')
 +    .action((id: string) => {
 +      rejectParentOptions('plugin enable')
 +      resolved = { mode: 'plugin', action: 'enable', id }
 +    })
 +  plugin
 +    .command('disable <id>')
-+    .description('disable an installed plugin so the next load skips it')
++    .description('disable an installed plugin so the runtime unmounts it immediately')
 +    .action((id: string) => {
 +      rejectParentOptions('plugin disable')
 +      resolved = { mode: 'plugin', action: 'disable', id }
@@ -127,15 +122,15 @@ index 19bc58cc..0925c858 100644
 +      resolved = { mode: 'plugin', action: 'uninstall', id }
 +    })
 +
-   program
-     .command('meta')
-     .description('work on the dsh source that runs this command, from any directory (experimental)')
+   try {
+     program.parse(argv, { from: 'user' })
+   } catch (error) {
 diff --git a/apps/cli/src/bin.ts b/apps/cli/src/bin.ts
-index 58045f48..ed52d8d1 100644
+index 0ee87162..e42ae5a6 100644
 --- a/apps/cli/src/bin.ts
 +++ b/apps/cli/src/bin.ts
-@@ -59,6 +59,11 @@ switch (invocation.mode) {
-     await runTui(undefined, undefined, undefined, `dsh-${invocation.mode}`)
+@@ -48,6 +48,11 @@ switch (invocation.mode) {
+     runDumpConfig(invocation.surface, invocation.defaultOnly, invocation.config)
      break
    }
 +  case 'plugin': {
@@ -243,13 +238,16 @@ index 00000000..57dfce62
 +  }
 +}
 diff --git a/apps/cli/tests/args.spec.ts b/apps/cli/tests/args.spec.ts
-index 5b0e7632..b0ab8c19 100644
+index 3acbdf0b..ef6122af 100644
 --- a/apps/cli/tests/args.spec.ts
 +++ b/apps/cli/tests/args.spec.ts
-@@ -43,6 +43,13 @@ describe('parseDshArgs', () => {
-     // Guided fresh-session entries carry nothing: bare mode discriminant only.
-     expect(parse(['upgrade', '--experimental'])).toEqual({ mode: 'upgrade' })
-     expect(parse(['upgrade'], true)).toEqual({ mode: 'upgrade' })
+@@ -28,6 +28,17 @@ describe('parseDshArgs', () => {
+     expect(parse(['web', '--config', 'web.yml'])).toEqual({ mode: 'web', dev: false, config: 'web.yml' })
+     expect(parse(['web', '--host', '0.0.0.0', '--port', '8080', '--dev', '--workspace-root', '/w']))
+       .toEqual({ mode: 'web', host: '0.0.0.0', port: 8080, dev: true, workspaceRoot: '/w' })
++    // Guided fresh-session entries carry nothing: bare mode discriminant only.
++    expect(parse(['upgrade', '--experimental'])).toEqual({ mode: 'upgrade' })
++    expect(parse(['upgrade'], true)).toEqual({ mode: 'upgrade' })
 +    // Plugin registry subcommands carry their action and one argument.
 +    expect(parse(['plugin', 'install', '/tmp/demo'])).toEqual({ mode: 'plugin', action: 'install', path: '/tmp/demo' })
 +    expect(parse(['plugin', 'create', 'acme/tool'])).toEqual({ mode: 'plugin', action: 'create', id: 'acme/tool' })
@@ -257,27 +255,34 @@ index 5b0e7632..b0ab8c19 100644
 +    expect(parse(['plugin', 'enable', 'acme/tool'])).toEqual({ mode: 'plugin', action: 'enable', id: 'acme/tool' })
 +    expect(parse(['plugin', 'disable', 'acme/tool'])).toEqual({ mode: 'plugin', action: 'disable', id: 'acme/tool' })
 +    expect(parse(['plugin', 'uninstall', 'acme/tool'])).toEqual({ mode: 'plugin', action: 'uninstall', id: 'acme/tool' })
-     // --trusted-host is variadic and repeatable; authorities pass through unvalidated.
++    // --trusted-host is variadic and repeatable; authorities pass through unvalidated.
      expect(parse(['web', '--trusted-host', 'harness.internal:3080', 'lab.internal', '--trusted-host', '10.0.0.9']))
        .toEqual({ mode: 'web', dev: false, trustedHosts: ['harness.internal:3080', 'lab.internal', '10.0.0.9'] })
-@@ -102,6 +109,12 @@ describe('parseDshArgs', () => {
-     expect(exitCode(['upgrade', '--experimental', '--resume', 's'])).toBe(1)
-     expect(exitCode(['upgrade', '--experimental', '--config', 'c.yml'])).toBe(1)
-     expect(exitCode(['-p', 'task', 'upgrade', '--experimental'])).toBe(1)
-+    // `plugin` needs its one argument and shares none of the default surface.
+   })
+@@ -45,6 +56,18 @@ describe('parseDshArgs', () => {
+       .toEqual({ mode: 'dump-config', surface: 'web', defaultOnly: true })
+   })
+ 
++  it('routes plugin registry subcommands', () => {
++    expect(parse(['plugin', 'install', '/tmp/demo'])).toEqual({ mode: 'plugin', action: 'install', path: '/tmp/demo' })
++    expect(parse(['plugin', 'create', 'acme/tool'])).toEqual({ mode: 'plugin', action: 'create', id: 'acme/tool' })
++    expect(parse(['plugin', 'list'])).toEqual({ mode: 'plugin', action: 'list' })
++    expect(parse(['plugin', 'enable', 'acme/tool'])).toEqual({ mode: 'plugin', action: 'enable', id: 'acme/tool' })
++    expect(parse(['plugin', 'disable', 'acme/tool'])).toEqual({ mode: 'plugin', action: 'disable', id: 'acme/tool' })
++    expect(parse(['plugin', 'uninstall', 'acme/tool'])).toEqual({ mode: 'plugin', action: 'uninstall', id: 'acme/tool' })
 +    expect(exitCode(['plugin', 'install'])).toBe(1)
 +    expect(exitCode(['plugin', 'create'])).toBe(1)
 +    expect(exitCode(['plugin', 'list', '-p', 'task'])).toBe(1)
-+    expect(exitCode(['plugin', 'enable'])).toBe(1)
-+    expect(exitCode(['plugin', '--config', 'c.yml', 'list'])).toBe(1)
-     // The pre-release command names have no compatibility aliases.
-     expect(exitCode(['experimental-meta'])).toBe(1)
-     expect(exitCode(['experimental-upgrade'])).toBe(1)
++  })
++
+   it('rejects missing config, removed commands, and contradictory inputs', () => {
+     expect(exitCode([])).toBe(1)
+     expect(exitCode(['tui'])).toBe(1)
 diff --git a/apps/cli/tsconfig.json b/apps/cli/tsconfig.json
-index 2f995abf..ec20d7ea 100644
+index b9b2eeea..f9791f22 100644
 --- a/apps/cli/tsconfig.json
 +++ b/apps/cli/tsconfig.json
-@@ -32,6 +32,9 @@
+@@ -29,6 +29,9 @@
      {
        "path": "../../packages/util/paths"
      },
@@ -287,20 +292,8 @@ index 2f995abf..ec20d7ea 100644
      {
        "path": "../../packages/session-query/session-query-sqlite"
      },
-diff --git a/packages/README.i18n.yaml b/packages/README.i18n.yaml
-index 5491ce54..07e91b5a 100644
---- a/packages/README.i18n.yaml
-+++ b/packages/README.i18n.yaml
-@@ -2,5 +2,5 @@
- # side as of the last confirmed-consistent state. Both languages carry equal authority;
- # after editing either side, bring the other along and re-record with:
- #   pnpm run verify-translation-pairing --write packages/README.md
--README.md: c8984bfa652a0ad7e12bc1f2001618df452bc863
--README.zh.md: 2a59a63d22cdb2e5c0de53cd1dcfce1296882c01
-+README.md: 491283f794b6cafdf19c9c8105989fc50c662938
-+README.zh.md: ec6dec1cadd2699cf9e2ab21af5b8f291b938793
 diff --git a/packages/README.md b/packages/README.md
-index c8984bfa..491283f7 100644
+index 4832fffb..f70cd372 100644
 --- a/packages/README.md
 +++ b/packages/README.md
 @@ -17,27 +17,28 @@ Packages live at `packages/<group>/<pkg>/`; groups are containers, while names r
@@ -338,7 +331,7 @@ index c8984bfa..491283f7 100644
  | [`settings/`](settings/README.md) | User-settings seam + file-backed provider | Product — stable surface |
  | [`credentials/`](credentials/README.md) | Credential-reference seam + env-over-`.env` provider | Product — stable surface |
 diff --git a/packages/README.zh.md b/packages/README.zh.md
-index 2a59a63d..ec6dec1c 100644
+index 076b4f87..c75cc483 100644
 --- a/packages/README.zh.md
 +++ b/packages/README.zh.md
 @@ -30,6 +30,7 @@
@@ -350,10 +343,10 @@ index 2a59a63d..ec6dec1c 100644
  | [`timeout/`](timeout/README.md) | 工具调用超时策略：`tools/execute` 截止时间强制执行器 | 产品：稳定表面 |
  | [`guard/`](guard/README.md) | 循环卫生守卫：建议性重复调用提醒 | 产品：稳定表面 |
 diff --git a/packages/client/connection/src/client/fixture.ts b/packages/client/connection/src/client/fixture.ts
-index 801dc69c..bb34abc3 100644
+index dd877227..f6c6a125 100644
 --- a/packages/client/connection/src/client/fixture.ts
 +++ b/packages/client/connection/src/client/fixture.ts
-@@ -2350,6 +2350,13 @@ export function createFixtureApi(options: FixtureOptions = {}): ApiProxy {
+@@ -2442,6 +2442,13 @@ export function createFixtureApi(options: FixtureOptions = {}): ApiProxy {
        }),
        models: request => ok(request, { groups: fixtureModelGroups(), failures: [] }),
      },
@@ -367,7 +360,7 @@ index 801dc69c..bb34abc3 100644
      respond(message: ClientResponse): Promise<RpcReceipt> {
        // Same routing discipline as the host: rpcId first, then the payload's
        // audit correlation; a settled or unknown id is not-pending.
-@@ -2465,6 +2472,11 @@ export class FixtureApiClient extends AbstractApiClient {
+@@ -2557,6 +2564,11 @@ export class FixtureApiClient extends AbstractApiClient {
        case 'credentials.unset': return this.api.credentials.unset(request)
        case 'llm.providers': return this.api.llm.providers(request)
        case 'llm.models': return this.api.llm.models(request)
@@ -527,7 +520,7 @@ index 47b92f8b..627d8071 100644
        describe(request) {
          const settings = ctx.get('settings')
 diff --git a/packages/host/apiproxy/src/api/index.ts b/packages/host/apiproxy/src/api/index.ts
-index 7f2f55cb..2e826526 100644
+index 8beeda58..ed15c8b5 100644
 --- a/packages/host/apiproxy/src/api/index.ts
 +++ b/packages/host/apiproxy/src/api/index.ts
 @@ -14,6 +14,7 @@ import type { EventsApi } from './events.ts'
@@ -670,7 +663,7 @@ index efcbb87d..60616046 100644
  
  /** Business request payload of method K (reaches through the RpcRequest narrow form to payload). */
 diff --git a/packages/host/apiproxy/src/fetch/client.ts b/packages/host/apiproxy/src/fetch/client.ts
-index 758fe638..c48bf224 100644
+index a767ea8f..5e0e0c82 100644
 --- a/packages/host/apiproxy/src/fetch/client.ts
 +++ b/packages/host/apiproxy/src/fetch/client.ts
 @@ -60,6 +60,7 @@ import {
@@ -749,7 +742,7 @@ index 0c0485f5..c467af7d 100644
  
  /** Route lookup that narrows an arbitrary path segment to a map key (single cast point for the string→key refinement). */
 diff --git a/packages/host/apiproxy/src/index.ts b/packages/host/apiproxy/src/index.ts
-index 21330079..92a4f366 100644
+index e279575f..e9dcf38b 100644
 --- a/packages/host/apiproxy/src/index.ts
 +++ b/packages/host/apiproxy/src/index.ts
 @@ -66,6 +66,7 @@ export class ApiProxyService extends Service implements ApiProxy {
@@ -1014,10 +1007,10 @@ index 20449b45..8a792f15 100644
    'packages/spill/spill-local': { kind: 'indirect', reason: 'The storage backend delegates model rendering to spill consumers.' },
    'packages/subagent/subagent': { kind: 'indirect', reason: 'The provider registry delegates parent-model rendering to dsh-tool-subagent.' },
 diff --git a/tsconfig.base.json b/tsconfig.base.json
-index 2e80649a..8fe76101 100644
+index 43c643d9..e3b7e3e0 100644
 --- a/tsconfig.base.json
 +++ b/tsconfig.base.json
-@@ -109,6 +109,7 @@
+@@ -108,6 +108,7 @@
          "./packages/examples/*/src/invariant.ts",
          "./packages/util/*/src/invariant.ts",
          "./packages/mcp/*/src/invariant.ts",
@@ -1025,7 +1018,7 @@ index 2e80649a..8fe76101 100644
          "./packages/support/*/src/invariant.ts"
        ],
        // host/client package names prefix the group dir (dsh-client-<dir>), so
-@@ -154,6 +155,7 @@
+@@ -153,6 +154,7 @@
        "@deepseek-ai/dsh-client-ui-model": ["./packages/client/ui-model/src"],
        "@deepseek-ai/dsh-client-ui-goal": ["./packages/client/ui-goal/src"],
        "@deepseek-ai/dsh-client-ui-permission": ["./packages/client/ui-permission/src"],
@@ -1033,7 +1026,7 @@ index 2e80649a..8fe76101 100644
        "@deepseek-ai/dsh-client-ui-skill": ["./packages/client/ui-skill/src"],
        "@deepseek-ai/dsh-client-ui-subagent": ["./packages/client/ui-subagent/src"],
        "@deepseek-ai/dsh-client-ui-plan": ["./packages/client/ui-plan/src"],
-@@ -207,6 +209,7 @@
+@@ -206,6 +208,7 @@
          "./packages/examples/*/src",
          "./packages/util/*/src",
          "./packages/mcp/*/src",
@@ -1054,10 +1047,10 @@ index e1d40880..3269aae9 100644
      { "path": "./packages/client/ui-trajectory" },
      { "path": "./packages/client/ui-theme" },
 diff --git a/tsconfig.host.json b/tsconfig.host.json
-index 82abd3cf..daf709f5 100644
+index bfc4f898..73a0f977 100644
 --- a/tsconfig.host.json
 +++ b/tsconfig.host.json
-@@ -226,6 +226,7 @@
+@@ -231,6 +231,7 @@
      { "path": "./packages/lsp/lsp" },
      { "path": "./packages/lsp/lsp-local" },
      { "path": "./packages/lsp/tool-lsp" },

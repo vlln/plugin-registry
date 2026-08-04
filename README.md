@@ -34,7 +34,7 @@ Web 设置页「插件」面板：
 
 ## 集成到 DeepSeek Harness
 
-前置条件：**DSH 源码环境**（官方 0803 快照 `20260803T142347Z` 或兼容布局，pnpm workspace）。集成方式与社区其他扩展一致：**复制包 + git apply 补丁 + 组合启用**。
+前置条件：**DSH 源码环境**（官方 0804 快照 `20260804T143803Z` 或兼容布局，pnpm workspace）。集成方式与社区其他扩展一致：**复制包 + git apply 补丁 + 组合启用**。
 
 ### 1. 放插件
 
@@ -46,7 +46,7 @@ Web 设置页「插件」面板：
 git apply patches/dsh-plugin-registry.patch   # 在 DSH monorepo 根目录执行
 ```
 
-补丁基于官方 0803 快照生成，改动 31 个文件（CLI plugin 子命令、apiproxy `plugins` 域、tsconfig paths/references、base/web 组合挂载、测试 fake 与 README），验证过可干净应用。若你的基线更新导致锚点漂移，可 `git apply --3way` 或手动对齐。
+补丁基于官方 0804 快照生成，改动 30 个文件（CLI plugin 子命令、apiproxy `plugins` 域、tsconfig paths/references、base/web 组合挂载、测试 fake 与 README），验证过可干净应用。若你的基线更新导致锚点漂移，可 `git apply --3way` 或手动对齐。
 
 ### 3. 启用插件
 
