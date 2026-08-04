@@ -34,9 +34,44 @@ dsh 里有两层插件，机制相同（都是 Cordis 插件：函数/类/带 ap
 
 边界：
 
+边界：
+
 - 本仓库**不管理、不替换** cordis.yml 官方插件树——那是产品声明式组合，保持 Loader 静态加载
 - registry 挂载的插件与官方插件**互相可见**：第三方插件可以 `inject` cordis.yml 里的服务（`tools`、`skills`、`commands`…）
 - 有意不做的"统一管理"（registry 也管官方插件）：版本/更新语义、组合顺序、跨 surface 差异都属于产品层，纳入统一管理会混淆产品结构与生态层，且与在线市场路线重叠——如未来需要，另行设计
+
+### 加载路径：registry 插件不在 Loader 配置树里
+
+两条完全独立的加载路径：
+
+| | cordis.yml 官方树（静态） | registry 插件（动态） |
+|---|---|---|
+| 来源 | cordis.yml entry | `<dshHome>/plugins` + `index.json` |
+| 加载者 | Loader（配置驱动，启动时） | `plugin-local`（索引驱动，运行时） |
+| 生命周期 | 随启动/配置 | `enable`/`disable`/`uninstall`（registry 控制） |
+| 是否进 Loader 树 | 是（组合树成员） | 否（`ctx.plugin()` 动态挂载，组合树看不见） |
+
+后果：registry 插件**不出现在** `cordis.yml` / dump-config 的组合输出里；`modules` 的 dshClient 扫描只看 Loader 树，因此 registry 插件的浏览器 bundle 不会进入 `__DSH_BOOT__`（client 插件应走独立 dshClient 包通道）。但两者**同进程同 context**：registry 插件可 inject 官方树服务，官方插件可见它提供的服务。
+
+### 能力面 vs 声明面（contributes）
+
+`contributes` 字段目前只有 `tools` / `skills`（且只对 `tools` 做挂载时校验）——这是**清单协议的校验范围**，不是**插件能力上限**。registry 挂载的插件是完整 Cordis 插件，可注册：
+
+- `ctx.tools` 工具、`ctx.skills` 技能提供者
+- `ctx.on()` / `ctx.waterfall()` 事件监听（拦截、权限、审计）
+- `ctx.provide()` / `Service` 子类提供**新服务** `ctx.xxx`（其他插件可 inject）
+- `ctx.commands` 命令、`ctx.systemPrompt` 提示词 section、`ctx.settings` 配置命名空间、`ctx.tui` TUI 覆盖层…
+
+示例：插件可注册 3 个工具 + 监听 `agent/request` + 提供新服务 + 注册 `/hello` 命令；`contributes` 只需声明 `{ "tools": [...] }`，其余能力"无声明但可用"。
+
+### 服务的关系：registry 管插件，插件用服务
+
+`ctx.tasks`（后台任务注册表）、`ctx.workflows`（工作流引擎）等是 **cordis.yml 官方树提供的服务**，本身不是 registry 管理的对象。registry 插件作为消费者使用它们：`inject: ['tasks']` 在 apply 里登记自己的后台任务、`inject: ['workflows']` 调用引擎。这些任务/运行由 tasks/workflows 管理，与 registry 无关。
+
+### 新服务 vs 内置服务
+
+- ✅ registry 可管理"**提供新 `ctx.xxx` 服务**"的第三方插件（新增服务，其他插件可 inject；enable 挂载、disable 卸载即服务出现/消失）
+- ❌ registry 不能管理/替换 dsh **内置**的 `ctx.xxx`（`tools`/`tasks`/`workflows`/`sessions`…）：它们由官方树启动时提供，registry 插件对同名服务 `provide` 会注册冲突（cordis 拒绝重复提供）——内置服务属产品层，见上表边界
 
 ## 能力一览
 
