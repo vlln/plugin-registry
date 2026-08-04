@@ -11,6 +11,14 @@ DeepSeek Harness 的本地插件系统实现：清单协议、安装/启停、We
 | `packages/plugin/plugin` | 插件系统核心包（`@deepseek-ai/dsh-plugin`）：`dsh.plugin.json` 清单协议、本地注册表（`$DSH_HOME/plugins`）、`plugins-catalog.json` 本地目录、`ctx.plugins` 运行时服务（实时热挂载）、contributes 声明校验、`dsh plugin` CLI 操作、脚手架与 tarball 安装 |
 | `packages/ui-plugin-manager` | Web 设置页插件管理面板（`@deepseek-ai/dsh-client-ui-plugin-manager`）：浏览/搜索/安装/启停/卸载 |
 
+## 展示
+
+Web 设置页「插件」面板：
+
+![插件管理面板 1](screenshots/plugin-panel-1.png)
+
+![插件管理面板 2](screenshots/plugin-panel-2.png)
+
 ## 能力一览
 
 - **清单协议**：插件根目录携带 `dsh.plugin.json`，声明身份（publisher/name）、版本、入口、兼容的 harness 版本范围、贡献声明（工具/技能）
