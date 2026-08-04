@@ -3,10 +3,18 @@
  * `<dshHome>/plugins`, with one directory per plugin and one index file.
  * Registry operations are plain filesystem facts — no runtime services.
  *
+ * Consistency contract: every mutation is serialized per harness home, the
+ * index commits through a same-directory temporary file plus rename (readers
+ * never see a truncated index, and a failed write leaves no partial state),
+ * and a failed install rolls the copied directory back so the operation can
+ * be retried. An uninstall failure leaves the directory removed and the
+ * index record intact, which is safe to retry (the directory removal is
+ * idempotent).
+ *
  * @module @deepseek-ai/dsh-plugin/registry
  */
 
-import { access, cp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { access, cp, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { InstalledRecord, PluginIndex, PluginManifest } from './types.ts'
 import { checkEngine, readManifest } from './manifest.ts'
@@ -35,30 +43,17 @@ export interface InstallOptions {
   harnessVersion: string
 }
 
-/**
- * Resolve the plugin registry root for one harness home.
- * @param dshHome - the harness home.
- * @returns the absolute registry directory.
- */
+/** The resolved root of the plugin registry for one harness home. */
 export function pluginsRoot(dshHome: string): string {
   return join(dshHome, PLUGINS_DIR_NAME)
 }
 
-/**
- * Resolve the plugin index file path for one harness home.
- * @param dshHome - the harness home.
- * @returns the absolute index file path.
- */
+/** The index file path for one harness home. */
 export function indexFile(dshHome: string): string {
   return join(pluginsRoot(dshHome), INDEX_FILE_NAME)
 }
 
-/**
- * Resolve the installed directory for one plugin id.
- * @param dshHome - the harness home.
- * @param id - the installed plugin id.
- * @returns the absolute plugin directory.
- */
+/** The installed directory for one plugin id. */
 export function pluginDir(dshHome: string, id: string): string {
   return join(pluginsRoot(dshHome), id)
 }
@@ -79,13 +74,18 @@ export async function readIndex(dshHome: string): Promise<PluginIndex> {
 }
 
 /**
- * Write the plugin index, creating the registry root if needed.
+ * Write the plugin index atomically: a same-directory temporary file that is
+ * renamed over the index, so a reader never observes a truncated index and a
+ * failed write leaves the previous index intact.
  * @param dshHome - harness home whose registry is written.
  * @param index - the full index to persist.
  */
 export async function writeIndex(dshHome: string, index: PluginIndex): Promise<void> {
   await mkdir(pluginsRoot(dshHome), { recursive: true })
-  await writeFile(indexFile(dshHome), `${JSON.stringify(index, null, 2)}\n`)
+  const file = indexFile(dshHome)
+  const staging = `${file}.tmp`
+  await writeFile(staging, `${JSON.stringify(index, null, 2)}\n`)
+  await rename(staging, file)
 }
 
 /**
@@ -107,28 +107,48 @@ export async function listPlugins(dshHome: string): Promise<ListedPlugin[]> {
  * Install a plugin from a local source directory: validate its manifest and
  * engine range, copy the directory into the registry, and record it as
  * disabled. A plugin must be explicitly enabled before the runtime mounts it.
+ *
+ * The index write is the commit point: if it fails, the copied directory is
+ * rolled back so the registry returns to the pre-install state and the
+ * operation can be retried. A leftover directory without an index record
+ * (from a crashed run) is cleaned up first.
  * @param sourceDir - directory containing `dsh.plugin.json`.
  * @param options - registry home and harness version.
  * @returns the installed plugin.
  */
-export async function installPlugin(sourceDir: string, options: InstallOptions): Promise<ListedPlugin> {
+export function installPlugin(sourceDir: string, options: InstallOptions): Promise<ListedPlugin> {
+  return withRegistryLock(options.dshHome, () => installPluginLocked(sourceDir, options))
+}
+
+async function installPluginLocked(sourceDir: string, options: InstallOptions): Promise<ListedPlugin> {
   const manifest = await readManifest(sourceDir)
   checkEngine(manifest.engines, options.harnessVersion)
   const target = pluginDir(options.dshHome, manifest.id)
-  if (await exists(target)) throw new Error(`plugin ${manifest.id} is already installed`)
+  const before = await readIndex(options.dshHome)
+  if (before[manifest.id] !== undefined) throw new Error(`plugin ${manifest.id} is already installed`)
+  if (await exists(target)) {
+    // The index has no record but the directory exists: a crashed install
+    // left residue. Remove it so the install can proceed (and retry cleanly).
+    await rm(target, { recursive: true, force: true })
+  }
   if (!(await exists(join(sourceDir, manifest.main)))) {
     throw new Error(`plugin ${manifest.id} manifest entry ${JSON.stringify(manifest.main)} is missing`)
   }
   await mkdir(pluginsRoot(options.dshHome), { recursive: true })
   await cp(sourceDir, target, { recursive: true })
-  const index = await readIndex(options.dshHome)
   const record: InstalledRecord = {
     version: manifest.version,
     enabled: false,
     installedAt: new Date().toISOString(),
   }
-  index[manifest.id] = record
-  await writeIndex(options.dshHome, index)
+  try {
+    const index = await readIndex(options.dshHome)
+    index[manifest.id] = record
+    await writeIndex(options.dshHome, index)
+  } catch (error) {
+    await rm(target, { recursive: true, force: true })
+    throw error
+  }
   return { id: manifest.id, record, manifest }
 }
 
@@ -138,7 +158,11 @@ export async function installPlugin(sourceDir: string, options: InstallOptions):
  * @param id - the installed plugin id.
  * @param enabled - the new enabled state.
  */
-export async function setEnabled(dshHome: string, id: string, enabled: boolean): Promise<void> {
+export function setEnabled(dshHome: string, id: string, enabled: boolean): Promise<void> {
+  return withRegistryLock(dshHome, () => setEnabledLocked(dshHome, id, enabled))
+}
+
+async function setEnabledLocked(dshHome: string, id: string, enabled: boolean): Promise<void> {
   const index = await readIndex(dshHome)
   const record = index[id]
   if (record === undefined) throw new Error(`plugin ${id} is not installed`)
@@ -149,11 +173,17 @@ export async function setEnabled(dshHome: string, id: string, enabled: boolean):
 }
 
 /**
- * Uninstall a plugin: remove its directory and drop its index record.
+ * Uninstall a plugin: remove its directory and drop its index record. The
+ * directory removal is idempotent, so a failed index write leaves a state
+ * that is safe to retry.
  * @param dshHome - harness home whose registry is updated.
  * @param id - the installed plugin id.
  */
-export async function uninstallPlugin(dshHome: string, id: string): Promise<void> {
+export function uninstallPlugin(dshHome: string, id: string): Promise<void> {
+  return withRegistryLock(dshHome, () => uninstallPluginLocked(dshHome, id))
+}
+
+async function uninstallPluginLocked(dshHome: string, id: string): Promise<void> {
   const index = await readIndex(dshHome)
   if (index[id] === undefined) throw new Error(`plugin ${id} is not installed`)
   await rm(pluginDir(dshHome, id), { recursive: true, force: true })
@@ -182,4 +212,23 @@ async function exists(path: string): Promise<boolean> {
     () => true,
     () => false,
   )
+}
+
+/** Chain tail per harness home: serializes registry mutations process-locally. */
+const registryQueues = new Map<string, Promise<unknown>>()
+
+/**
+ * Run a registry mutation under a per-harness-home serial queue, so
+ * read-modify-write sequences (install, enable, uninstall) never interleave
+ * and a concurrent batch cannot drop updates. The queue tail swallows errors
+ * so one failed mutation never blocks later ones.
+ * @param dshHome - harness home whose registry queue is used.
+ * @param task - the mutation to run after all earlier ones settle.
+ * @returns the task's promise, preserving its rejection.
+ */
+function withRegistryLock<T>(dshHome: string, task: () => Promise<T>): Promise<T> {
+  const tail = registryQueues.get(dshHome) ?? Promise.resolve()
+  const run = tail.then(task, task)
+  registryQueues.set(dshHome, run.then(() => undefined, () => undefined))
+  return run
 }
