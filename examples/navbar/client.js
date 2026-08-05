@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
           style.id = STYLE_ID;
           style.textContent = [
             '[data-vlln-navbar]{position:fixed;top:50%;transform:translateY(-50%);z-index:900;display:flex;flex-direction:column;gap:10px;padding:8px;border-radius:12px;font-family:system-ui;max-height:calc(100vh - 32px);overflow-y:auto;background:transparent;border:1px solid transparent;transition:background .18s ease,border-color .18s ease}',
-            '[data-vlln-navbar]:hover{background:rgba(30,30,34,.32);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-color:rgba(255,255,255,.08)}',
+            '[data-vlln-navbar]:hover{background:transparent;border-color:rgba(128,128,140,.35)}',
             '[data-vlln-dot]{width:7px;height:7px;border-radius:999px;padding:0;border:none;background:rgba(128,128,140,.45);cursor:pointer;flex:none;transition:width .22s ease,background .22s ease,transform .22s ease}',
             '[data-vlln-dot]:hover{background:rgba(128,128,140,.8);transform:scale(1.25)}',
             '[data-vlln-dot].active{width:22px;border-radius:999px;background:var(--dsw-alias-text-accent,#4c9aff)}',
@@ -110,7 +110,11 @@ window.__ModuleLoader__.load({
           var lo = windowed ? Math.max(0, active - HALF_WINDOW) : 0;
           var hi = windowed ? Math.min(rows.length - 1, active + HALF_WINDOW) : rows.length - 1;
           var dotCount = hi - lo + 1 + (windowed ? 2 : 0);
-          if (bar.childElementCount === dotCount) { updateActive(); return; }
+          if (bar.childElementCount === dotCount) {
+            // 窗口未变：只移动激活态（滚动时不应重建节点）。
+            updateActiveClass(active);
+            return;
+          }
           bar.textContent = '';
           if (windowed && lo > 0) {
             var moreL = document.createElement('span');
@@ -146,6 +150,15 @@ window.__ModuleLoader__.load({
             var moreR = document.createElement('span');
             moreR.setAttribute('data-vlln-more', '');
             bar.appendChild(moreR);
+          }
+        };
+
+        // 窗口内激活态：第 i 个 dot 对应行 lo+i，只切换 class 不重建。
+        var updateActiveClass = function (active) {
+          var dots = bar.querySelectorAll('[data-vlln-dot]');
+          for (var i = 0; i < dots.length; i++) {
+            if (i + lo === active) dots[i].classList.add('active');
+            else dots[i].classList.remove('active');
           }
         };
 

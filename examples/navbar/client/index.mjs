@@ -31,9 +31,8 @@ export default {
   transition: background .18s ease, border-color .18s ease;
 }
 [data-vlln-navbar]:hover {
-  background: rgba(30, 30, 34, .32);
-  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
-  border-color: rgba(255, 255, 255, .08);
+  background: transparent;
+  border-color: rgba(128, 128, 140, .35);
 }
 [data-vlln-dot] {
   width: 7px; height: 7px; border-radius: 999px; padding: 0; border: none;
@@ -160,7 +159,8 @@ export default {
       // 重建（点数/窗口变化时才重建；滚动只走 updateActive 不重建）。
       const dotCount = hi - lo + 1 + (windowed ? 2 : 0) // +2 端点细点
       if (bar.childElementCount === dotCount && rows.length >= 2) {
-        updateActive()
+        // 窗口未变：只移动激活态（重建会重挂 dot，滚动时不应重建）。
+        updateActiveClass(active)
         return
       }
       bar.textContent = ''
@@ -203,6 +203,15 @@ export default {
         more.setAttribute('data-vlln-more', '')
         bar.appendChild(more)
       }
+    }
+
+    // 窗口内激活态：第 i 个 dot 对应行 lo+i，只切换 class 不重建。
+    const updateActiveClass = (active: number): void => {
+      const dots = [...bar.querySelectorAll<HTMLElement>('[data-vlln-dot]')]
+      dots.forEach((dot, i) => {
+        if (i + lo === active) dot.classList.add('active')
+        else dot.classList.remove('active')
+      })
     }
 
     // 滚动只重算激活态（rAF 节流）：激活药丸滑动，不动节点重建。
