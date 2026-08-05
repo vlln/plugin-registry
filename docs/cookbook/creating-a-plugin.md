@@ -42,6 +42,8 @@ export default {
 
 其他能力面：`ctx.on()` 事件、`ctx.provide()` 新服务、`ctx.commands` 命令、`ctx.systemPrompt`、`ctx.tui` 覆盖层。能力上限是完整 Cordis，不是 `contributes` 声明（见 [architecture.md](../architecture.md#能力面-vs-声明面contributes)）。
 
+**依赖解析**：入口可 `import` 官方包（`@deepseek-ai/*`、`cordis`）及 checkout 依赖闭包内的任意包——registry 在 `<dshHome>/plugins/node_modules` 维护指向 checkout 的共享链接（安装/挂载时自动确保，built 形态也成立）。插件**不能声明自己的 npm 依赖**（`dsh.plugin.json` 无 dependencies 字段），可用依赖 = checkout 的依赖闭包（见 [architecture.md](../architecture.md#插件依赖解析共享-nodemodules-链接)）。
+
 ## 3. 同步 contributes
 
 `dsh.plugin.json` 的 `contributes.tools` 必须与入口实际注册的工具**逐名一致**：每个声明的必须注册，每个注册的必须声明。这是清单契约——启用时校验，缺失即报错回滚（[architecture.md](../architecture.md#信任边界)）。

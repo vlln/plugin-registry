@@ -32,6 +32,14 @@
 - `modules` 的 dshClient 扫描只看 Loader 树 → registry 插件的 client half **不靠扫描**进 `__DSH_BOOT__`，而是启用时经 `ClientModuleHostService.registerExternal` 运行时登记（见「web 边界」）。
 - 两者**同进程同 context**：registry 插件可 inject 官方树服务，官方插件可见它提供的服务。
 
+### 插件依赖解析：共享 node_modules 链接
+
+插件在 `<dshHome>/plugins`（checkout 树外），标准 Node 裸名解析（从 import 文件向上找 node_modules）够不到 checkout——built 形态下 `import '@deepseek-ai/dsh-tools'` 会 `ERR_MODULE_NOT_FOUND`（源码形态靠 tsx paths 兜底，是开发期隐式红利，非契约）。
+
+机制：`<dshHome>/plugins/node_modules` 建**共享目录链接**指向 checkout 的 `node_modules`（`ensureDepsLink`：安装/挂载/启动扫描时确保，checkout 轮转后失效自动重建，Windows 用 junction）。链接是物理事实，任何运行形态（tsx 源码 / built 纯 Node）下 `@deepseek-ai/*`、`cordis` 及 checkout 依赖闭包内任意包都按标准解析命中。
+
+边界：链接**尽力而为**——不 import 官方包的插件无需它；解析不到 checkout 的部署（如单文件 bundle）跳过，不影响安装与挂载。插件**不能声明自己的 npm 依赖**（`dsh.plugin.json` 无 dependencies 字段）；可用依赖 = checkout 的依赖闭包。
+
 ## 能力面 vs 声明面（contributes）
 
 `contributes` 字段目前只有 `tools` / `skills`（仅 `tools` 做挂载时校验）——这是**校验范围**，不是**能力上限**。
@@ -68,11 +76,7 @@ registry 插件是**消费者**：`inject: ['tasks']` 登记自己的后台任�
 
 ### 加载通道：官方 client 插件 vs registry client half
 
-浏览器端插件的加载通道（`packages/client/modules`）：
-
-1. 浏览器侧：`apps/web` 启动时解析 `window.__DSH_BOOT__`（boot graph），按行加载每个 client 插件的 bundle。
-2. Node 侧：`ClientModuleHostService` 扫描 **Loader 配置树 entries**（`dshClient` 声明 + `exports["./client"]`）组成 graph，也接受 **`registerExternal` 动态登记**（registry 插件通道）。
-3. registry 插件经 `ctx.plugin()` 运行时挂载，不在 Loader entries 里——通过 `ClientModuleHostService.registerExternal` 在启用时把 client half 直接建成一行 table 记录，`compose`/`/plugins` 路由/`__DSH_BOOT__` 注入全部复用。
+浏览器端插件的加载通道（`packages/client/modules`）：浏览器侧按 `window.__DSH_BOOT__`（boot graph）逐行加载 bundle；Node 侧 `ClientModuleHostService` 由 **Loader 树扫描**（`dshClient` 声明 + `exports["./client"]`）与 **`registerExternal` 动态登记**（registry 插件启用时登记；`compose`/`/plugins` 路由/`__DSH_BOOT__` 注入全部复用）共同组成 graph。
 
 两条通道并存：**官方 client 插件**（`dsh-client-*` 包，随产品发布，进 Loader 树）与 **registry client half**（用户安装，运行时登记）。前者是产品结构，后者是用户扩展；同一能力建议先做官方包。
 
@@ -104,7 +108,7 @@ registry 插件是**消费者**：`inject: ['tasks']` 登记自己的后台任�
 | 启停 | 无 | ✅ 默认禁用 + 实时热挂载 |
 | 信任 | 直接执行 | ✅ 显式信任边界 |
 
-TUI 差异补充：pi 开放 **pi-tui 组件树**（`ctx.ui.custom` 拿 tui 实例、注入组件、`ui.notify`）；dsh 是**受限覆盖层**（`ctx.tui.openOverlay()` 只给 viewport/主题/重绘/关闭，不给底层树）——命令与事件驱动 UI 平齐，改主 UI 布局不如 pi 开放（安全取舍）。
+TUI 差异：pi 开放 pi-tui 组件树（`ctx.ui.custom` 注入组件）；dsh 是受限覆盖层（`ctx.tui.openOverlay()` 只给 viewport/主题/重绘/关闭，不给底层树）——命令与事件驱动 UI 平齐，改主 UI 布局不如 pi 开放（安全取舍）。
 
 **结论**：
 

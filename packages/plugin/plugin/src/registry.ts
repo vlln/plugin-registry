@@ -18,6 +18,7 @@ import { access, cp, mkdir, readFile, rename, rm, stat, writeFile } from 'node:f
 import { join } from 'node:path'
 import type { InstalledRecord, PluginIndex, PluginManifest } from './types.ts'
 import { checkEngine, readManifest } from './manifest.ts'
+import { ensureDepsLink } from './deps-link.ts'
 
 /** Directory name under the harness home that holds installed plugins. */
 export const PLUGINS_DIR_NAME = 'plugins'
@@ -160,6 +161,10 @@ async function installPluginLocked(sourceDir: string, options: InstallOptions): 
     await rm(target, { recursive: true, force: true })
     throw error
   }
+  // Dependency link is best-effort: a plugin that never imports a checkout
+  // package needs no link, and an unlinkable deployment is not an install
+  // failure (the runtime re-ensures at mount anyway).
+  await ensureDepsLink(options.dshHome)
   return { id: manifest.id, record, manifest }
 }
 

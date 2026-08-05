@@ -13,6 +13,7 @@ import { join, resolve } from 'node:path'
 import { Context, Service, type Fiber } from 'cordis'
 import type { ToolRegistry } from '@deepseek-ai/dsh-tools'
 import { normalizePlugin } from './load.ts'
+import { ensureDepsLink } from './deps-link.ts'
 import type { PluginClient } from './types.ts'
 
 declare module 'cordis' {
@@ -123,6 +124,10 @@ export class PluginLocalService extends Service {
   async mount(id: string): Promise<void> {
     if (this.mounts.has(id)) return
     const manifest = await readManifest(pluginDir(this.dshHome, id))
+    // Dependency link best-effort (also re-ensured on reconcile): a plugin
+    // whose entry imports checkout packages needs the shared node_modules
+    // link; a plugin that never does is unaffected by an unlinkable checkout.
+    await ensureDepsLink(this.dshHome)
     const entryUrl = pathToFileURL(join(pluginDir(this.dshHome, id), manifest.main)).href
     const plugin = normalizePlugin(await import(entryUrl))
     const fiber = this.group.ctx.plugin(plugin)
@@ -263,6 +268,10 @@ export class PluginLocalService extends Service {
    * Mount every enabled plugin in the index (the load-time sweep).
    */
   async reconcile(): Promise<void> {
+    // Ensure the shared dependency link once before the sweep so a plugin
+    // that imports checkout packages resolves on first mount (mount also
+    // re-ensures, covering a checkout rotation mid-session).
+    await ensureDepsLink(this.dshHome)
     const index = await readIndex(this.dshHome)
     for (const [id, record] of Object.entries(index).sort(([a], [b]) => a.localeCompare(b))) {
       if (record.enabled) await this.mount(id)

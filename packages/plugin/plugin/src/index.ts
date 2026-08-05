@@ -21,6 +21,7 @@ export * from './catalog.ts'
 export * from './service.ts'
 export * from './scaffold.ts'
 export * from './tarball.ts'
+export * from './deps-link.ts'
 export { normalizePlugin } from './load.ts'
 export { MANIFEST_FILE_NAME } from './types.ts'
 export type {
