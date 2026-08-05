@@ -1,0 +1,9 @@
+{
+  "id": "vlln/taskboard",
+  "version": "0.1.0",
+  "main": "./index.mjs",
+  "description": "示例插件：侧边栏 task board 入口（sidebar.panel 缝）+ 浮层列 Agent 卡片——验证统一模型的 S5 场景",
+  "engines": { "dsh": ">=0.0.1" },
+  "contributes": { "tools": [], "skills": [] },
+  "client": { "main": "./client.js" }
+}

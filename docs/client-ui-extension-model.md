@@ -129,12 +129,12 @@
 
 ## 验证方案（评审 F8 修正：先自渲染，容器落地后替换）
 
-- **S1 冒烟 ✅ 已落地（`examples/navbar`）**：`vlln/navbar` 自渲染导航条，实现「纯 DOM 锚点契约」而非 useSession：扫描官方每行 `data-chat-flow-kind="user"` + `data-chat-anchor-key`（`ChatView.tsx:655-657`）渲染导航点，点击 `scrollIntoView` 跳转，observer 监听，dispose 清理。**零数据依赖，只靠锚点契约**。
-  - **验证结果**：① 安装/启用 → boot graph 含 `vlln/navbar` 行、bundle 200；② Chrome dump-dom 见导航条容器 + 页面完整（171KB 未冻结）；③ DOM 级单测（worktree `tests/navbar.client.spec.ts`，3 例）：点渲染/点击跳转/dispose 清理/**无关变更不重建**。
-  - **发现（印证 F6）**：导航点只覆盖已渲染行——`data-chat-*` 契约化 + 跨窗口导航是待补件；导航条 `z-index:900`（官方模态之下）。
-  - **审查修复**：初版 observer 观察整个 body，render 重建又触发 observer 无限循环冻结；修复为限定 `[data-chat-flow=""]`，单测锁定。
-  - **后续**：通用容器落地后，导航条可替换为 `ctx.ui.mount`（UI 位置标准化，数据/跳转不变）。
-- **S5 冒烟（需先开 sidebar.panel 缝）**：sidebar.panel 入口 + conversation.view 新页 + useSessions + openSubagent。
+- **S1 冒烟 ✅ 已落地（`examples/navbar`）**：`vlln/navbar` 自渲染导航条，「纯 DOM 锚点契约」：扫描官方每行 `data-chat-flow-kind="user"` + `data-chat-anchor-key`（`ChatView.tsx:655-657`）渲染导航点，点击 `scrollIntoView` 跳转，observer 监听，dispose 清理。**零数据依赖，只靠锚点契约**。
+  - **验证结果**：① 安装/启用 → boot graph 行 + bundle 200；② Chrome dump-dom 见导航条 + 页面完整（未冻结）；③ DOM 单测（worktree `tests/navbar.client.spec.ts`）：点渲染/点击跳转/dispose 清理/**无关变更不重建**。
+  - **发现（印证 F6）**：导航点只覆盖已渲染行——`data-chat-*` 契约化 + 跨窗口导航待补；`z-index:900`（官方模态之下）。
+  - **审查修复**：初版 observer 观察 body，render 重建又触发 observer 无限循环冻结；修复为限定 `[data-chat-flow=""]`，单测锁定。
+  - **后续**：通用容器落地后，导航条可替换为 `ctx.ui.mount`。
+- **S5 冒烟 ✅ sidebar.panel 缝已开 + 入口落地（`examples/taskboard`）**：ui-sidebar 开 `sidebar.panel` list 缝（`034c03fa`）；`vlln/taskboard` 注册 React 入口，Chrome DOM 确认按钮出现。剩余（session 作用域）留后续。
 - **数据投影**：`useTasks` 单测（投影正确性 + 响应式 + session 作用域隔离）。
 - **安全**：S4 拒绝 html 内嵌的测试（markdown 渲染器对 `<script>` 的处置）。
 - **性能（F10）**：S3/S4 的流内分发不破坏 ChatView 的渲染预算（节点级 memo、chunk 风暴只重渲 StreamingTail）——加性能冒烟。
