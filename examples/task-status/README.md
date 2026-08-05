@@ -17,12 +17,13 @@ dsh plugin install ./examples/task-status
 dsh plugin enable vlln/task-status
 ```
 
-启用后刷新 Web 页面：对话页对话框上方出现任务状态条（无任务显示 idle，任务运行显示 running 计数）。
+启用后刷新 Web 页面：对话页对话框上方出现任务状态卡片（running 计数高亮 + 已完成附注，多任务可展开逐条）。**仅对话页显示**——切到轨迹等视图隐藏，切回恢复。
 
 ## 已验证（真实 web 组合，bundle 与源码同步）
 
 - 安装/启用 → boot graph 含 `vlln/task-status` 行（rev 对应当前 bundle）
-- **真实 Chrome DOM**：`[data-task-status-bar]` 渲染在 textarea 上方（`compareDocumentPosition` 确认）；任务启动后状态条实时显示 running 计数（`useTasks` 帧推送）
+- **真实 Chrome DOM**：状态卡片渲染在 textarea 上方（官方 token：12px 圆角 + `--dsw-specific-tip` 表面 + `--dsw-alias-border-l1` 边框）；任务启动实时显示 running 计数（`useTasks` 帧推送）
+- **仅对话页**：`[data-chat-flow=""]` 探针（与 navbar 同信号）——切 Trajectory 隐藏、切回 Chat 恢复（MutationObserver 双向覆盖 flow 移除/重建）
 - 与 navbar/taskboard 共存正常
 
 ## 前置：官方改动
