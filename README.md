@@ -25,7 +25,7 @@ dsh plugin list                    # 列表
 node scripts/install-into-dsh.mjs <dsh-monorepo路径>
 ```
 
-一键完成：复制插件包 + 打接线补丁 + 装依赖。之后 `npm run build && node --import tsx/esm apps/cli/src/bin.ts web` 启动 Web（设置页出现「插件」面板）。完整步骤见 [集成到 dsh](docs/cookbook/integrating-into-dsh.md)。
+一键完成：复制插件包 + 打接线补丁 + 装依赖。之后 `npm run build && ./bin/dsh web` 按官方方式启动（设置页出现「插件」面板）。完整步骤见 [集成到 dsh](docs/cookbook/integrating-into-dsh.md)。
 
 ## 展示
 

@@ -33,4 +33,4 @@
 - `docs/generic-client-render-container-design.md`：通用渲染容器设计（已实现）
 - `docs/registry-client-half-design.md`：registry client half 机制（既有）
 - `scripts/install-into-dsh.mjs`：一键集成脚本（复制包 + 打补丁 + 装依赖），README 与 integrating-into-dsh 推广
-- integrating-into-dsh 补「运行」段：build + 启动命令、registry 验证、TSX_TSCONFIG_PATH 指向坑（实测 0805 基线 + 脚本安装后启动 Web 成功、greeter 安装启用通过）
+- integrating-into-dsh 补「运行」段：官方方式 `npm run build && ./bin/dsh web`、registry 验证、TSX_TSCONFIG_PATH 指向坑（实测 0805 基线 + 脚本安装后 `./bin/dsh web` 启动成功、插件 API 返回 greeter enabled）
