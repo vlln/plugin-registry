@@ -61,6 +61,20 @@ dsh plugin list                       # enabled acme/greeter@0.1.0
 
 **验证点**：启用后 Web 刷新页面，bundle 经 `/plugins/acme/greeter/client.js` 进入 `__DSH_BOOT__`，浏览器出现插件 UI；`dsh plugin disable` 后刷新，UI 消失。
 
+## 3.5 client half 的 UI 自由度
+
+client half 是浏览器端**完整 Cordis 插件**（`apply(ctx)` 在浏览器执行），UI 能力三层：
+
+| 方式 | 机制 | 需官方 hole？ | 适用 |
+|---|---|---|---|
+| **填官方 hole** | `ctx.slots.register` 进 `SlotMap` 扩展点（如 `sidebar.workspaces.*`） | ✅ | 深度集成官方 UI |
+| **自渲染** | 直接操作 DOM（`createElement`+`appendChild` 或 React portal） | ❌ | 浮层、标记、面板——`examples/greeter` 即此形态 |
+| **无 UI 行为** | `ctx.commands` / `ctx.on` / `ctx.provide` | ❌ | 命令、监听、后台行为 |
+
+**关键认知**：client half **不局限于填 hole**——`examples/greeter` 零 slot 依赖，`body.appendChild` 画标记。「改官方 UI 结构」（往官方组件树内部插入）才受限于官方预留的 hole——所有 client 插件（官方包同样）的通用边界；「新增自己的 UI/行为」完全自由。选型：嵌入官方树内部 → 填 hole；只要自己的可见表面 → 自渲染。
+
+**hole 缺失时**：`ctx.slots.register` 类型与运行时都要求 hole 存在。官方树未声明期望的 hole（如 0804 无 `sidebar.workspaces.sessionRow`）时，填 hole 的组件不注册——要么改宿主官方包补声明，要么改用自渲染。
+
 ## 契约要点
 
 - **id 必须一致**：bundle 里 `load` 的 id 必须等于插件 id（`acme/greeter`），否则浏览器侧 `arrive()` 校验失败。
@@ -74,9 +88,9 @@ dsh plugin list                       # enabled acme/greeter@0.1.0
 
 ### 官方 cordis 标准包形态与核心冲突
 
-官方 client 包是**双面 npm 包**：Node half（包 `main`，常为空 `apply`，让包出现在 cordis.yml）+ Client half（`exports["./client"]` + `dshClient` 声明，浏览器 bundle）。构建用 `clientBundle(包名, libEntry)`，**banner id = 包名**。
+官方 client 包是**双面 npm 包**：Node half（包 `main`，常为空 `apply`）+ Client half（`exports["./client"]` + `dshClient` 声明）。构建用 `clientBundle(包名, libEntry)`，**banner id = 包名**。
 
-**核心冲突**：registry 插件 id 必须匹配 `publisher/name`（小写字母数字+连字符，无 `@`）；官方包名含 `@`（如 `@deepseek-ai/dsh-client-ui-subagent-tree`）过不了校验。所以 registry 形态必须**单独构建**——把 `clientBundle` 的 id 换成 registry 插件 id。
+**核心冲突**：registry 插件 id 必须匹配 `publisher/name`（无 `@`）；官方包名含 `@` 过不了校验。所以 registry 形态必须**单独构建**——`clientBundle` 的 id 换成 registry 插件 id。
 
 ### 假设 workflow（以 subagent-tree 为实例）
 
@@ -93,22 +107,21 @@ dsh plugin list                       # enabled acme/greeter@0.1.0
      }
    }
    ```
-   - `client.inject` 平移原 `dshClient.inject`（图元数据）；`main` 指向 Node half 的 registry 版（纯 UI 插件用空 `apply` 的函数插件）。
-3. **在 DSH monorepo 内构建 registry 版 bundle**（官方工具链 workspace 解析依赖）：staging 复制包进 `packages/client/`（如 `ui-subagent-tree-registry`），保留原 `tsconfig.json`（references 路径仍有效）；覆盖 `tsdown.config.ts` 为 `clientBundle('vlln/subagent-tree', ['lib/types/index.js', 'lib/types/invariant.js'])`；`npx tsc -b` 产 `lib/types`（hole 类型错误只影响 dts，bundle 照常产出）→ `pnpm --filter <包名> run bundle`。
+   - `client.inject` 平移原 `dshClient.inject`；`main` 指向 Node half 的 registry 版（纯 UI 插件用空 `apply` 函数插件）。
+3. **在 DSH monorepo 内构建 registry 版 bundle**（`@deepseek-ai/*` 需 workspace 解析）：staging 复制包进 `packages/client/`，保留原 `tsconfig.json`；覆盖 `tsdown.config.ts` 为 `clientBundle('vlln/subagent-tree', ['lib/types/index.js', 'lib/types/invariant.js'])`；`npx tsc -b` 产 `lib/types`（hole 类型错误只影响 dts）→ `pnpm --filter <包名> run bundle`。
 4. **组装发布目录**：`client.js`（+`.map`）+ `index.mjs`（函数插件 Node half）+ `dsh.plugin.json`。
-5. **验证**（真实 web 组合）：`dsh plugin install ./registry && dsh plugin enable vlln/subagent-tree`；检查 `__DSH_BOOT__` 含该行、`/plugins/vlln/subagent-tree/client.js` 200、bundle 导出 `inject` + `apply`、所需模块全在平台模块表（`slots`/`runtime`/`primitives`/`react`）；disable 后行移除。
+5. **验证**（真实 web 组合）：`dsh plugin install ./registry && dsh plugin enable vlln/subagent-tree`；检查 `__DSH_BOOT__` 含该行、`/plugins/vlln/subagent-tree/client.js` 200、bundle 导出 `inject`+`apply`、所需模块全在平台模块表；disable 后行移除。
 
 ### 与「从零写 client half」的差异
 
 | | 从零写（greeter） | 转官方包（subagent-tree） |
 |---|---|---|
 | bundle 来源 | 手写或新建构建 | **复用官方 tsdown 构建，只换 id** |
-| 依赖面 | 尽量少 | 官方包原有依赖（peerDeps / inject）全部继承 |
+| 依赖面 | 尽量少 | 官方包原有依赖全部继承 |
 | 构建环境 | 可独立 | **必须在 monorepo 内**（`@deepseek-ai/*` workspace 解析） |
-| 风险 | 低 | 官方 hole/peer 依赖决定功能是否生效（如 `ui-workspace` 的 `sessionRow` hole） |
 
 ### 注意事项
 
-- **react 被 require 正常**：官方 client 包 bundle 同样 require `react`/`react/jsx-runtime`——react 是平台模块表成员，非 registry 化问题。
+- **react 被 require 正常**：官方 client 包 bundle 同样 require `react`——react 是平台模块表成员，非 registry 化问题。
 - **官方通道不动**：转换是「新增发布形态」，原 `dsh-client-*` 包与 Loader 树通道保持原样，两种形态并存。
-- **功能依赖不变**：registry 化只改安装/管理形态；组件注册仍需宿主提供官方扩展 hole（原 peerDeps 依赖的 slot 服务）。
+- **功能依赖不变**：registry 化只改安装/管理形态；组件注册仍需宿主提供官方扩展 hole（原 peerDeps 依赖的 slot 服务，如 `ui-workspace` 的 `sessionRow`）。
