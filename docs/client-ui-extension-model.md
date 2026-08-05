@@ -29,7 +29,7 @@
 | 要素 | 机制 | 证据 |
 |---|---|---|
 | 数据 | **`task/snapshot` 帧（完整快照，对齐 `session/queue`）→ client 适配器 → `useTasks`** | events.ts 帧变体；session.ts 消费；provide tasks hook → standard kit 自动生成 |
-| UI 位置 | **对话页对话框（composer）上方的任务状态条**（`conversation.input.dock`，与 queue/todo 同 strip） | taskboard 示例已落地 |
+| UI 位置 | **对话页对话框（composer）上方的任务状态条**（`conversation.input.dock`，与 queue/todo 同 strip） | task-status 示例已落地 |
 
 **数据投影已实现（评审 F4 修正）**：线协议取**完整快照姿势**——每变更广播 session 全量列表，重连基线免费；host 侧 `onChanged` + `listOwned` + api-proxy 广播 + **mux 打开推基线**。tasks 是 session 作用域，`useTasks` 是 session 钩子；列表含 settled 历史。
 
@@ -62,7 +62,7 @@
 
 **场景定义修正**：S5 的 task board 是**用户委派任务给 Agent 的委派台**——与**工作区平级**（workspace 级概念，非 session 归属）。之前误把「侧边栏入口 + session 级视图切换 + 任务列表」当作 S5——那是缝机制验证，不是 S5 委派台本身。
 
-**已落地的机制件**（示例 taskboard 验证，仍有效）：`sidebar.panel` list 缝（`034c03fa`）、`conversation.view` 视图环 + `setView` 通道（`005d8061`/F9）、`useTasks` 投影——它们是通用机制，与 S5 场景定义错位无关。
+**已落地的机制件**（仍有效）：`sidebar.panel` list 缝（`034c03fa`）、`conversation.view` 视图环 + `setView` 通道（`005d8061`/F9）、`useTasks` 投影——通用机制，与 S5 场景定义错位无关。
 
 **S5 委派台（暂不做）**：工作区级 UI（委派台入口、Agent 队列、分派动作），需工作区作用域视图（非 session 环）——作为独立工作区级机制件，**已决定暂不做**。
 
@@ -134,7 +134,7 @@
   - **发现（印证 F6）**：导航点只覆盖已渲染行——`data-chat-*` 契约化 + 跨窗口导航待补；`z-index:900`（官方模态之下）。
   - **审查修复**：初版 observer 观察 body，render 重建又触发 observer 无限循环冻结；修复为限定 `[data-chat-flow=""]`，单测锁定。
   - **后续**：导航条可迁移到 `ctx.ui.mount`（容器已落地）。
-- **taskboard 冒烟 ✅ 缝机制验证（`examples/taskboard`）**：ui-sidebar 开 `sidebar.panel` list 缝（`034c03fa`）；ui-conversation 加 `setView` 通道（`005d8061`，F9 闭环；F1 孤儿实例 `b5cf95a9` 修复）；taskboard 注册入口 + 视图，点击 setView 切换。**浏览器复验**：点击切视图 + `useTasks` 真实任务。**注意**：示例验证的是缝机制，非 S5 委派台场景（见上）。
+- **缝机制件 ✅ 已验证**：`sidebar.panel` list 缝（`034c03fa`）与 `conversation.view` 视图环 + `setView` 通道（`005d8061`/F9）经示例验证（浏览器点击切视图 + `useTasks`）；**taskboard 示例已移除**（S5 委派台暂不做，示例不再保留在 examples/）。
 - **数据投影**：`useTasks` 单测（投影正确性 + 响应式 + session 作用域隔离）+ host 侧帧广播/基线单测 + 浏览器复验。
 - **安全**：S4 拒绝 html 内嵌的测试（markdown 渲染器对 `<script>` 的处置）。
 - **性能（F10）**：S3/S4 的流内分发不破坏 ChatView 的渲染预算（节点级 memo、chunk 风暴只重渲 StreamingTail）——加性能冒烟。
