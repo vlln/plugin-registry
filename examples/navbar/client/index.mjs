@@ -43,11 +43,6 @@ export default {
   width: 22px; border-radius: 999px;
   background: var(--dsw-alias-text-accent, #4c9aff);
 }
-[data-vlln-dot].pulse { animation: vlln-navbar-pulse .9s ease-out; }
-@keyframes vlln-navbar-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(76, 154, 255, .55); }
-  100% { box-shadow: 0 0 0 10px rgba(76, 154, 255, 0); }
-}
 [data-vlln-preview] {
   position: fixed; z-index: 910; max-width: 320px; min-width: 200px;
   padding: 10px 12px; border-radius: 10px; font-size: 12px; line-height: 1.55;
@@ -62,7 +57,7 @@ export default {
 }
 [data-vlln-more] { width: 3px; height: 3px; border-radius: 999px; background: rgba(128,128,140,.5); flex: none; }
 @media (prefers-reduced-motion: reduce) {
-  [data-vlln-navbar], [data-vlln-dot], [data-vlln-dot].active, [data-vlln-dot].pulse {
+  [data-vlln-navbar], [data-vlln-dot], [data-vlln-dot].active {
     transition: none; animation: none;
   }
 }
@@ -190,13 +185,12 @@ export default {
           const scroller = scrollerOf()
           if (scroller !== null) {
             scroller.dispatchEvent(new WheelEvent('wheel', {
-              deltaY: 1, bubbles: true, cancelable: true,
+              // 向上（-1）：刷新后页面常在底部，向下（+1）在底部时官方
+              // canMove=false 不记录 wheel 起源，smooth 仍被 follow 拉回。
+              deltaY: -1, bubbles: true, cancelable: true,
             }))
           }
           row.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          // 到达提示：药丸绽开品牌蓝高亮环。
-          dot.classList.add('pulse')
-          setTimeout(() => dot.classList.remove('pulse'), 950)
         })
         if (i === active) dot.classList.add('active')
         bar.appendChild(dot)
@@ -247,15 +241,21 @@ export default {
       scrollScheduled = true
       requestAnimationFrame(() => { scrollScheduled = false; updateActive() })
     }
-    let scroller = scrollerOf()
-    const bindScroller = (): void => {
-      const next = scrollerOf()
-      if (next === scroller) return
-      scroller?.removeEventListener('scroll', onScroll)
-      scroller = next
-      scroller?.addEventListener('scroll', onScroll, { passive: true })
+    // 激活跟踪用 IntersectionObserver（比 scroll 事件绑定鲁棒：行进出
+    // 视口自动触发，不依赖绑定时机/重建；滚动时交叉变化即更新激活态）。
+    let io: IntersectionObserver | null = null
+    const bindIO = (): void => {
+      io?.disconnect()
+      const root = scrollerOf()
+      if (root === null) return
+      io = new IntersectionObserver(() => {
+        if (scrollScheduled) return
+        scrollScheduled = true
+        requestAnimationFrame(() => { scrollScheduled = false; updateActive() })
+      }, { root, rootMargin: '0px 0px -15% 0px', threshold: [0, 0.25, 0.5, 0.75, 1] })
+      userRows().forEach(row => { io?.observe(row) })
     }
-    bindScroller()
+    bindIO()
     render()
 
     // 观察 body 全量，但回调只响应两类变更：流容器被替换，或变更落在
@@ -269,7 +269,7 @@ export default {
     }
     const observer = new MutationObserver((mutations) => {
       bindFlow()
-      bindScroller()
+      bindIO()
       for (const m of mutations) {
         if (m.target === bar || bar.contains(m.target)) continue
         if (m.target === preview || preview.contains(m.target)) continue
@@ -285,7 +285,7 @@ export default {
     return () => {
       observer.disconnect()
       sizeObserver?.disconnect()
-      scroller?.removeEventListener('scroll', onScroll)
+      io?.disconnect()
       window.removeEventListener('resize', position)
       bar.remove()
       preview.remove()

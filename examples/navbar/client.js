@@ -21,11 +21,9 @@ window.__ModuleLoader__.load({
             '[data-vlln-dot]{width:7px;height:7px;border-radius:999px;padding:0;border:none;background:rgba(128,128,140,.45);cursor:pointer;flex:none;transition:width .22s ease,background .22s ease,transform .22s ease}',
             '[data-vlln-dot]:hover{background:rgba(128,128,140,.8);transform:scale(1.25)}',
             '[data-vlln-dot].active{width:22px;border-radius:999px;background:var(--dsw-alias-text-accent,#4c9aff)}',
-            '[data-vlln-dot].pulse{animation:vlln-navbar-pulse .9s ease-out}',
-            '@keyframes vlln-navbar-pulse{0%{box-shadow:0 0 0 0 rgba(76,154,255,.55)}100%{box-shadow:0 0 0 10px rgba(76,154,255,0)}}',
-            '[data-vlln-preview]{position:fixed;z-index:910;max-width:320px;min-width:200px;padding:10px 12px;border-radius:10px;font-size:12px;line-height:1.55;color:var(--dsw-alias-text-1,#eee);background:rgba(24,24,28,.72);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.1);box-shadow:0 4px 14px rgba(0,0,0,.28);overflow:hidden;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;pointer-events:none}',
+                        '[data-vlln-preview]{position:fixed;z-index:910;max-width:320px;min-width:200px;padding:10px 12px;border-radius:10px;font-size:12px;line-height:1.55;color:var(--dsw-alias-text-1,#eee);background:rgba(24,24,28,.72);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.1);box-shadow:0 4px 14px rgba(0,0,0,.28);overflow:hidden;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;pointer-events:none}',
             '[data-vlln-more]{width:3px;height:3px;border-radius:999px;background:rgba(128,128,140,.5);flex:none}',
-            '@media (prefers-reduced-motion: reduce){[data-vlln-navbar],[data-vlln-dot],[data-vlln-dot].active,[data-vlln-dot].pulse{transition:none;animation:none}}',
+            '@media (prefers-reduced-motion: reduce){[data-vlln-navbar],[data-vlln-dot],[data-vlln-dot].active{transition:none;animation:none}}',
           ].join('');
           document.head.appendChild(style);
         }
@@ -139,11 +137,9 @@ window.__ModuleLoader__.load({
                 // 使本次程序化滚动不被 follow 逻辑拉回（合成 wheel 无默认滚动）。
                 var scroller = scrollerOf();
                 if (scroller !== null) {
-                  scroller.dispatchEvent(new WheelEvent('wheel', { deltaY: 1, bubbles: true, cancelable: true }));
+                  scroller.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }));
                 }
                 row.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                d.classList.add('pulse');
-                setTimeout(function () { d.classList.remove('pulse'); }, 950);
               });
             })(rows[i], dot);
             if (i === active) dot.classList.add('active');
@@ -194,15 +190,21 @@ window.__ModuleLoader__.load({
           scrollScheduled = true;
           requestAnimationFrame(function () { scrollScheduled = false; updateActive(); });
         };
-        var scroller = scrollerOf();
-        var bindScroller = function () {
-          var next = scrollerOf();
-          if (next === scroller) return;
-          if (scroller !== null) scroller.removeEventListener('scroll', onScroll);
-          scroller = next;
-          if (scroller !== null) scroller.addEventListener('scroll', onScroll, { passive: true });
+        // 激活跟踪用 IntersectionObserver（行进出视口自动触发，鲁棒）。
+        var io = null;
+        var bindIO = function () {
+          if (io !== null) io.disconnect();
+          var root = scrollerOf();
+          if (root === null) return;
+          io = new IntersectionObserver(function () {
+            if (scrollScheduled) return;
+            scrollScheduled = true;
+            requestAnimationFrame(function () { scrollScheduled = false; updateActive(); });
+          }, { root: root, rootMargin: '0px 0px -15% 0px', threshold: [0, 0.25, 0.5, 0.75, 1] });
+          var rows = userRows();
+          for (var i = 0; i < rows.length; i++) { io.observe(rows[i]); }
         };
-        bindScroller();
+        bindIO();
         render();
 
         // 观察 body 全量，只响应流容器替换或流容器内变更（其他零触发）。
@@ -214,7 +216,7 @@ window.__ModuleLoader__.load({
         };
         var observer = new MutationObserver(function (mutations) {
           bindFlow();
-          bindScroller();
+          bindIO();
           for (var i = 0; i < mutations.length; i++) {
             var m = mutations[i];
             if (m.target === bar || bar.contains(m.target)) continue;
@@ -231,7 +233,7 @@ window.__ModuleLoader__.load({
         return function () {
           observer.disconnect();
           if (sizeObserver !== null) sizeObserver.disconnect();
-          if (scroller !== null) scroller.removeEventListener('scroll', onScroll);
+          if (io !== null) io.disconnect();
           window.removeEventListener('resize', position);
           bar.remove();
           preview.remove();
