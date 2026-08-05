@@ -15,7 +15,7 @@ export default {
     if (typeof document !== 'undefined') {
       const tag = document.createElement('span')
       tag.textContent = '👋 greeter client half active'
-      tag.style.cssText = 'position:fixed;right:8px;bottom:8px;font-size:12px;opacity:.7'
+      tag.style.cssText = 'position:fixed;right:8px;bottom:8px;font-size:12px;opacity:.9;z-index:2147483647'
       document.body?.appendChild(tag)
     }
   },
