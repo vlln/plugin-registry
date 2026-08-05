@@ -34,7 +34,7 @@ English | [中文](README.md)
 
 | 字段 | 默认 | 含义 |
 |---|---|---|
-| `dshHome` | `$DSH_HOME` 或 `~/.dsh` | 要挂载其 `plugins` 目录的 Harness home，由 [`@deepseek-ai/dsh-paths`](../../util/paths/README.md) 解析 |
+| `dshHome` | `$DSH_HOME` 或 `~/.dsh` | 要挂载其 `plugins` 目录的 Harness home，由 [`@deepseek-ai/dsh-paths`](https://github.com/dsh2026/test-vlln/blob/main/packages/util/paths/README.md) 解析 |
 | `harnessVersion` | `0.0.1` | 安装时对照 `engines.dsh` 校验的当前 dsh 版本；部署时应设为真实版本 |
 
 ## Service
