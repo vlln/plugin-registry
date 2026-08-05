@@ -8,7 +8,7 @@
 |---|---|---|
 | S1 | 导航条 | 侧边一条 user message 导航，点击跳转 |
 | S2 | 后台任务 UI | 显示 Agent 启动的后台任务 |
-| S3 | Turn 折叠 | turn 结束后折叠执行过程，只留 Answer |
+| S3 | Turn 折叠 | turn 结束折叠执行过程（**不可行**：区间折叠需官方折叠容器；per-item 回退缝已落地）|
 | S4 | 动态卡片 | Agent 输出结构化标记 → 插件渲染动态卡片 |
 | S5 | Task board | 侧边栏加区域，点击开新页，卡片排列 Agent + 分派 |
 
@@ -31,16 +31,18 @@
 | 数据 | **`task/snapshot` 帧（完整快照，对齐 `session/queue`）→ client 适配器 → `useTasks`** | events.ts 帧变体；session.ts 消费；provide tasks hook → standard kit 自动生成 |
 | UI 位置 | 通用容器 | 同上 |
 
-**落地（评审 F4 修正）**：线协议取**完整快照姿势**（非初稿增量帧）——每变更广播 session 全量列表，重连基线免费；host 侧 `onChanged` + `listOwned` + api-proxy 广播 + **mux 打开推基线**（连接前任务不可见，已修）。tasks 是 session 作用域，`useTasks` 是 session 钩子；列表含 settled 历史（到 owner 销毁）。
+**落地（评审 F4 修正）**：线协议取**完整快照姿势**——每变更广播 session 全量列表，重连基线免费；host 侧 `onChanged` + `listOwned` + api-proxy 广播 + **mux 打开推基线**（连接前任务不可见，已修）。tasks 是 session 作用域，`useTasks` 是 session 钩子；列表含 settled 历史。
 
-### S3 Turn 折叠 ✅ 已实现（conversation.chat.item per-item 回退缝）
+### S3 Turn 折叠 ⚠️ per-item 回退缝已落地，turn 折叠不可行
 
 | 要素 | 机制 | 证据 |
 |---|---|---|
 | 数据 | `node.turn` + `streaming` 标志已存在 | `conversation.ts:92`、`AssistantMarkdown` props |
 | 渲染控制 | **逐 flow item 过判别式，未命中回退官方渲染** | `conversation.chat.item` chain 槽（`ChatView.tsx` renderItem 外包） |
 
-**落地（评审 F1 拍板）**：方案 (a)——**复用 chain 语义**：ChatView 对每个 flow item 调 `renderSlotChain('conversation.chat.item', { item, turnEnds, answerSeqs }, { fallback: 官方渲染 })`——条目判「已结束 turn 的执行过程」接管，组件聚合为可展开折叠块、未命中走官方，零新槽形态。`vlln/turn-fold` 已复验（每 turn 一折叠块、可展开、Answer 保留）。
+**机制件落地（评审 F1 拍板）**：方案 (a)——**复用 chain 语义**：ChatView 对每个 flow item 调 `renderSlotChain('conversation.chat.item', { item, ... }, { fallback: 官方渲染 })`——条目判 item 接管、未命中走官方。逐 item 接管/回退是有效通用机制（官方测试验证）。
+
+**turn 折叠场景不可行**：折叠是**区间语义**（N item → 1 折叠头），per-item 缝只能逐 item 替换——hack 折叠有硬缺陷：卸载原生行丢 tool 展开状态、null 占位破坏间距、上下文注入无 turn 归属。正确形态 M2（纯折叠策略 + 官方折叠容器 + 原生常驻）是官方渲染管线新能力，**已决定不做**——turn-fold 移除。
 
 ### S4 动态卡片 ⚠️ 需数据侧 marker + 渲染点（安全版）
 
@@ -114,7 +116,7 @@
 |---|---|---|---|
 | `sidebar.panel` list 缝 | S5（已开） | **ui-sidebar** 声明 + SidebarRoot panelArea 渲染（shell 归属） | 开一类缝 |
 | `useTasks` client 投影 | S2（已落地） | **`task/snapshot` 帧 + client 适配器 + session 钩子**（`onChanged`/`listOwned` + mux 基线） | 数据投影 |
-| 内容流 per-item 回退缝 | S3（已落地） | **`conversation.chat.item` chain 槽**（逐 item 分发 + fallback 官方渲染） | 机制扩展 |
+| 内容流 per-item 回退缝 | S3（已落地） | **`conversation.chat.item` chain 槽**（逐 item 分发 + fallback）；turn 折叠区间语义不可行 | 机制扩展 |
 | 卡片 marker + keyed 缝 | S4 | marker 识别（线协议/fence 约定）+ 渲染点（有 slots 的层） | 两件 |
 | CSS 变量契约文档化 | 主题 | 文档 | 零代码 |
 | `data-chat-*` 锚点属性契约化 | S1 | 文档（现为未版本化实现细节） | 文档 |
@@ -129,12 +131,12 @@
 
 ## 验证方案（评审 F8 修正：先自渲染，容器落地后替换）
 
-- **S1 冒烟 ✅ 已落地（`examples/navbar`）**：`vlln/navbar` 自渲染导航条，「纯 DOM 锚点契约」：扫描官方每行 `data-chat-flow-kind="user"` + `data-chat-anchor-key`（`ChatView.tsx:655-657`）渲染导航点，点击 `scrollIntoView` 跳转，observer 监听，dispose 清理。**零数据依赖，只靠锚点契约**。
-  - **验证结果**：① 安装/启用 → boot graph 行 + bundle 200；② Chrome dump-dom 见导航条 + 页面完整（未冻结）；③ DOM 单测（worktree `tests/navbar.client.spec.ts`）：点渲染/点击跳转/dispose 清理/**无关变更不重建**。
+- **S1 冒烟 ✅ 已落地（`examples/navbar`）**：`vlln/navbar` 自渲染导航条，「纯 DOM 锚点契约」：扫描官方每行 `data-chat-flow-kind="user"` + `data-chat-anchor-key` 渲染导航点，点击 `scrollIntoView` 跳转，observer 监听，dispose 清理。**零数据依赖，只靠锚点契约**。
+  - **验证结果**：① 安装/启用 → boot graph 行 + bundle 200；② Chrome dump-dom 见导航条（未冻结）；③ DOM 单测（`tests/navbar.client.spec.ts`）：点渲染/点击跳转/dispose/**无关变更不重建**。
   - **发现（印证 F6）**：导航点只覆盖已渲染行——`data-chat-*` 契约化 + 跨窗口导航待补；`z-index:900`（官方模态之下）。
   - **审查修复**：初版 observer 观察 body，render 重建又触发 observer 无限循环冻结；修复为限定 `[data-chat-flow=""]`，单测锁定。
   - **后续**：导航条可迁移到 `ctx.ui.mount`（容器已落地）。
-- **S5 冒烟 ✅ sidebar.panel 缝 + 入口 + 视图切换（`examples/taskboard`）**：ui-sidebar 开 `sidebar.panel` list 缝（`034c03fa`）；ui-conversation 加 `ctx.conversation.setView`（`005d8061`，F9 闭环）；F1 孤儿实例（setView 曾写一次性 store）由 `b5cf95a9` 修复为写共享实例；`vlln/taskboard` 注册 React 入口 + 视图，点击经 setView 切换（无会话退回浮层）。setView 有官方单测；**浏览器复验**：点击切视图 + `useTasks` 显示真实任务。
+- **S5 冒烟 ✅ sidebar.panel 缝 + 入口 + 视图切换（`examples/taskboard`）**：ui-sidebar 开 `sidebar.panel` list 缝（`034c03fa`）；ui-conversation 加 `setView` 通道（`005d8061`，F9 闭环；F1 孤儿实例 `b5cf95a9` 修复为写共享实例）；taskboard 注册入口 + 视图，点击 setView 切换（无会话退回浮层）。**浏览器复验**：点击切视图 + `useTasks` 真实任务。
 - **数据投影**：`useTasks` 单测（投影正确性 + 响应式 + session 作用域隔离）+ host 侧帧广播/基线单测 + 浏览器复验。
 - **安全**：S4 拒绝 html 内嵌的测试（markdown 渲染器对 `<script>` 的处置）。
 - **性能（F10）**：S3/S4 的流内分发不破坏 ChatView 的渲染预算（节点级 memo、chunk 风暴只重渲 StreamingTail）——加性能冒烟。
@@ -142,7 +144,7 @@
 ## 开放决策
 
 1. **缝的覆盖面**：官方按「结构类型」开缝的节奏与优先级（先 sidebar.panel 还是先卡片缝）——由官方产品决策。
-2. **chain 的 per-item 回退语义（F1，已定）**：复用 chain 的 per-render select——新增 `conversation.chat.item` 槽逐 item 分发、fallback 官方渲染（方案 a）；无需新形态。
+2. **chain 的 per-item 回退语义（F1，已定）**：`conversation.chat.item` 槽逐 item 分发、fallback 官方渲染（方案 a）；per-item 缝不覆盖区间折叠（turn 折叠不可行，见 S3）。
 3. **task board 作用域（已实现）**：`ctx.conversation.setView` 已加；「跨 session 全局看板」仍需 root 级视图环（开放项）。
 4. **S4 marker 线协议（F3）**：新 AssistantBlock kind（动 host + 回放兼容）vs fence 语言约定（零 host 改动但易与 shiki 高亮冲突）。
 5. **useTasks 线协议（F4，已定）**：`task/snapshot` 完整快照帧，mux 打开推基线；剩余开放：任务跨页面存活语义、输出流投影（当前只投影状态）、投影节流。
