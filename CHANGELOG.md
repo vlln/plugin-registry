@@ -34,3 +34,4 @@
 - `docs/registry-client-half-design.md`：registry client half 机制（既有）
 - `scripts/install-into-dsh.mjs`：一键集成脚本（复制包 + 打补丁 + 装依赖），README 与 integrating-into-dsh 推广
 - integrating-into-dsh 补「运行」段：官方方式 `npm run build && ./bin/dsh web`、registry 验证、TSX_TSCONFIG_PATH 指向坑（实测 0805 基线 + 脚本安装后 `./bin/dsh web` 启动成功、插件 API 返回 greeter enabled）
+- 文档补 client half 生效边界：CLI `plugin enable` 服务端实时但已运行 web 需重启；面板内启用同进程、刷新页面即可（creating-a-plugin 验证点 + integrating-into-dsh 步骤 3）

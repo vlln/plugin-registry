@@ -55,6 +55,8 @@ Web 组合再挂载面板：
 
 **验证点**：`pnpm install` 后 `dsh plugin list` 输出 `no plugins installed`（命令可用）；启动 Web 后设置页出现「插件」面板。
 
+**client half 生效边界**：`dsh plugin enable` 是服务端实时（`plugin.list` 立即可见），但 client bundle 在 CLI 进程注册——**已运行的 web 需重启**；Web 面板内启用是同进程，**刷新页面即可**。详见 [creating-a-plugin](creating-a-plugin.md#4-安装启用验证)。
+
 ### 4. 冒烟
 
 ```sh
