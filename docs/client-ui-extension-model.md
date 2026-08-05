@@ -31,7 +31,7 @@
 | 数据 | **`task/snapshot` 帧（完整快照，对齐 `session/queue`）→ client 适配器 → `useTasks`** | events.ts 帧变体；session.ts 消费；provide tasks hook → standard kit 自动生成 |
 | UI 位置 | 通用容器 | 同上 |
 
-**落地（评审 F4 修正）**：线协议取**完整快照姿势**（非初稿增量帧）——每变更广播 session 全量任务列表，重连基线免费；host 侧 `onChanged` + `listOwned`（可信宿主投影）+ api-proxy 广播 + **mux 打开推基线**（连接前任务不可见是真实缺陷，已修）。tasks 是 session 作用域，`useTasks` 是 session 钩子。
+**落地（评审 F4 修正）**：线协议取**完整快照姿势**（非初稿增量帧）——每变更广播 session 全量列表，重连基线免费；host 侧 `onChanged` + `listOwned` + api-proxy 广播 + **mux 打开推基线**（连接前任务不可见，已修）。tasks 是 session 作用域，`useTasks` 是 session 钩子；列表含 settled 历史（到 owner 销毁）。
 
 ### S3 Turn 折叠 ⚠️ 内容流分发维度需扩展
 
