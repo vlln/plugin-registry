@@ -74,10 +74,7 @@ registry 插件是**消费者**：`inject: ['tasks']` 登记自己的后台任�
 
 所以 registry 插件的浏览器 bundle 永远进不了 `__DSH_BOOT__`。client 插件应做成**独立 `dsh-client-*` 包**（`dshClient` 声明 + `exports ./client` + tsdown client preset + web roster 行），走官方组合通道——`ui-plugin-manager` 自己就是这个形态。
 
-**若要让 registry 插件带 client half**，需要打通两条路（未实现，属扩展方向）：
-
-1. **登记**：registry 插件安装/启用时把其 client 包声明注入 boot graph（`ClientModuleHostService` 增加来自 `plugin-local` 的动态 dshClient 行来源）。
-2. **分发**：registry 插件的 tarball 需包含 client bundle，安装时放进 `<dshHome>/plugins` 且能被 `/plugins` 路由服务到。
+**若要让 registry 插件带 client half**，需要打通两条路（登记：`ClientModuleHostService` 增加动态 dshClient 来源；分发：tarball 携带 client bundle，`/plugins` 路由可服务）。完整机制设计见 [registry client half 设计稿](registry-client-half-design.md)（未实现）。
 
 ## 与 pi-mono 插件的对比
 
