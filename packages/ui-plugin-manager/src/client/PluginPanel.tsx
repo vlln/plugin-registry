@@ -33,6 +33,7 @@ export function PluginPanel(props: PluginPanelProps): React.ReactNode {
   const [plugins, setPlugins] = useState<PluginEntryView[]>([])
   const [query, setQuery] = useState('')
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | undefined>(undefined)
 
   const refresh = useCallback(async (): Promise<void> => {
     const response = await api.plugins.list({})
@@ -41,10 +42,21 @@ export function PluginPanel(props: PluginPanelProps): React.ReactNode {
 
   const run = useCallback(async (action: 'install' | 'enable' | 'disable' | 'uninstall', id: string): Promise<void> => {
     setBusy(true)
+    setError(undefined)
     try {
       const call = api.plugins[action]
-      await call({ id })
+      const response = await call({ id })
+      // The RPC carrier returns ok:false for business failures (a broken
+      // enable, a missing source) instead of throwing — surface it or the
+      // click looks dead.
+      if (!response.result.ok) {
+        const message = response.result.error.message
+        setError(`操作失败：${id} — ${message}`)
+        return
+      }
       await refresh()
+    } catch (caught: unknown) {
+      setError(`操作失败：${id} — ${caught instanceof Error ? caught.message : String(caught)}`)
     } finally {
       setBusy(false)
     }
@@ -70,6 +82,7 @@ export function PluginPanel(props: PluginPanelProps): React.ReactNode {
         onChange={(event) => { setQuery(event.target.value) }}
         aria-label="搜索插件"
       />
+      {error !== undefined ? <p className={css.error} role="alert">{error}</p> : null}
       <ul className={css.list}>
         {filtered.map(plugin => (
           <li key={plugin.id} className={css.row}>

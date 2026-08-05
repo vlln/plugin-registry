@@ -97,3 +97,13 @@
   text-align: center;
   padding: 24px 0;
 }
+
+.error {
+  color: var(--dsw-alias-danger-fg);
+  font-size: 13px;
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-danger-border, currentColor);
+  border-radius: 6px;
+  background: var(--dsw-alias-danger-bg, transparent);
+}

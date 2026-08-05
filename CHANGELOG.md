@@ -7,7 +7,7 @@
 本仓库是「官方基线 + patch + package」构建式仓库（见 [AGENTS.md](AGENTS.md)），交付时需标明基线：
 
 - **机制分支基线**：官方 0805 快照（`20260805T134133Z`，提交 `9e785ce`）——worktree 分支已对齐
-- **patch 基线**：`patches/dsh-plugin-registry.patch` 基于官方 **0804** 快照生成，**尚未重新生成**到 0805（待办：机制大轮后需基于新基线重新生成，见 `docs/cookbook/distributing-plugins.md` 生成命令）
+- **patch 基线**：`patches/dsh-plugin-registry.patch` 已基于官方 0805 快照重新生成（84 文件，含 S2/S3/mount 机制件），与机制分支同步
 
 ## 2026-08（plugin-registry 机制件大轮）
 

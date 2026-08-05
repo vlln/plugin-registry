@@ -6,6 +6,11 @@ import { PluginPanel, type PluginPanelProps } from '../src/client/PluginPanel.ts
 
 afterEach(cleanup)
 
+/** Enable-call shape with the RPC failure branch (ok:false) a test stubs. */
+type EnableCall = (payload: { id: string }) => Promise<{
+  result: { ok: boolean; error?: { code: string; message: string; details: unknown }; value?: { id: string } }
+}>
+
 function entry(overrides: Partial<PluginEntryView>): PluginEntryView {
   return {
     id: 'acme/tool',
@@ -36,7 +41,9 @@ function pluginsApi() {
         patch(payload.id, { installed: true, enabled: false })
         return { result: { ok: true as const, value: payload } }
       }),
-      enable: vi.fn(async (payload: { id: string }) => {
+      // RPC responses carry both outcomes; the wide return type lets a test
+      // stub a business failure (ok:false) through mockImplementation.
+      enable: vi.fn<EnableCall>(async (payload: { id: string }) => {
         calls.push(`enable:${payload.id}`)
         patch(payload.id, { enabled: true })
         return { result: { ok: true as const, value: payload } }
@@ -120,5 +127,29 @@ describe('PluginPanel', () => {
     const { api } = pluginsApi()
     render(<PluginPanel {...props(api)} />)
     await screen.findByText(/尚未发现插件/)
+  })
+
+  it('surfaces an enable failure instead of staying silent', async () => {
+    const { api, setRows } = pluginsApi()
+    setRows([entry({ id: 'broken/ghost', installed: true, enabled: false })])
+    // The RPC carrier returns ok:false for business failures (declared tool
+    // never registered), not a thrown rejection — the failure shape is the
+    // runtime reality the panel must surface.
+    api.plugins.enable.mockImplementation(async () => ({
+      result: {
+        ok: false,
+        error: { code: 'internal', message: 'plugin broken/ghost declares tools [ghost-tool] but registered none', details: {} },
+      },
+    }))
+    render(<PluginPanel {...props(api)} />)
+    await screen.findByText('broken/ghost')
+
+    fireEvent.click(screen.getByText('启用'))
+    // The failure is visible: the row still reads disabled and an alert shows
+    // the API message — no dead click.
+    await screen.findByRole('alert')
+    expect(screen.getByRole('alert').textContent).toContain('broken/ghost')
+    expect(screen.getByRole('alert').textContent).toContain('ghost-tool')
+    expect(screen.getByText('已禁用')).toBeTruthy()
   })
 })
