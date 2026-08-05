@@ -29,7 +29,7 @@
 后果：
 
 - registry 插件**不出现在** cordis.yml / dump-config 的组合输出里。
-- `modules` 的 dshClient 扫描只看 Loader 树 → registry 插件的浏览器 bundle 不会进入 `__DSH_BOOT__`（client 插件应走独立 dshClient 包通道，见「web 边界」）。
+- `modules` 的 dshClient 扫描只看 Loader 树 → registry 插件的 client half **不靠扫描**进 `__DSH_BOOT__`，而是启用时经 `ClientModuleHostService.registerExternal` 运行时登记（见「web 边界」）。
 - 两者**同进程同 context**：registry 插件可 inject 官方树服务，官方插件可见它提供的服务。
 
 ## 能力面 vs 声明面（contributes）
