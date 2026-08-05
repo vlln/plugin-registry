@@ -36,6 +36,7 @@ Web 设置页「插件」面板：
 - **安装/启停**：目录或 tarball（解压防路径穿越）；启停实时生效
 - **Web 面板**：设置页「插件」区，浏览、搜索、安装、启停、卸载
 - **client half**：插件可带浏览器端 bundle，启用后进入 `__DSH_BOOT__` 在 Web 端运行（`client` 声明 + 运行时登记）
+- **UI 扩展机制件**（官方树提供，示例验证）：`sidebar.panel` 缝、`conversation.view` 视图环 + `setView`、`conversation.chat.item` per-item 缝、`ctx.ui.mount` 通用容器、`useTasks` 数据投影——统一模型见 [client UI 扩展心智模型](docs/client-ui-extension-model.md)
 - **信任边界**：安装默认禁用，显式启用才执行
 - **脚手架**：`dsh plugin create <id>` 一键生成标准插件根
 
@@ -43,7 +44,9 @@ Web 设置页「插件」面板：
 
 | 示例 | 说明 |
 |---|---|
-| [`examples/greeter`](examples/greeter/README.md) | Node 侧 greet 工具 + 浏览器端 client half（清单 + 双入口） |
+| [`examples/greeter`](examples/greeter/README.md) | Node 侧 greet 工具 + 浏览器端 client half（经 `ctx.ui.mount` 渲染浮层） |
+| [`examples/navbar`](examples/navbar/README.md) | S1 自渲染导航条：对话流 user 消息导航，仅对话页显示（DOM 锚点契约） |
+| [`examples/task-status`](examples/task-status/README.md) | S2 后台任务状态条：对话框上方实时显示该会话后台任务（`useTasks`，仅对话页、完成后消失、点击展开详情） |
 | [`examples/loop`](examples/loop/README.md) | `/loop` 命令 + `loop` 工具，按间隔向当前 agent 重复投递 prompt（对齐 Claude Code `/loop`） |
 
 ## Agent Skill
