@@ -2,6 +2,14 @@
 
 目标：把 plugin-registry 集成进 DSH 源码环境，让 `dsh plugin` 命令与 Web 设置页插件面板可用。集成方式与社区其他扩展一致：**复制包 + git apply 补丁 + 组合启用**。
 
+## 一键安装（推荐）
+
+```sh
+node scripts/install-into-dsh.mjs <dsh-monorepo路径>
+```
+
+自动完成：复制 `packages/plugin`、`packages/ui-plugin-manager` 进 monorepo → `git apply` 接线补丁（先 dry-run）→ `pnpm install`。脚本校验目标必须是 DSH monorepo 根（含 `package.json` + `pnpm-workspace.yaml`），补丁基线不匹配时提示用 `--3way` 手动对齐。
+
 ## 前置条件
 
 - DSH 源码环境：官方 0805 快照 `20260805T134133Z` 或兼容布局，pnpm workspace。

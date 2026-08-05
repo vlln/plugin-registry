@@ -32,3 +32,4 @@
 - `docs/client-ui-extension-model.md`：统一心智模型（一个 slot 体系 + 四种匹配 + 数据投影；两轴 = 缝 + mount）
 - `docs/generic-client-render-container-design.md`：通用渲染容器设计（已实现）
 - `docs/registry-client-half-design.md`：registry client half 机制（既有）
+- `scripts/install-into-dsh.mjs`：一键集成脚本（复制包 + 打补丁 + 装依赖），README 与 integrating-into-dsh 推广

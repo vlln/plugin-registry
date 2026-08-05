@@ -4,6 +4,8 @@ DeepSeek Harness 的本地插件系统：清单协议、安装/启停、Web 管�
 
 ## 快速上手
 
+### 已有 registry 的 dsh（插件用户）
+
 ```sh
 dsh plugin create acme/cool-tool   # 脚手架：生成 dsh.plugin.json + index.mjs + README
 cd cool-tool
@@ -16,6 +18,14 @@ dsh plugin list                    # 列表
 不想从空脚手架开始？复制示例：`cp -r examples/greeter ./my-tool`，改 `id` 与工具注册即可。完整指南见 [创建插件](docs/cookbook/creating-a-plugin.md)。
 
 要定时循环能力（轮询部署、照看 PR、build-fix-test 循环）？安装 `examples/loop`：`dsh plugin install ./examples/loop && dsh plugin enable acme/loop`，然后 `/loop 5m check the deploy`。
+
+### 从源码集成 registry（给 DSH 开发者）
+
+```sh
+node scripts/install-into-dsh.mjs <dsh-monorepo路径>
+```
+
+一键完成：复制插件包 + 打接线补丁 + 装依赖。详见 [集成到 dsh](docs/cookbook/integrating-into-dsh.md)。
 
 ## 展示
 
