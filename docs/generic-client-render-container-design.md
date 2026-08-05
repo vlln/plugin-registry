@@ -1,6 +1,6 @@
 # 设计：client 通用渲染容器（generic client render container）
 
-状态：**设计稿，未实现**。目标：让 registry client 插件获得 Obsidian 式的通用 UI 挂载能力——官方维护一组通用渲染容器与 API，插件往里渲染自己的 React UI，而不是依赖官方为每个插件挖专用 slot hole。本文是 [registry client half](registry-client-half-design.md) 的能力扩展：前者解决「bundle 怎么进浏览器」，本文解决「插件的 UI 挂到哪里」。
+状态：**已实现**（runtime client half `ctx.ui`，worktree `feat/plugin-registry-mvp`）。目标：让 registry client 插件获得 Obsidian 式的通用 UI 挂载能力——官方维护一组通用渲染容器与 API，插件往里渲染自己的 React UI，而不是依赖官方为每个插件挖专用 slot hole。本文是 [registry client half](registry-client-half-design.md) 的能力扩展：前者解决「bundle 怎么进浏览器」，本文解决「插件的 UI 挂到哪里」。
 
 ## 问题：专用 hole 的扩展成本
 

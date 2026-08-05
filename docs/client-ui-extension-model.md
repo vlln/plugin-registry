@@ -100,13 +100,13 @@
 
 **规律**：官方把 host 服务投影成 client 钩子（sessions/workspaces/sessionHistory 三实例），一次做对所有插件有用。`useTasks` 是第一个补完的实例（原本连 wire 面都没有）。tasks 是 **session 作用域**，`useTasks` 是 session 钩子。
 
-### 3. 通用渲染容器（附加式 UI 的标准化，第二轴）
+### 3. 通用渲染容器（附加式 UI 的标准化，第二轴）✅ 已实现
 
-浮层/角标/导航条（S1）这类**附加式** UI：官方维护 body 级容器，插件经 `ctx.ui.mount` 渲染（姊妹稿）。它解决「流外附加」，不解决「树内嵌入」——与缝是**不同轴**（mount 服务 vs 树内槽）。
+浮层/角标/导航条（S1）这类**附加式** UI：官方维护 body 级容器，插件经 `ctx.ui.mount` 渲染（姊妹稿已实现：overlay/floating + per-mount root + error boundary + fiber 生命周期）。解决「流外附加」，与缝是**不同轴**；greeter 已迁移验证。
 
 ### 4. 主题/skin（视觉层，已免费）
 
-换颜色/字体/间距 = **CSS 变量覆盖**——插件 CSS 全局注入（`<style data-plugin>`）+ body 内联变量（`theme-presenter.ts`），**零官方改动**。缺的是「把 CSS 变量契约 + 类名契约文档化为稳定 API」。
+换颜色/字体/间距 = **CSS 变量覆盖**（插件 CSS 全局注入 `<style data-plugin>` + body 内联变量），**零官方改动**。缺的是「CSS 变量 + 类名契约文档化」。
 
 ## 官方需补的机制件清单（按场景推导，评审修正）
 
@@ -133,7 +133,7 @@
   - **验证结果**：① 安装/启用 → boot graph 行 + bundle 200；② Chrome dump-dom 见导航条 + 页面完整（未冻结）；③ DOM 单测（worktree `tests/navbar.client.spec.ts`）：点渲染/点击跳转/dispose 清理/**无关变更不重建**。
   - **发现（印证 F6）**：导航点只覆盖已渲染行——`data-chat-*` 契约化 + 跨窗口导航待补；`z-index:900`（官方模态之下）。
   - **审查修复**：初版 observer 观察 body，render 重建又触发 observer 无限循环冻结；修复为限定 `[data-chat-flow=""]`，单测锁定。
-  - **后续**：通用容器落地后，导航条可替换为 `ctx.ui.mount`。
+  - **后续**：导航条可迁移到 `ctx.ui.mount`（容器已落地）。
 - **S5 冒烟 ✅ sidebar.panel 缝 + 入口 + 视图切换（`examples/taskboard`）**：ui-sidebar 开 `sidebar.panel` list 缝（`034c03fa`）；ui-conversation 加 `ctx.conversation.setView`（`005d8061`，F9 闭环）；F1 孤儿实例（setView 曾写一次性 store）由 `b5cf95a9` 修复为写共享实例；`vlln/taskboard` 注册 React 入口 + 视图，点击经 setView 切换（无会话退回浮层）。setView 有官方单测；**浏览器复验**：点击切视图 + `useTasks` 显示真实任务。
 - **数据投影**：`useTasks` 单测（投影正确性 + 响应式 + session 作用域隔离）+ host 侧帧广播/基线单测 + 浏览器复验。
 - **安全**：S4 拒绝 html 内嵌的测试（markdown 渲染器对 `<script>` 的处置）。

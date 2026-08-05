@@ -1,29 +1,37 @@
-// acme/greeter 的 client bundle 产物（示例提交的手写等价物）。
-//
-// 契约（与官方 client 包一致）：脚本执行时调用
-// window.__ModuleLoader__.load({ id, factory })，factory(require) 返回
-// Cordis 插件的导出面；浏览器侧随后按 graph row（id 必须等于
-// `acme/greeter`）创建 fiber 并 apply。
-//
-// 实际开发中请用构建工具生成此文件（见 README.md「构建 client bundle」），
-// 手写产物仅用于此示例：无外部依赖、无 CSS、无 sourcemap，factory 直接
-// 返回源码模块。
-var module = { exports: {} };
-var exports = module.exports;
 window.__ModuleLoader__.load({
-  id: 'acme/greeter',
-  factory: function (require) {
-    module.exports = {
-      name: 'greeter-client',
-      apply: function (ctx) {
-        if (typeof document !== 'undefined') {
-          var tag = document.createElement('span');
-          tag.textContent = '👋 greeter client half active';
-          tag.style.cssText = 'position:fixed;right:8px;bottom:8px;font-size:12px;opacity:.9;z-index:2147483647';
-          if (document.body) document.body.appendChild(tag);
-        }
-      },
-    };
-    return module.exports;
-  },
+	id: "acme/greeter",
+	factory: (require) => {
+		var module = { exports: {} };
+		var exports = module.exports;
+		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
+		let react_jsx_runtime = require("react/jsx-runtime");
+		//#region src/client/index.tsx
+		/** 需要此插件声明的服务：ui（通用渲染容器）。 */
+		const inject = ["ui"];
+		function apply(ctx) {
+			ctx.ui.mount({
+				container: "overlay",
+				priority: 100
+			}).render(/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+				style: {
+					position: "fixed",
+					right: 8,
+					bottom: 8,
+					fontSize: 12,
+					opacity: .9
+				},
+				children: "👋 greeter client half active"
+			}));
+		}
+		//#endregion
+		//#region src/client/index.ts
+		const name = "greeter-client";
+		//#endregion
+		exports.apply = apply;
+		exports.inject = inject;
+		exports.name = name;
+		return module.exports;
+	}
 });
+
+//# sourceMappingURL=client.js.map
