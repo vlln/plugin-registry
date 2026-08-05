@@ -12,20 +12,22 @@ window.__ModuleLoader__.load({
         // 导航条容器：fixed 定位，水平位置跟随对话流列（见 position()）。
         var bar = document.createElement('nav');
         bar.setAttribute('aria-label', '用户消息导航');
-        bar.style.cssText = 'position:fixed;top:50%;transform:translateY(-50%);z-index:900;display:flex;flex-direction:column;gap:4px;padding:8px;background:rgba(20,20,20,.85);border-radius:8px;font-family:system-ui;';
+        bar.style.cssText = 'position:fixed;top:50%;transform:translateY(-50%);z-index:900;display:flex;flex-direction:column;gap:4px;padding:8px;background:rgba(20,20,20,.85);border-radius:8px;font-family:system-ui;max-height:calc(100vh - 32px);overflow-y:auto;';
         var body = document.body;
         if (body === null) return;
         body.appendChild(bar);
-        // 位置：贴近对话流列右缘 + 12px 间距（不是视口右缘）；只在变化时写。
+        // 位置：贴近对话流列右缘 + 12px 间距。只在列移动时触发（列重建/
+        // 尺寸变化/窗口 resize）——绝不进 render 的每帧路径：getBoundingClientRect
+        // 强制 reflow，高频跑会拖死主线程。
+        var flowOf = function () { return document.querySelector('[data-chat-flow=""]'); };
         var position = function () {
-          var flow = document.querySelector('[data-chat-flow=""]');
+          var flow = flowOf();
           if (flow === null) return;
           var next = Math.round(flow.getBoundingClientRect().right + 12) + 'px';
           if (bar.style.left !== next) bar.style.left = next;
         };
         // 重建导航点：每个 user 消息一个可导航点；点数未变跳过重建。
         var render = function () {
-          position();
           var rows = Array.prototype.slice.call(document.querySelectorAll('[data-chat-flow-kind="user"]'));
           if (rows.length === bar.childElementCount) return;
           bar.textContent = '';
@@ -41,25 +43,41 @@ window.__ModuleLoader__.load({
             bar.appendChild(dot);
           });
         };
-        render();
-        // 观察 body 全量 + 过滤自身变更 + rAF 去抖：覆盖对话流挂载/重建
-        // （hero → active、会话切换、翻页），同时避免重建循环。
+        // 流容器绑定：初始 + 每次检测到流重建时重绑尺寸观察并重新定位。
+        var flow = flowOf();
+        var sizeObserver = null;
+        var bindFlow = function () {
+          var next = flowOf();
+          if (next === flow) return;
+          flow = next;
+          if (sizeObserver !== null) sizeObserver.disconnect();
+          sizeObserver = flow === null ? null : new ResizeObserver(function () { position(); });
+          if (sizeObserver !== null && flow !== null) sizeObserver.observe(flow);
+          position();
+        };
+        bindFlow();
+        render(); // 初始渲染（后续变更经 observer 增量更新）
+        window.addEventListener('resize', position);
+        // 观察 body 全量，但回调只响应两类变更：流容器被替换，或变更落在
+        // 当前流容器内。其他区域完全不触发——避免每帧 reflow 拖死页面。
         var scheduled = false;
-        var observer = new MutationObserver(function (mutations) {
-          for (var i = 0; i < mutations.length; i++) {
-            var m = mutations[i];
-            if (m.target === bar || bar.contains(m.target)) return;
-          }
+        var schedule = function () {
           if (scheduled) return;
           scheduled = true;
           requestAnimationFrame(function () { scheduled = false; render(); });
+        };
+        var observer = new MutationObserver(function (mutations) {
+          bindFlow();
+          for (var i = 0; i < mutations.length; i++) {
+            var m = mutations[i];
+            if (m.target === bar || bar.contains(m.target)) continue;
+            if (flow !== null && (m.target === flow || flow.contains(m.target))) {
+              schedule();
+              return;
+            }
+          }
         });
         observer.observe(body, { childList: true, subtree: true });
-        // 列宽变化（面板开合/resize）移动列：单独跟一次尺寸。
-        var flow = document.querySelector('[data-chat-flow=""]');
-        var sizeObserver = flow === null ? null : new ResizeObserver(function () { position(); });
-        if (sizeObserver !== null && flow !== null) sizeObserver.observe(flow);
-        window.addEventListener('resize', position);
         return function () {
           observer.disconnect();
           if (sizeObserver !== null) sizeObserver.disconnect();

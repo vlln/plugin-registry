@@ -15,26 +15,26 @@ export default {
     // z-index 取官方浮层阶梯之下、正文之上。
     const bar = document.createElement('nav')
     bar.setAttribute('aria-label', '用户消息导航')
-    bar.style.cssText = 'position:fixed;top:50%;transform:translateY(-50%);z-index:900;display:flex;flex-direction:column;gap:4px;padding:8px;background:rgba(20,20,20,.85);border-radius:8px;font-family:system-ui;'
+    bar.style.cssText = 'position:fixed;top:50%;transform:translateY(-50%);z-index:900;display:flex;flex-direction:column;gap:4px;padding:8px;background:rgba(20,20,20,.85);border-radius:8px;font-family:system-ui;max-height:calc(100vh - 32px);overflow-y:auto;'
     const body = document.body
     if (body === null) return
     body.appendChild(bar)
 
-    // 位置：贴近对话流列右缘 + 12px 间距（不是视口右缘）——对话流是居中
-    // 列，侧边栏/细节面板开合或窗口 resize 都会移动它，所以每次定位都
-    // 现算现设；只在 left 变化时写样式，避免无谓重排。
+    // 位置：贴近对话流列右缘 + 12px 间距（不是视口右缘）。只在列移动时
+    // 触发（列重建 / 列尺寸变化 / 窗口 resize）——绝不放进 render 的每帧
+    // 路径：getBoundingClientRect 强制 reflow，高频跑会拖死主线程。
     const position = (): void => {
-      const flow = document.querySelector('[data-chat-flow=""]')
+      const flow = flowOf()
       if (flow === null) return
       const next = `${Math.round(flow.getBoundingClientRect().right + 12)}px`
       if (bar.style.left !== next) bar.style.left = next
     }
+    const flowOf = (): HTMLElement | null => document.querySelector('[data-chat-flow=""]')
 
     // 重建导航点：扫描官方已渲染的 user 消息行——每个 user 消息一个可
     // 导航点（DOM 锚点契约，非数据通道）。点数未变（无新 user 消息）时
     // 跳过重建，避免 streaming 高频触发下反复清空重建导航条。
     const render = (): void => {
-      position()
       const rows = [...document.querySelectorAll('[data-chat-flow-kind="user"]')]
       if (rows.length === bar.childElementCount) return
       bar.textContent = ''
@@ -50,25 +50,46 @@ export default {
         bar.appendChild(dot)
       })
     }
-    render()
 
-    // 观察 body 全量 + 过滤自身变更 + rAF 去抖：覆盖对话流挂载/重建
-    // （hero → active、会话切换、翻页）——之前只观察 apply 时的流容器，
-    // 它重建（或启动时尚未挂载）后导航条就再也不会更新。过滤掉 bar 自身
-    // 的变更防止重建循环，rAF 合并同帧多次变更。
+    // 流容器绑定：初始 + 每次检测到流重建（会话切换/hero→active 等）时
+    // 重绑尺寸观察并重新定位。sizeObserver 观察流容器尺寸（面板开合、
+    // resize 引起的列移动）。
+    let flow = flowOf()
+    let sizeObserver: ResizeObserver | null = null
+    const bindFlow = (): void => {
+      const next = flowOf()
+      if (next === flow) return
+      flow = next
+      sizeObserver?.disconnect()
+      sizeObserver = flow === null ? null : new ResizeObserver(() => { position() })
+      if (sizeObserver !== null && flow !== null) sizeObserver.observe(flow)
+      position()
+    }
+    bindFlow()
+    render() // 初始渲染（后续变更经 observer 增量更新）
+    window.addEventListener('resize', position)
+
+    // 观察 body 全量，但回调只响应两类变更：流容器被替换（重建），或
+    // 变更落在当前流容器内（新消息/翻页）。其他区域（侧边栏、其他插件
+    // UI、导航条自身）完全不触发——避免每帧 reflow 拖死页面。rAF 去抖
+    // 合并流区域内同帧的多次变更。
     let scheduled = false
-    const observer = new MutationObserver((mutations) => {
-      if (mutations.some(m => m.target === bar || bar.contains(m.target))) return
+    const schedule = (): void => {
       if (scheduled) return
       scheduled = true
       requestAnimationFrame(() => { scheduled = false; render() })
+    }
+    const observer = new MutationObserver((mutations) => {
+      bindFlow() // 流可能刚被替换（会话切换）
+      for (const m of mutations) {
+        if (m.target === bar || bar.contains(m.target)) continue
+        if (flow !== null && (m.target === flow || flow.contains(m.target))) {
+          schedule()
+          return
+        }
+      }
     })
     observer.observe(body, { childList: true, subtree: true })
-    // 列宽变化（面板开合/resize）不动导航点集合但移动列：单独跟一次尺寸。
-    const flow = document.querySelector('[data-chat-flow=""]')
-    const sizeObserver = flow === null ? null : new ResizeObserver(() => { position() })
-    if (sizeObserver !== null && flow !== null) sizeObserver.observe(flow)
-    window.addEventListener('resize', position)
 
     // 插件生命周期：unload 时清理（fiber dispose → apply 返回的 disposer）。
     return () => {
