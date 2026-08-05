@@ -31,8 +31,8 @@ export default {
   transition: background .18s ease, border-color .18s ease;
 }
 [data-vlln-navbar]:hover {
-  background: rgba(30, 30, 34, .55);
-  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  background: rgba(30, 30, 34, .32);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
   border-color: rgba(255, 255, 255, .08);
 }
 [data-vlln-dot] {
@@ -57,7 +57,7 @@ export default {
   background: rgba(24, 24, 28, .72);
   -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
   border: 1px solid rgba(255, 255, 255, .1);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, .35);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .28);
   overflow: hidden; white-space: pre-wrap; word-break: break-word;
   display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical;
   pointer-events: none;

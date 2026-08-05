@@ -17,13 +17,13 @@ window.__ModuleLoader__.load({
           style.id = STYLE_ID;
           style.textContent = [
             '[data-vlln-navbar]{position:fixed;top:50%;transform:translateY(-50%);z-index:900;display:flex;flex-direction:column;gap:10px;padding:8px;border-radius:12px;font-family:system-ui;max-height:calc(100vh - 32px);overflow-y:auto;background:transparent;border:1px solid transparent;transition:background .18s ease,border-color .18s ease}',
-            '[data-vlln-navbar]:hover{background:rgba(30,30,34,.55);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-color:rgba(255,255,255,.08)}',
+            '[data-vlln-navbar]:hover{background:rgba(30,30,34,.32);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-color:rgba(255,255,255,.08)}',
             '[data-vlln-dot]{width:7px;height:7px;border-radius:999px;padding:0;border:none;background:rgba(128,128,140,.45);cursor:pointer;flex:none;transition:width .22s ease,background .22s ease,transform .22s ease}',
             '[data-vlln-dot]:hover{background:rgba(128,128,140,.8);transform:scale(1.25)}',
             '[data-vlln-dot].active{width:22px;border-radius:999px;background:var(--dsw-alias-text-accent,#4c9aff)}',
             '[data-vlln-dot].pulse{animation:vlln-navbar-pulse .9s ease-out}',
             '@keyframes vlln-navbar-pulse{0%{box-shadow:0 0 0 0 rgba(76,154,255,.55)}100%{box-shadow:0 0 0 10px rgba(76,154,255,0)}}',
-            '[data-vlln-preview]{position:fixed;z-index:910;max-width:320px;min-width:200px;padding:10px 12px;border-radius:10px;font-size:12px;line-height:1.55;color:var(--dsw-alias-text-1,#eee);background:rgba(24,24,28,.72);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.1);box-shadow:0 8px 28px rgba(0,0,0,.35);overflow:hidden;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;pointer-events:none}',
+            '[data-vlln-preview]{position:fixed;z-index:910;max-width:320px;min-width:200px;padding:10px 12px;border-radius:10px;font-size:12px;line-height:1.55;color:var(--dsw-alias-text-1,#eee);background:rgba(24,24,28,.72);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.1);box-shadow:0 4px 14px rgba(0,0,0,.28);overflow:hidden;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;pointer-events:none}',
             '[data-vlln-more]{width:3px;height:3px;border-radius:999px;background:rgba(128,128,140,.5);flex:none}',
             '@media (prefers-reduced-motion: reduce){[data-vlln-navbar],[data-vlln-dot],[data-vlln-dot].active,[data-vlln-dot].pulse{transition:none;animation:none}}',
           ].join('');
@@ -85,7 +85,9 @@ window.__ModuleLoader__.load({
 
         // 预览：消息开头（CSS line-clamp 6 行截断）。
         var showPreview = function (row, anchor) {
-          var text = (row.textContent || '').trim();
+          // 消息文本 = 气泡内文本（排除时间戳/操作按钮/分支提示）。
+          var bubble = row.querySelector('[class*="bubble"]');
+          var text = ((bubble !== null ? bubble : row).textContent || '').trim();
           if (text === '') return;
           preview.textContent = text;
           preview.style.display = 'block';

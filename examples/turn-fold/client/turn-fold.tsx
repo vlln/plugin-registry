@@ -10,6 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // SlotMap merge: conversation.chat.item (ui-conversation) is declared by its
 // contract.
+import type { ChatFlowItemOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { deferRegistration, type PropsLocale, type PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 
@@ -22,24 +23,27 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 const NS = 'turn-fold'
 const zh = {
-  'fold.label': '已折叠 {count} 个工具调用',
+  'fold.label': '已折叠第 {count} 轮执行过程',
   'fold.expand': '展开',
 } satisfies Record<string, string>
 /** Turn-fold namespace key union. */
 type TurnFoldKey = keyof typeof zh
 const en = {
-  'fold.label': '{count} tool call(s) folded',
+  'fold.label': 'Turn {count} execution folded',
   'fold.expand': 'Expand',
 } satisfies Record<string, string>
 
 /**
- * 折叠已完成工具组的渲染器。select 是 owner 的纯函数（只判 flow item）：
- * tool-group（工具调用组）接管折叠，其余 item 未命中走官方渲染。
+ * 折叠已结束 turn 的"执行过程"的渲染器：工具调用组 + 中间文本（非 Answer）。
+ * select 是 owner 纯函数，用 owner 携带的 turn 上下文判别：
+ * - tool-group：所属 turn 已结束 → 折叠
+ * - assistant：非 Answer（不在 answerSeqs）且所属 turn 已结束 → 折叠（中间文本）
+ * - Answer / user / 未结束 turn 的 item → 未命中走官方渲染
  */
 export function TurnFoldRow(
-  props: PropsRuntime<'conversation.chat.item'> & PropsLocale<'turn-fold'> & { matched: { folded: true } },
+  props: PropsRuntime<'conversation.chat.item'> & PropsLocale<'turn-fold'> & { matched: { folded: true; turn: number } },
 ): ReactNode {
-  const { t } = props
+  const { t, matched } = props
   return (
     <div
       style={{
@@ -49,18 +53,25 @@ export function TurnFoldRow(
         borderRadius: 6, color: 'var(--dsw-alias-text-muted, #999)',
       }}
     >
-      {t('fold.label', { count: 0 })}
+      {t('fold.label', { count: matched.turn })}
     </div>
   )
 }
 
-/** 判别式：只折叠工具调用组（已完成 = 全是 tool-result 的组）。 */
-export function select(owner: { item: { kind: string; results?: readonly unknown[] } }): { folded: true } | null {
-  if (owner.item.kind !== 'tool-group') return null
-  // 组里没有 running 调用即已完成（tool-result 组）；折叠它。
-  const results = owner.item.results ?? []
-  if (results.length === 0) return null
-  return { folded: true }
+/** 判别式：折叠"已结束 turn 的执行过程"（工具组 + 中间文本），Answer 与未结束 turn 走官方。 */
+export function select(owner: ChatFlowItemOwnerProps): { folded: true; turn: number } | null {
+  const { item, turnEnds, answerSeqs } = owner
+  if (item.kind === 'tool-group') {
+    // 工具组：所属 turn 已结束即为执行过程。
+    return turnEnds.has(item.turn) ? { folded: true, turn: item.turn } : null
+  }
+  const node = item.node
+  if (node.kind === 'assistant') {
+    // Answer（每 turn 最后 content assistant）保留；中间文本在 turn 结束后折叠。
+    if (answerSeqs.has(node.seq)) return null
+    return turnEnds.has(node.turn) ? { folded: true, turn: node.turn } : null
+  }
+  return null
 }
 
 /** 需要此插件声明的服务：slots + locale。 */
