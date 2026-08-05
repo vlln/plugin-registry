@@ -40,7 +40,7 @@
 | 数据 | `node.turn` + `streaming` 标志已存在 | `conversation.ts:92`、`AssistantMarkdown` props |
 | 渲染控制 | **逐 flow item 过判别式，未命中回退官方渲染** | `conversation.chat.item` chain 槽（`ChatView.tsx` renderItem 外包） |
 
-**落地（评审 F1 拍板）**：方案 (a)——**复用 chain 语义**：ChatView 对每个 flow item 调 `renderSlotChain('conversation.chat.item', { item, turnEnds, answerSeqs }, { fallback: 官方渲染 })`——条目判「已结束 turn 的执行过程」接管，组件用 `useSession` 聚合该 turn 全部执行过程为可展开折叠块（其余执行过程 item 渲染 null）、未命中走官方，零新槽形态。`vlln/turn-fold` 已复验（每 turn 一个折叠块、可展开、Answer 保留）。
+**落地（评审 F1 拍板）**：方案 (a)——**复用 chain 语义**：ChatView 对每个 flow item 调 `renderSlotChain('conversation.chat.item', { item, turnEnds, answerSeqs }, { fallback: 官方渲染 })`——条目判「已结束 turn 的执行过程」接管，组件聚合为可展开折叠块、未命中走官方，零新槽形态。`vlln/turn-fold` 已复验（每 turn 一折叠块、可展开、Answer 保留）。
 
 ### S4 动态卡片 ⚠️ 需数据侧 marker + 渲染点（安全版）
 
