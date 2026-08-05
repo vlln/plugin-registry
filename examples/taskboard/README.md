@@ -43,5 +43,5 @@ dsh plugin enable vlln/taskboard
 ## 已知限制
 
 - **点击切视图需非 blank 会话**：`ctx.conversation.setView` 是 scope-addressed（无会话时 root 调用抛错，本插件降级为浮层）；且 blank（hero）会话下视图区不渲染（`ConversationSession` hideChrome），切换要等会话有内容（发消息转 active）后可见。setView 写共享实例的机制由官方单测覆盖（`service-orchestration.spec.ts`）。
-- **Agent 卡片/分派是占位**：tasks 数据无 client 投影（S2 最高成本项）。
+- **Agent 卡片显示真实任务（S2 落地）**：`TaskBoardView` 用 `useTasks`（`task/snapshot` 帧投影，官方 `onChanged`/`listOwned` + mux 基线）渲染宿主侧后台任务（label/status/detail），浏览器复验 sleep 任务 running 可见；**分派按钮仍是占位**。
 - 侧边栏折叠（rail 态）下按钮仍渲染为宽行（`SidebarPanelOwnerProps.wide` 已传，但本示例未做 `!wide` 图标化，rail 下会被裁切）——与 ui-settings 触发器的 rail 模式对照可改进。

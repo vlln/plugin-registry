@@ -24,14 +24,14 @@
 
 **契约化缺口（F6）**：锚点属性是内部细节——S1 在自渲染前提下可行，但 `data-chat-*` 属性契约需文档化（与 CSS 变量契约并列），否则插件依赖脆弱内部。
 
-### S2 后台任务 UI ⚠️ 缺数据投影（最高成本项）
+### S2 后台任务 UI ✅ 已实现（task/snapshot 投影）
 
 | 要素 | 机制 | 证据 |
 |---|---|---|
-| 数据 | **缺失**：tasks 是 host 侧服务，无 client 投影，且 **connection 无 task 事件帧**（连 wire 面都没有） | `packages/tasks/tasks/src/index.ts`（Node 侧）、`connection/src` 无 task 事件 |
+| 数据 | **`task/snapshot` 帧（完整快照，对齐 `session/queue`）→ client 适配器 → `useTasks`** | events.ts 帧变体；session.ts 消费；provide tasks hook → standard kit 自动生成 |
 | UI 位置 | 通用容器 | 同上 |
 
-**缺口（F4）**：需新线协议（task/start、task/done 事件帧）→ client 适配器 → provide 钩子——是清单**最高成本项**（不是「仿 sessions」那么简单），且 tasks 是 session 作用域（详见 §2）。
+**落地（评审 F4 修正）**：线协议取**完整快照姿势**（非初稿增量帧）——每变更广播 session 全量任务列表，重连基线免费；host 侧 `onChanged` + `listOwned`（可信宿主投影）+ api-proxy 广播 + **mux 打开推基线**（连接前任务不可见是真实缺陷，已修）。tasks 是 session 作用域，`useTasks` 是 session 钩子。
 
 ### S3 Turn 折叠 ⚠️ 内容流分发维度需扩展
 
@@ -96,9 +96,9 @@
 | 会话（sessions） | `useSessions`/`useSession`/`ctx.sessions` 动作 | ✅ 已有（S1/S5） |
 | 工作区（workspaces） | `useWorkspaces` | ✅ 已有 |
 | 会话历史（sessionHistory） | `useProjection`（key-addressed cell） | ✅ 已有（ui-trajectory 在用） |
-| 后台任务（tasks） | **无 client 投影**（且需新线协议：connection 无 task 事件帧） | ⚠️ 需补，**清单最高成本项**（S2） |
+| 后台任务（tasks） | **`useTasks`（task/snapshot 帧投影）** | ✅ 已实现（S2） |
 
-**规律**：官方把 host 服务投影成 client 钩子（sessions/workspaces/sessionHistory 三实例），一次做对所有插件有用。`useTasks` 是第一个待补实例，但**成本高于「仿 sessions」**——tasks 连 wire 面都没有，需新事件帧 → client 适配器 → provide 钩子；且 `TaskService` 是 **session 作用域**（owned-task 按 session 隔离），`useTasks` 应是 session 作用域钩子，非全局。
+**规律**：官方把 host 服务投影成 client 钩子（sessions/workspaces/sessionHistory 三实例），一次做对所有插件有用。`useTasks` 是第一个补完的实例（原本连 wire 面都没有）。tasks 是 **session 作用域**，`useTasks` 是 session 钩子。
 
 ### 3. 通用渲染容器（附加式 UI 的标准化，第二轴）
 
@@ -113,7 +113,7 @@
 | 件 | 场景 | 改动面 | 性质 |
 |---|---|---|---|
 | `sidebar.panel` list 缝 | S5（已开） | **ui-sidebar** 声明 + SidebarRoot panelArea 渲染（shell 归属） | 开一类缝 |
-| `useTasks` client 投影 | S2 | **新线协议（task 事件帧）+ client 适配器 + session 作用域钩子** | 数据投影，最高成本 |
+| `useTasks` client 投影 | S2（已落地） | **`task/snapshot` 帧 + client 适配器 + session 钩子**（`onChanged`/`listOwned` + mux 基线） | 数据投影 |
 | 内容流 per-item 回退缝 | S3 | **新开流级缝 + 渲染点 + 回退语义**（chain 扩展或新形态） | 机制扩展 |
 | 卡片 marker + keyed 缝 | S4 | marker 识别（线协议/fence 约定）+ 渲染点（有 slots 的层） | 两件 |
 | CSS 变量契约文档化 | 主题 | 文档 | 零代码 |
@@ -134,8 +134,8 @@
   - **发现（印证 F6）**：导航点只覆盖已渲染行——`data-chat-*` 契约化 + 跨窗口导航待补；`z-index:900`（官方模态之下）。
   - **审查修复**：初版 observer 观察 body，render 重建又触发 observer 无限循环冻结；修复为限定 `[data-chat-flow=""]`，单测锁定。
   - **后续**：通用容器落地后，导航条可替换为 `ctx.ui.mount`。
-- **S5 冒烟 ✅ sidebar.panel 缝 + 入口 + 视图切换（`examples/taskboard`）**：ui-sidebar 开 `sidebar.panel` list 缝（`034c03fa`）；ui-conversation 加 `ctx.conversation.setView`（`005d8061`，F9 闭环）；F1 孤儿实例（setView 曾写一次性 store）由 `b5cf95a9` 修复为写共享实例；`vlln/taskboard` 注册 React 入口 + 视图，点击经 setView 切换（无会话退回浮层）。setView 有官方单测；**浏览器真实点击已复验**（注入选中 + 转 active 后点击切视图）；Agent 卡片依赖 tasks 投影（S2）。
-- **数据投影**：`useTasks` 单测（投影正确性 + 响应式 + session 作用域隔离）。
+- **S5 冒烟 ✅ sidebar.panel 缝 + 入口 + 视图切换（`examples/taskboard`）**：ui-sidebar 开 `sidebar.panel` list 缝（`034c03fa`）；ui-conversation 加 `ctx.conversation.setView`（`005d8061`，F9 闭环）；F1 孤儿实例（setView 曾写一次性 store）由 `b5cf95a9` 修复为写共享实例；`vlln/taskboard` 注册 React 入口 + 视图，点击经 setView 切换（无会话退回浮层）。setView 有官方单测；**浏览器复验**：点击切视图 + `useTasks` 显示真实任务。
+- **数据投影**：`useTasks` 单测（投影正确性 + 响应式 + session 作用域隔离）+ host 侧帧广播/基线单测 + 浏览器复验。
 - **安全**：S4 拒绝 html 内嵌的测试（markdown 渲染器对 `<script>` 的处置）。
 - **性能（F10）**：S3/S4 的流内分发不破坏 ChatView 的渲染预算（节点级 memo、chunk 风暴只重渲 StreamingTail）——加性能冒烟。
 
@@ -145,7 +145,7 @@
 2. **chain 的 per-item 回退语义（F1）**：S3 依赖「未命中回退官方 item 渲染」，官方 chain 无此语义——拍板：扩展 chain（条目内注入 fallback）vs 新形态（per-item transform list）vs 接受插件整流接管。
 3. **task board 作用域（已实现）**：`ctx.conversation.setView` 已加；「跨 session 全局看板」仍需 root 级视图环（开放项）。
 4. **S4 marker 线协议（F3）**：新 AssistantBlock kind（动 host + 回放兼容）vs fence 语言约定（零 host 改动但易与 shiki 高亮冲突）。
-5. **useTasks 线协议（F4）**：新事件帧的宿主侧来源、任务跨页面/跨 session 存活语义、投影节流。
+5. **useTasks 线协议（F4，已定）**：`task/snapshot` 完整快照帧，mux 打开推基线；剩余开放：任务跨页面存活语义、输出流投影（当前只投影状态）、投影节流。
 6. **数据投影范围**：tasks 之后还有哪些 host 服务值得投影（按插件需求热度）。
 7. **CSS 变量契约**：哪些变量可被覆盖、类名契约的稳定承诺——是否需要官方维护「样式契约清单」。
 8. **与姊妹稿的关系**：本文统一模型是 `generic-client-render-container-design.md` 的上层抽象（两轴：缝 + mount），不取代；registry-client-half-design.md 是底层机制。

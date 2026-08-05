@@ -82,15 +82,33 @@ export function TaskBoardTrigger(
   )
 }
 
-/** conversation.view 视图：task board 内容（Agent 卡片占位）。 */
+/** conversation.view 视图：task board 内容（useTasks 投影真实任务 + 分派占位）。 */
 export function TaskBoardView(
   props: PropsRuntime<'conversation.view'> & PropsLocale<'taskboard'>,
 ): ReactNode {
-  const { t } = props
+  const { t, useTasks } = props
+  const tasks = useTasks(s => s)
   return (
     <div style={{ padding: 16, fontFamily: 'system-ui' }}>
       <h2 style={{ margin: '0 0 12px', fontSize: 15 }}>{t('view.title')}</h2>
-      <p style={{ fontSize: 13 }}>{t('view.empty')}</p>
+      {tasks.length === 0 ? (
+        <p style={{ fontSize: 13 }}>{t('view.empty')}</p>
+      ) : (
+        <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+          {tasks.map(task => (
+            <li key={task.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--dsw-alias-border-l2, #333)', fontSize: 13 }}>
+              <strong>{task.label}</strong>
+              {' '}
+              <span style={{ color: task.status === 'running' ? 'var(--dsw-alias-text-accent, #4c9aff)' : 'inherit' }}>
+                {task.status}
+              </span>
+              {task.detail !== undefined && (
+                <div style={{ color: 'var(--dsw-alias-text-muted, #999)', fontSize: 12 }}>{task.detail}</div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
       <button type="button" style={{ marginTop: 8, padding: '6px 12px', fontSize: 13 }}>
         {t('view.dispatch')}
       </button>

@@ -80,9 +80,10 @@ window.__ModuleLoader__.load({
 				})]
 			})] });
 		}
-		/** conversation.view 视图：task board 内容（Agent 卡片占位）。 */
+		/** conversation.view 视图：task board 内容（useTasks 投影真实任务 + 分派占位）。 */
 		function TaskBoardView(props) {
-			const { t } = props;
+			const { t, useTasks } = props;
+			const tasks = useTasks((s) => s);
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				style: {
 					padding: 16,
@@ -96,9 +97,37 @@ window.__ModuleLoader__.load({
 						},
 						children: t("view.title")
 					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+					tasks.length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 						style: { fontSize: 13 },
 						children: t("view.empty")
+					}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("ul", {
+						style: {
+							margin: 0,
+							padding: 0,
+							listStyle: "none"
+						},
+						children: tasks.map((task) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("li", {
+							style: {
+								padding: "6px 0",
+								borderBottom: "1px solid var(--dsw-alias-border-l2, #333)",
+								fontSize: 13
+							},
+							children: [
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", { children: task.label }),
+								" ",
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+									style: { color: task.status === "running" ? "var(--dsw-alias-text-accent, #4c9aff)" : "inherit" },
+									children: task.status
+								}),
+								task.detail !== void 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+									style: {
+										color: "var(--dsw-alias-text-muted, #999)",
+										fontSize: 12
+									},
+									children: task.detail
+								})
+							]
+						}, task.id))
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 						type: "button",
