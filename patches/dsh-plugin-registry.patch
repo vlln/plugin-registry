@@ -3752,3 +3752,15 @@ index e1d40880..3269aae9 100644
      { "path": "./packages/client/ui-question" },
      { "path": "./packages/client/ui-trajectory" },
      { "path": "./packages/client/ui-theme" },
+diff --git a/packages/client/ui-question/tests/question-composer.spec.tsx b/packages/client/ui-question/tests/question-composer.spec.tsx
+index 849bb611..bf26404d 100644
+--- a/packages/client/ui-question/tests/question-composer.spec.tsx
++++ b/packages/client/ui-question/tests/question-composer.spec.tsx
+@@ -32,6 +32,7 @@ const kit = {
+   useSessions: (() => { throw new Error('unused') }) as unknown as SnapshotSelectorHook<SessionListState>,
+   useWorkspaces: (() => { throw new Error('unused') }) as unknown as SnapshotSelectorHook<WorkspaceListState>,
+   useProjection: (() => undefined) as never,
++  useTasks: (() => []) as never,
+   useInput: (() => { throw new Error('unused') }) as never,
+   inputActions: { setDraft: () => { throw new Error('unused') }, submit: () => { throw new Error('unused') } } as never,
+   // The seat's key domain is question ∪ common.
