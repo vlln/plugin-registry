@@ -4,6 +4,7 @@
   "docs/architecture.md": 6000,
   "docs/registry-client-half-design.md": 10600,
   "docs/generic-client-render-container-design.md": 7000,
+  "docs/client-ui-extension-model.md": 7500,
   "docs/cookbook/creating-a-plugin.md": 3500,
   "docs/cookbook/integrating-into-dsh.md": 3500,
   "docs/cookbook/distributing-plugins.md": 3500,
