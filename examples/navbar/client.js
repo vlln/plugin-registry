@@ -86,7 +86,6 @@ window.__ModuleLoader__.load({
         var lo = 0;
 
         // 预览：消息开头（CSS line-clamp 6 行截断）。
-        var previewTimer = null;
         var positionPreview = function (anchor) {
           var r = anchor.getBoundingClientRect();
           // right 定位：卡片右缘贴 dot 左缘 - 14px（内容短的卡片也贴紧）。
@@ -95,21 +94,15 @@ window.__ModuleLoader__.load({
         };
         var showPreview = function (row, anchor) {
           // 消息文本 = 气泡内文本（排除时间戳/操作按钮/分支提示）；CSS
-          // line-clamp 6 行截断。延迟 500ms（对齐官方 HoverCard 行为）。
-          if (previewTimer !== null) clearTimeout(previewTimer);
-          previewTimer = setTimeout(function () {
-            var bubble = row.querySelector('[class*="bubble"]');
-            var text = ((bubble !== null ? bubble : row).textContent || '').trim();
-            if (text === '') return;
-            preview.textContent = text;
-            preview.style.display = 'block';
-            positionPreview(anchor);
-          }, 500);
+          // line-clamp 6 行截断。立即显示（导航点小、hover 精确）。
+          var bubble = row.querySelector('[class*="bubble"]');
+          var text = ((bubble !== null ? bubble : row).textContent || '').trim();
+          if (text === '') return;
+          preview.textContent = text;
+          preview.style.display = 'block';
+          positionPreview(anchor);
         };
-        var hidePreview = function () {
-          if (previewTimer !== null) clearTimeout(previewTimer);
-          preview.style.display = 'none';
-        };
+        var hidePreview = function () { preview.style.display = 'none'; };
 
         // 渲染节点串：等距节点 + 滑动窗口（>11 显示激活 ± 5，端点细点）。
         var render = function () {

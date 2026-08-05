@@ -126,7 +126,6 @@ export default {
     let lo = 0
 
     // 预览：显示消息开头（最多 6 行，CSS line-clamp 截断）。
-    let previewTimer: ReturnType<typeof setTimeout> | null = null
     const positionPreview = (anchor: HTMLElement): void => {
       const r = anchor.getBoundingClientRect()
       // right 定位：卡片右缘贴 dot 左缘 - 14px（内容短的卡片也贴紧）。
@@ -136,21 +135,16 @@ export default {
     const showPreview = (row: HTMLElement, anchor: HTMLElement): void => {
       // 消息文本 = 气泡内文本（排除时间戳/操作按钮/分支提示——整行
       // textContent 会混入 actions 和官方提示文案）；CSS line-clamp 6 行
-      // 截断。延迟 500ms 显示（对齐官方 HoverCard 行为）。
-      if (previewTimer !== null) clearTimeout(previewTimer)
-      previewTimer = setTimeout(() => {
-        const bubble = row.querySelector('[class*="bubble"]')
-        const text = ((bubble ?? row).textContent ?? '').trim()
-        if (text === '') return
-        preview.textContent = text
-        preview.style.display = 'block'
-        positionPreview(anchor)
-      }, 500)
+      // 截断。立即显示（导航点小、hover 精确，无需 session list 行的
+      // 500ms 防误触延迟）。
+      const bubble = row.querySelector('[class*="bubble"]')
+      const text = ((bubble ?? row).textContent ?? '').trim()
+      if (text === '') return
+      preview.textContent = text
+      preview.style.display = 'block'
+      positionPreview(anchor)
     }
-    const hidePreview = (): void => {
-      if (previewTimer !== null) clearTimeout(previewTimer)
-      preview.style.display = 'none'
-    }
+    const hidePreview = (): void => { preview.style.display = 'none' }
 
     // 渲染节点串：等距节点 + 滑动窗口（>11 时显示激活 ± 5，端点细点）。
     const render = (): void => {
