@@ -1,9 +1,16 @@
 {
   "id": "vlln/navbar",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "main": "./index.mjs",
   "description": "示例插件：user 消息导航条（点击跳转到对应消息）——验证自渲染 + DOM 锚点契约",
-  "engines": { "dsh": ">=0.0.1" },
-  "contributes": { "tools": [], "skills": [] },
-  "client": { "main": "./client.js" }
+  "engines": {
+    "dsh": ">=0.0.1"
+  },
+  "contributes": {
+    "tools": [],
+    "skills": []
+  },
+  "client": {
+    "main": "./client.js"
+  }
 }

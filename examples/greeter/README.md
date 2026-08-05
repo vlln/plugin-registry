@@ -16,7 +16,7 @@
 ```sh
 dsh plugin install ./examples/greeter   # 安装（默认禁用）
 dsh plugin enable acme/greeter          # 启用：挂载 greet 工具 + 登记 client half
-dsh plugin list                         # 看到 enabled acme/greeter@0.1.0
+dsh plugin list                         # 看到 enabled acme/greeter@0.2.0
 ```
 
 启用后：模型可调用 `greet` 工具；Web 端刷新页面后，右下角出现「👋 greeter client half active」（经 `ctx.ui.mount({container:'overlay'})` 渲染进官方通用渲染容器——见 [通用渲染容器设计](../../docs/generic-client-render-container-design.md)）。
