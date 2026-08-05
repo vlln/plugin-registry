@@ -1,6 +1,7 @@
 {
   "README.md": 4500,
-  "docs/AGENTS.md": 1400,
+  "AGENTS.md": 3000,
+  "docs/AGENTS.md": 1500,
   "docs/architecture.md": 6000,
   "docs/registry-client-half-design.md": 10600,
   "docs/generic-client-render-container-design.md": 7000,

@@ -6,6 +6,7 @@
 
 | 层 | 职责 | 不该放这里 |
 |---|---|---|
+| 根 `AGENTS.md` | 项目导览：仓库定位（patch+package 构建式）、双仓库格局、协作约束 | 文档写作规则（→ 本文）、机制细节（→ architecture.md） |
 | 根 `README.md` | 产品入口：是什么、截图、快速上手、指向各文档 | 深度机制（→ architecture.md）、分步操作（→ cookbook/） |
 | [`docs/architecture.md`](architecture.md) | 系统地图：两层插件模型、加载路径、能力面、服务关系、信任边界、web 边界 | 分步操作（→ cookbook）、逐包细节（→ 包 README） |
 | [`docs/cookbook/`](cookbook/) | 分步操作指南，带可验证步骤 | 设计理由（→ architecture.md） |
