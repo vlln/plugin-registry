@@ -18,11 +18,12 @@ dsh plugin install ./examples/navbar
 dsh plugin enable vlln/navbar
 ```
 
-启用后刷新 Web 页面：右缘出现导航条，圆点 = 已渲染的 user 消息；点击跳转对应消息。
+启用后刷新 Web 页面：对话流列右侧出现导航条（贴近列、留 12px 间距），圆点 = 每个已渲染的 user 消息；点击跳转对应消息。
 
 ## 已知限制
 
 - **只扫已渲染的行**：跨窗口的旧 user 消息（未加载进 DOM）不出现——需要官方把 `data-chat-*` 属性契约化 + 提供跨窗口导航才完整（设计文档 F6）。
+- **判别/跳转是 DOM 级**：导航点按 DOM 扫描顺序编号（`user #N`），消息增删（翻页）后编号会重排；纯 DOM 方案没有稳定消息 id（锚点 key `node:<seq>` 在 DOM 上，编号按扫描序）。
 - **锚点是内部实现细节**：属性未版本化，官方改动可能破坏——`data-chat-*` 契约文档化是待补机制件。行内 CallRow/SubCallRow 另有 `data-chat-anchor-key="call:<callId>"`（行级 wrapper 无锚点，子行有）。
 - **页面内 disable 不清除**：disposer 只在 fiber 卸载时执行（页面生命周期终点/HMR 重建）——页面内 disable 插件不触发，刷新后生效（与 client half 一致）。
 - **单会话作用域假设**：扫描是 document 级；多会话流并挂（未来 split view）时会把不可见会话的 user 行混入。
@@ -30,7 +31,7 @@ dsh plugin enable vlln/navbar
 
 ## 测试
 
-DOM 级单测见 worktree `packages/plugin/plugin/tests/navbar.client.spec.ts`（3 例）：点渲染/点击跳转/dispose 清理/无关变更不重建。**MutationObserver 必须限定会话流区域**（`[data-chat-flow=""]`）——观察整个 body 会把导航条自身重建计入变更，形成无限微任务循环冻结页面（已修复并有用例锁定）。
+DOM 级单测见 worktree `packages/plugin/plugin/tests/navbar.client.spec.ts`（3 例）：点渲染/点击跳转/dispose 清理/无关变更不重建。**MutationObserver 观察 body 全量 + 过滤导航条自身变更 + rAF 去抖**——覆盖对话流挂载/重建（hero → active、会话切换、翻页），同时避免把自身重建计入变更形成循环（曾有的冻结回归有用例锁定）。位置跟随对话流列（ResizeObserver + window resize）。
 
 ## 构建
 
