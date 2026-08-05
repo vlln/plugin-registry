@@ -114,6 +114,8 @@ window.__ModuleLoader__.load({
         // 渲染节点串：等距节点 + 滑动窗口（>11 显示激活 ± 5，端点细点）。
         var render = function () {
           position();
+          // 仅在对话页面显示：无对话流列（设置页/其他视图）时隐藏。
+          if (flowOf() === null) { bar.style.display = 'none'; return; }
           var rows = userRows();
           if (rows.length < 2) { bar.style.display = 'none'; return; }
           bar.style.display = 'flex';
@@ -203,12 +205,13 @@ window.__ModuleLoader__.load({
         var sizeObserver = null;
         var bindFlow = function () {
           var next = flowOf();
-          if (next === flow) return;
+          if (next === flow) return false;
           flow = next;
           if (sizeObserver !== null) sizeObserver.disconnect();
           sizeObserver = flow === null ? null : new ResizeObserver(function () { position(); });
           if (sizeObserver !== null && flow !== null) sizeObserver.observe(flow);
           position();
+          return true;
         };
         bindFlow();
         window.addEventListener('resize', position);
@@ -244,7 +247,12 @@ window.__ModuleLoader__.load({
           requestAnimationFrame(function () { scheduled = false; render(); });
         };
         var observer = new MutationObserver(function (mutations) {
-          bindFlow();
+          // flow 被移除/替换（切出对话页/视图）必须触发重渲染——此时
+          // mutation 目标在父级，过滤条件不匹配，需显式处理。
+          if (bindFlow()) {
+            schedule();
+            return;
+          }
           bindIO();
           for (var i = 0; i < mutations.length; i++) {
             var m = mutations[i];

@@ -155,6 +155,11 @@ export default {
     // 渲染节点串：等距节点 + 滑动窗口（>11 时显示激活 ± 5，端点细点）。
     const render = (): void => {
       position()
+      // 仅在对话页面显示：无对话流列（设置页/其他视图）时隐藏。
+      if (flowOf() === null) {
+        bar.style.display = 'none'
+        return
+      }
       const rows = userRows()
       // <2 条 user 消息自动隐藏。
       if (rows.length < 2) {
@@ -259,14 +264,15 @@ export default {
     // 重绑尺寸观察并重新定位。
     let flow = flowOf()
     let sizeObserver: ResizeObserver | null = null
-    const bindFlow = (): void => {
+    const bindFlow = (): boolean => {
       const next = flowOf()
-      if (next === flow) return
+      if (next === flow) return false
       flow = next
       sizeObserver?.disconnect()
       sizeObserver = flow === null ? null : new ResizeObserver(() => { position() })
       if (sizeObserver !== null && flow !== null) sizeObserver.observe(flow)
       position()
+      return true
     }
     bindFlow()
     window.addEventListener('resize', position)
@@ -304,7 +310,12 @@ export default {
       requestAnimationFrame(() => { scheduled = false; render() })
     }
     const observer = new MutationObserver((mutations) => {
-      bindFlow()
+      // flow 被移除/替换（切出对话页/视图）必须触发重渲染——此时
+      // mutation 目标在父级（非 flow 内），过滤条件不匹配，需显式处理。
+      if (bindFlow()) {
+        schedule()
+        return
+      }
       bindIO()
       for (const m of mutations) {
         if (m.target === bar || bar.contains(m.target)) continue
