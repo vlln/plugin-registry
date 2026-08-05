@@ -1,0 +1,9 @@
+{
+  "id": "vlln/task-status",
+  "version": "0.1.0",
+  "main": "./index.mjs",
+  "description": "示例插件：对话页对话框上方的后台任务状态条——验证 S2 场景（conversation.input.dock + useTasks 实时渲染）",
+  "engines": { "dsh": ">=0.0.1" },
+  "contributes": { "tools": [], "skills": [] },
+  "client": { "main": "./client.js" }
+}

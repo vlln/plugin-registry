@@ -33,7 +33,7 @@
 
 **数据投影已实现（评审 F4 修正）**：线协议取**完整快照姿势**——每变更广播 session 全量列表，重连基线免费；host 侧 `onChanged` + `listOwned` + api-proxy 广播 + **mux 打开推基线**。tasks 是 session 作用域，`useTasks` 是 session 钩子；列表含 settled 历史。
 
-**UI 位置已落地**：对话页**对话框上方**状态条——taskboard 经 `conversation.input.dock` 注册 `TaskStatusBar`，`useTasks` 实时渲染（复验通过）。
+**UI 位置已落地**：对话页**对话框上方**状态条——`task-status` 经 `conversation.input.dock` 注册，`useTasks` 实时渲染（复验通过）。
 
 ### S3 Turn 折叠 ⚠️ per-item 回退缝已落地，turn 折叠不可行
 

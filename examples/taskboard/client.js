@@ -14,18 +14,14 @@ window.__ModuleLoader__.load({
 			"view.title": "Task Board",
 			"view.empty": "暂无会话",
 			"view.dispatch": "分派任务（占位）",
-			"panel.overlayTitle": "Task Board",
-			"status.running": "{count} 个后台任务运行中",
-			"status.idle": "无后台任务"
+			"panel.overlayTitle": "Task Board"
 		};
 		const en = {
 			"panel.trigger": "Task Board",
 			"view.title": "Task Board",
 			"view.empty": "No sessions",
 			"view.dispatch": "Dispatch (placeholder)",
-			"panel.overlayTitle": "Task Board",
-			"status.running": "{count} background task(s) running",
-			"status.idle": "No background tasks"
+			"panel.overlayTitle": "Task Board"
 		};
 		/** sidebar.panel 入口按钮：有当前会话则 setView 切视图，否则展开浮层。 */
 		function TaskBoardTrigger(props) {
@@ -116,35 +112,6 @@ window.__ModuleLoader__.load({
 				]
 			});
 		}
-		/**
-		* 对话页对话框（composer）上方的后台任务状态条（S2 正确 UI 位置）：
-		* 经 `conversation.input.dock`（list 槽，输入上方 stacked strip）注册，
-		* `useTasks` 渲染该会话的后台任务——与 queue/todo 同姿势。
-		*/
-		function TaskStatusBar(props) {
-			const { t, useTasks } = props;
-			const tasks = useTasks((s) => s);
-			const running = tasks.filter((task) => task.status === "running").length;
-			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				"data-task-status-bar": "",
-				style: {
-					padding: "4px 12px",
-					fontSize: 12,
-					color: running > 0 ? "var(--dsw-alias-text-accent, #4c9aff)" : "var(--dsw-alias-text-muted, #999)"
-				},
-				children: [running > 0 ? t("status.running", { count: running }) : t("status.idle"), tasks.filter((task) => task.status !== "running").length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-					style: {
-						marginLeft: 8,
-						color: "var(--dsw-alias-text-muted, #999)"
-					},
-					children: [
-						"· ",
-						tasks.length - running,
-						" 已完成"
-					]
-				})]
-			});
-		}
 		/** 需要此插件声明的服务：slots + locale + sessions。 */
 		const inject = [
 			"slots",
@@ -170,12 +137,6 @@ window.__ModuleLoader__.load({
 					label: "Task Board",
 					locale: NS
 				}, TaskBoardView)));
-				deferred.push((0, _deepseek_ai_dsh_client_ui_slots.deferRegistration)(ctx.slots, "conversation.input.dock", TaskStatusBar, () => ctx.slots.register({
-					name: "conversation.input.dock",
-					id: "task-status",
-					order: 10,
-					locale: NS
-				}, TaskStatusBar)));
 				return () => {
 					for (const entry of deferred) entry.dispose();
 				};
@@ -187,7 +148,6 @@ window.__ModuleLoader__.load({
 		//#endregion
 		exports.TaskBoardTrigger = TaskBoardTrigger;
 		exports.TaskBoardView = TaskBoardView;
-		exports.TaskStatusBar = TaskStatusBar;
 		exports.apply = apply;
 		exports.inject = inject;
 		exports.name = name;
