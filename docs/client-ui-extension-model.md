@@ -7,10 +7,10 @@
 | # | 场景 | 一句话 |
 |---|---|---|
 | S1 | 导航条 | 侧边一条 user message 导航，点击跳转 |
-| S2 | 后台任务 UI | 显示 Agent 启动的后台任务 |
+| S2 | 后台任务 UI | 对话页**对话框上方**显示该会话的后台任务（数据投影已实现；UI 位置待调整）|
 | S3 | Turn 折叠 | turn 结束折叠执行过程（**不可行**：区间折叠需官方折叠容器；per-item 回退缝已落地）|
 | S4 | 动态卡片 | Agent 输出结构化标记 → 插件渲染动态卡片 |
-| S5 | Task board | 侧边栏加区域，点击开新页，卡片排列 Agent + 分派 |
+| S5 | Task board | 用户**委派任务给 Agent** 的委派台（**工作区级**，与 workspace 平级，非 session 归属）——**暂不做** |
 
 ## 场景逐一对照（三要素：数据通道 / 渲染控制 / UI 位置）
 
@@ -24,14 +24,16 @@
 
 **契约化缺口（F6）**：锚点属性是内部细节——S1 在自渲染前提下可行，但 `data-chat-*` 属性契约需文档化（与 CSS 变量契约并列），否则插件依赖脆弱内部。
 
-### S2 后台任务 UI ✅ 已实现（task/snapshot 投影）
+### S2 后台任务 UI ⚠️ 数据投影已实现，UI 位置待调整
 
 | 要素 | 机制 | 证据 |
 |---|---|---|
 | 数据 | **`task/snapshot` 帧（完整快照，对齐 `session/queue`）→ client 适配器 → `useTasks`** | events.ts 帧变体；session.ts 消费；provide tasks hook → standard kit 自动生成 |
-| UI 位置 | 通用容器 | 同上 |
+| UI 位置 | **对话页对话框（composer）上方的附加任务状态区**（非独立视图） | 待落地 |
 
-**落地（评审 F4 修正）**：线协议取**完整快照姿势**——每变更广播 session 全量列表，重连基线免费；host 侧 `onChanged` + `listOwned` + api-proxy 广播 + **mux 打开推基线**（连接前任务不可见，已修）。tasks 是 session 作用域，`useTasks` 是 session 钩子；列表含 settled 历史。
+**数据投影已实现（评审 F4 修正）**：线协议取**完整快照姿势**——每变更广播 session 全量列表，重连基线免费；host 侧 `onChanged` + `listOwned` + api-proxy 广播 + **mux 打开推基线**。tasks 是 session 作用域，`useTasks` 是 session 钩子；列表含 settled 历史。
+
+**UI 位置修正**：S2 正确形态是对话页**对话框上方**显示该会话后台任务（进度/状态条），非独立页面——当前 taskboard 示例把任务列表放进独立视图（位置不对）；composer 上方附加区待落地（可复用 `conversation.composer.dock` 类槽或 mount 附加）。
 
 ### S3 Turn 折叠 ⚠️ per-item 回退缝已落地，turn 折叠不可行
 
@@ -56,17 +58,13 @@
 
 **缺口（评审 F3 修正）**：机制件拆成两件——① **marker 识别**（新 AssistantBlock kind 线协议 vs fence 语言约定，前者动 host+回放兼容，后者零 host 改动但易与 shiki 高亮冲突）；② **卡片 keyed 缝的渲染点**（须在有 slots 访问的组件层）。
 
-### S5 Task board ⚠️ 主体支持，入口待开缝
+### S5 Task board ⚠️ 场景重定义（委派台、工作区级），暂不做
 
-| 要素 | 机制 | 证据 |
-|---|---|---|
-| 侧边栏入口 | **list 缝（`sidebar.panel`，已开）** | sidebar 整列 single 由 ui-sidebar 占用（`ui-layout/index.ts:39` 声明、`ui-sidebar` 注册）；`sidebar.panel` 缝归 ui-sidebar（list 槽，shell 直接 renderSlot 渲染全部条目） |
-| 打开新页 | **`conversation.view` list 槽（视图环）** | `apply.ts:121-123`（注册条目 = 一个视图 tab）——Obsidian `registerView` 等价物；**session 作用域**；root 经 `ctx.conversation.setView` 切换 |
-| Agent 列表 | `useSessions`/`useWorkspaces` | standard kit |
-| 分派任务 | `ctx.sessions.openSubagent` 等注入动作 | `runtime/client/sessions/service.ts:328` |
-| 卡片渲染 | 视图 tab 内自渲染 | 插件自由 |
+**场景定义修正**：S5 的 task board 是**用户委派任务给 Agent 的委派台**——与**工作区平级**（workspace 级概念，非 session 归属）。之前误把「侧边栏入口 + session 级视图切换 + 任务列表」当作 S5——那是缝机制验证，不是 S5 委派台本身。
 
-**作用域**：`conversation.view` 是 session 作用域——「每 session 的后台看板」用现环 + `ctx.conversation.setView` 切换；「跨 session 全局看板」仍需 root 级视图环（开放项）。
+**已落地的机制件**（示例 taskboard 验证，仍有效）：`sidebar.panel` list 缝（`034c03fa`）、`conversation.view` 视图环 + `setView` 通道（`005d8061`/F9）、`useTasks` 投影——它们是通用机制，与 S5 场景定义错位无关。
+
+**S5 委派台（暂不做）**：工作区级 UI（委派台入口、Agent 队列、分派动作），需工作区作用域视图（非 session 环）——作为独立工作区级机制件，**已决定暂不做**。
 
 ## 统一心智模型：一个 slot 体系 + 四种匹配 + 数据投影
 
@@ -136,7 +134,7 @@
   - **发现（印证 F6）**：导航点只覆盖已渲染行——`data-chat-*` 契约化 + 跨窗口导航待补；`z-index:900`（官方模态之下）。
   - **审查修复**：初版 observer 观察 body，render 重建又触发 observer 无限循环冻结；修复为限定 `[data-chat-flow=""]`，单测锁定。
   - **后续**：导航条可迁移到 `ctx.ui.mount`（容器已落地）。
-- **S5 冒烟 ✅ sidebar.panel 缝 + 入口 + 视图切换（`examples/taskboard`）**：ui-sidebar 开 `sidebar.panel` list 缝（`034c03fa`）；ui-conversation 加 `setView` 通道（`005d8061`，F9 闭环；F1 孤儿实例 `b5cf95a9` 修复为写共享实例）；taskboard 注册入口 + 视图，点击 setView 切换（无会话退回浮层）。**浏览器复验**：点击切视图 + `useTasks` 真实任务。
+- **taskboard 冒烟 ✅ 缝机制验证（`examples/taskboard`）**：ui-sidebar 开 `sidebar.panel` list 缝（`034c03fa`）；ui-conversation 加 `setView` 通道（`005d8061`，F9 闭环；F1 孤儿实例 `b5cf95a9` 修复）；taskboard 注册入口 + 视图，点击 setView 切换。**浏览器复验**：点击切视图 + `useTasks` 真实任务。**注意**：示例验证的是缝机制，非 S5 委派台场景（见上）。
 - **数据投影**：`useTasks` 单测（投影正确性 + 响应式 + session 作用域隔离）+ host 侧帧广播/基线单测 + 浏览器复验。
 - **安全**：S4 拒绝 html 内嵌的测试（markdown 渲染器对 `<script>` 的处置）。
 - **性能（F10）**：S3/S4 的流内分发不破坏 ChatView 的渲染预算（节点级 memo、chunk 风暴只重渲 StreamingTail）——加性能冒烟。

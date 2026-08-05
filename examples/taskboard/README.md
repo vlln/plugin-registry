@@ -1,6 +1,6 @@
 # vlln/taskboard
 
-示例插件：侧边栏 task board 入口——验证统一设计文档 [S5 场景](../../docs/client-ui-extension-model.md) 的 **`sidebar.panel` 缝**机制件。
+示例插件：侧边栏 task board 入口——验证统一设计文档 [S5 场景](../../docs/client-ui-extension-model.md) 的 **`sidebar.panel` 缝 + 视图切换 + useTasks 投影**机制件。**注意**：示例验证的是缝机制（sidebar.panel/视图环/setView/useTasks），S5 场景本身已重定义为工作区级委派台（暂不做），示例不构成 S5 委派台。
 
 ## 原理
 
