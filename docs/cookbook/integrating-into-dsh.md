@@ -22,7 +22,7 @@ cp -r packages/ui-plugin-manager DSH_MONOREPO/packages/client/
 git apply patches/dsh-plugin-registry.patch   # 在 DSH monorepo 根目录执行
 ```
 
-补丁基于官方 0804 快照生成，改动 33 个文件（CLI 子命令、apiproxy `plugins` 域、client-modules `registerExternal`、tsconfig、组合挂载、测试与 README），验证可干净应用。基线更新导致锚点漂移时，`git apply --3way` 或手动对齐。
+补丁基于官方 0804 快照生成，改动 38 个文件（CLI 子命令、apiproxy `plugins` 域、client-modules `registerExternal`、ui-workspace 会话行扩展 hole、tsconfig、组合挂载、测试与 README），验证可干净应用。基线更新导致锚点漂移时，`git apply --3way` 或手动对齐。
 
 **验证点**：`git apply --check` 无输出（干净应用）；`git status` 显示改动文件数符合预期。
 
