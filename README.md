@@ -19,6 +19,7 @@ DeepSeek Harness 的本地插件系统：清单协议、安装/启停、Web 管�
 | `packages/plugin/plugin` | 核心包 `@deepseek-ai/dsh-plugin`：清单协议、本地注册表、运行时服务、校验、脚手架、tarball 安装 |
 | `packages/ui-plugin-manager` | Web 设置页插件面板：浏览 / 搜索 / 安装 / 启停 / 卸载 |
 | `examples/greeter` | 可直接安装的示例插件（清单 + Cordis 入口），从零开发见 [`examples/README.md`](examples/README.md) |
+| `examples/loop` | 定时循环插件：`/loop` 命令 + `loop` 工具，按间隔向当前 agent 重复投递 prompt（对齐 Claude Code `/loop`），见 [`examples/loop/README.md`](examples/loop/README.md) |
 | `skills/plugin-registry-create` | Agent Skill：指导快速创建 registry 插件（脚手架 → 写入口 → 安装启用） |
 | `patches/dsh-plugin-registry.patch` | 基于官方 0804 快照的接线补丁（30 个文件） |
 
@@ -46,6 +47,8 @@ dsh plugin list                    # 列表
 ```
 
 不想从空脚手架开始？复制示例：`cp -r examples/greeter ./my-tool`，改 `id` 与工具注册即可。完整指南见 [创建插件](docs/cookbook/creating-a-plugin.md)。
+
+要定时循环能力（轮询部署、照看 PR、build-fix-test 循环）？安装 `examples/loop`：`dsh plugin install ./examples/loop && dsh plugin enable acme/loop`，然后 `/loop 5m check the deploy`。
 
 ## Agent Skill
 
