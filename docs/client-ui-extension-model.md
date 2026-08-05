@@ -129,7 +129,10 @@
 
 ## 验证方案（评审 F8 修正：先自渲染，容器落地后替换）
 
-- **S1 冒烟（先落地）**：自渲染导航条（greeter 式 DOM + useSession 过滤 + 锚点滚动）——通用容器未实现前先走自渲染；容器落地后替换为 `ctx.ui.mount`。验证「数据（useSession）+ 跳转（锚点）可复用」。
+- **S1 冒烟 ✅ 已落地（`examples/navbar`）**：自渲染导航条——`vlln/navbar` 插件。实现「纯 DOM 锚点契约」而非 useSession：扫描官方打在每行的 `data-chat-flow-kind="user"` + `data-chat-anchor-key`（`ChatView.tsx:655-657`）渲染导航点，点击 `scrollIntoView` 跳转，MutationObserver 监听重渲染，dispose 清理。**零数据通道依赖，只依赖锚点契约**。
+  - **验证结果**：① 安装/启用 → boot graph 含 `vlln/navbar` 行、`/plugins/vlln/navbar/client.js` 200；② 真实 Chrome dump-dom 确认导航条容器渲染（`aria-label="用户消息导航"`）；③ DOM 桩单测确认：2 个 user 行 → 2 个导航点、点击 → `scrollIntoView` 到对应锚点、dispose → 移除。
+  - **发现（印证 F6）**：导航点只覆盖已渲染行（跨窗口旧消息不出现）——`data-chat-*` 契约化 + 跨窗口导航是待补件；导航条 `z-index:900`（官方浮层之下）。
+  - **后续**：通用容器落地后，导航条可从自渲染替换为 `ctx.ui.mount`（UI 位置标准化，数据/跳转逻辑不变）。
 - **S5 冒烟（需先开 sidebar.panel 缝）**：sidebar.panel 入口 + conversation.view 新页 + useSessions + openSubagent。
 - **数据投影**：`useTasks` 单测（投影正确性 + 响应式 + session 作用域隔离）。
 - **安全**：S4 拒绝 html 内嵌的测试（markdown 渲染器对 `<script>` 的处置）。
