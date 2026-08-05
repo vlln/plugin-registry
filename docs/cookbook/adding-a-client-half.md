@@ -73,7 +73,7 @@ client half 是浏览器端**完整 Cordis 插件**（`apply(ctx)` 在浏览器�
 
 **关键认知**：client half **不局限于填 hole**——`examples/greeter` 零 slot 依赖，`body.appendChild` 画标记。「改官方 UI 结构」（往官方组件树内部插入）才受限于官方预留的 hole——所有 client 插件（官方包同样）的通用边界；「新增自己的 UI/行为」完全自由。选型：嵌入官方树内部 → 填 hole；只要自己的可见表面 → 自渲染。
 
-**hole 缺失时**：`ctx.slots.register` 类型与运行时都要求 hole 存在。官方树未声明期望的 hole（如 0804 原无 `sidebar.workspaces.sessionRow`）时，填 hole 的组件不注册——两个补救：改宿主官方包补声明（plugin-registry 补丁已为 ui-workspace 补了 sessionRow 扩展 hole，见 [集成到 dsh](integrating-into-dsh.md)），或改用自渲染。
+**hole 缺失时**：`ctx.slots.register` 类型与运行时都要求 hole 存在。官方树未声明期望的 hole（如 0804 原无 `sidebar.workspaces.sessionRow`）时，填 hole 的组件不注册——两个补救：由依赖该 hole 的**插件项目自带补丁**补声明（如 dsh-subagent-tree 仓库 `patches/`；plugin-registry 补丁不含插件特定改动），或改用自渲染。
 
 ## 契约要点
 
@@ -124,4 +124,4 @@ client half 是浏览器端**完整 Cordis 插件**（`apply(ctx)` 在浏览器�
 
 - **react 被 require 正常**：官方 client 包 bundle 同样 require `react`——react 是平台模块表成员，非 registry 化问题。
 - **官方通道不动**：转换是「新增发布形态」，原 `dsh-client-*` 包与 Loader 树通道保持原样，两种形态并存。
-- **功能依赖不变**：registry 化只改安装/管理形态；组件注册仍需宿主提供官方扩展 hole（如 `ui-workspace` 的 `sessionRow`）——该 hole 已随 plugin-registry 补丁（38 文件版）提供，集成补丁后即可用（subagent-tree 实测：浏览器加载 bundle、apply 执行、组件注册、CSS 注入均成功）。
+- **功能依赖不变**：registry 化只改安装/管理形态；组件注册仍需宿主提供官方扩展 hole（如 `sessionRow`）——该 hole 由**插件项目自带补丁**提供（如 dsh-subagent-tree `patches/`），不属于 plugin-registry 补丁。subagent-tree 实测：bundle 加载、apply 执行、组件注册、CSS 注入均成功。

@@ -23,7 +23,7 @@ DeepSeek Harness 的本地插件系统：清单协议、安装/启停、Web 管�
 | `examples/greeter` | 可直接安装的示例插件：Node 侧 greet 工具 + 浏览器端 client half（清单 + 双入口），见 [`examples/greeter/README.md`](examples/greeter/README.md) |
 | `examples/loop` | 定时循环插件：`/loop` 命令 + `loop` 工具，按间隔向当前 agent 重复投递 prompt（对齐 Claude Code `/loop`），见 [`examples/loop/README.md`](examples/loop/README.md) |
 | `skills/plugin-registry-create` | Agent Skill：指导快速创建 registry 插件（脚手架 → 写入口 → 安装启用） |
-| `patches/dsh-plugin-registry.patch` | 基于官方 0804 快照的接线补丁（38 个文件） |
+| `patches/dsh-plugin-registry.patch` | 基于官方 0804 快照的接线补丁（33 个文件，仅本仓库核心机制的官方改动） |
 
 ## 展示
 
