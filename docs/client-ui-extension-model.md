@@ -134,7 +134,7 @@
   - **发现（印证 F6）**：导航点只覆盖已渲染行——`data-chat-*` 契约化 + 跨窗口导航待补；`z-index:900`（官方模态之下）。
   - **审查修复**：初版 observer 观察 body，render 重建又触发 observer 无限循环冻结；修复为限定 `[data-chat-flow=""]`，单测锁定。
   - **后续**：通用容器落地后，导航条可替换为 `ctx.ui.mount`。
-- **S5 冒烟 ✅ sidebar.panel 缝 + 入口 + 视图切换（`examples/taskboard`）**：ui-sidebar 开 `sidebar.panel` list 缝（`034c03fa`）；ui-conversation 加 `ctx.conversation.setView`（`005d8061`，F9 闭环）；F1 孤儿实例（setView 曾写一次性 store）由 `b5cf95a9` 修复为写共享实例；`vlln/taskboard` 注册 React 入口 + 视图，点击经 setView 切换（无会话退回浮层）。setView 有官方单测；浏览器点击复验待办（headless 无持久化会话）；Agent 卡片依赖 tasks 投影（S2）。
+- **S5 冒烟 ✅ sidebar.panel 缝 + 入口 + 视图切换（`examples/taskboard`）**：ui-sidebar 开 `sidebar.panel` list 缝（`034c03fa`）；ui-conversation 加 `ctx.conversation.setView`（`005d8061`，F9 闭环）；F1 孤儿实例（setView 曾写一次性 store）由 `b5cf95a9` 修复为写共享实例；`vlln/taskboard` 注册 React 入口 + 视图，点击经 setView 切换（无会话退回浮层）。setView 有官方单测；**浏览器真实点击已复验**（注入选中 + 转 active 后点击切视图）；Agent 卡片依赖 tasks 投影（S2）。
 - **数据投影**：`useTasks` 单测（投影正确性 + 响应式 + session 作用域隔离）。
 - **安全**：S4 拒绝 html 内嵌的测试（markdown 渲染器对 `<script>` 的处置）。
 - **性能（F10）**：S3/S4 的流内分发不破坏 ChatView 的渲染预算（节点级 memo、chunk 风暴只重渲 StreamingTail）——加性能冒烟。

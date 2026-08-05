@@ -23,11 +23,12 @@ dsh plugin enable vlln/taskboard
 
 - 安装/启用 → boot graph 含 `vlln/taskboard` 行（rev 对应当前 bundle）
 - 真实 Chrome DOM：`<div class="panelArea"><button>Task Board</button></div>` 出现在侧边栏（regionArea 与 footArea 之间）
+- **浏览器真实点击复验（F9 通道）**：headless Chrome + CDP，注入会话选中态（localStorage `dsh.sessions.current`）→ 会话发消息转 active（blank hero 态视图区不渲染，见已知限制）→ 点击按钮 → 视图环从 Chat 切到本插件注册的 Task Board 视图（aria-selected 转移、视图内容出现），无 `console.error`
 - 服务器日志无错误；导航条（navbar）共存正常
 
-## 点击切视图：代码路径已接线，机制待 F1 修复后浏览器复验
+## 点击切视图：已验证
 
-点击按钮的完整链路已接线：`TaskBoardTrigger` onClick → `sessions.scope(current).get('conversation').setView('taskboard')`（F9 跨槽通道）→ 视图环切到本插件注册的 `conversation.view` 视图。**浏览器端尚未复验**：早期 headless 环境无持久化当前会话，且审查发现 setView 曾写进一次性 store 实例（F1 孤儿实例，官方 `b5cf95a9` 修复为写共享实例）——修复前浏览器验证无意义。无会话时按钮退回自渲染浮层并打 `console.error`（F4 降级）。
+`TaskBoardTrigger` onClick → `sessions.scope(current).get('conversation').setView('taskboard')`（F9 跨槽通道）→ 视图环切到本插件注册的 `conversation.view` 视图。链路含 F1 修复（`b5cf95a9`：setView 写共享会话 store 实例——修复前写一次性孤儿实例，切换不可见，单测也因 localStorage 重水合假阳性掩盖）。无会话时按钮退回自渲染浮层并打 `console.error`（F4 降级）。
 
 ## 前置：官方改动
 
@@ -37,10 +38,10 @@ dsh plugin enable vlln/taskboard
 
 ## 构建（保持 bundle 与源码同步）
 
-`client.js` 用 tsdown 构建（同 `dsh-subagent-tree` 的 registry 模式）：staging 复制进 DSH monorepo → tsc（类型必须过）→ tsdown bundle → 产物复制回本目录。**改源码必须重建 bundle**，否则产物与源码漂移（审查发现过此问题）。
+`client.js` 用 tsdown 构建（同 `dsh-subagent-tree` 的 registry 模式）：staging 复制进 DSH monorepo → tsc（类型必须过）→ tsdown bundle → 产物复制回本目录。**改源码必须重建 bundle**，否则产物与源码漂移（审查发现过此问题）。**官方侧同理**：`ui-conversation`/`runtime` 的 `lib/` 构建产物是 gitignore 的，src 改动（如 setView 通道、`storeInstance`）必须重建 lib 并重启 web，否则浏览器拿到旧 bundle（复验期间实测踩中：bundle 无 `setView` 方法，点击抛 `TypeError`）。
 
 ## 已知限制
 
-- **点击切视图需当前会话且待复验**：`ctx.conversation.setView` 是 scope-addressed（无会话时 root 调用抛错，本插件降级为浮层）；有会话时的真实浏览器切换尚未复验（见上节）；setView 写共享实例的机制由官方单测覆盖（`service-orchestration.spec.ts`）。
+- **点击切视图需非 blank 会话**：`ctx.conversation.setView` 是 scope-addressed（无会话时 root 调用抛错，本插件降级为浮层）；且 blank（hero）会话下视图区不渲染（`ConversationSession` hideChrome），切换要等会话有内容（发消息转 active）后可见。setView 写共享实例的机制由官方单测覆盖（`service-orchestration.spec.ts`）。
 - **Agent 卡片/分派是占位**：tasks 数据无 client 投影（S2 最高成本项）。
 - 侧边栏折叠（rail 态）下按钮仍渲染为宽行（`SidebarPanelOwnerProps.wide` 已传，但本示例未做 `!wide` 图标化，rail 下会被裁切）——与 ui-settings 触发器的 rail 模式对照可改进。
