@@ -58,7 +58,7 @@
 
 | 要素 | 机制 | 证据 |
 |---|---|---|
-| 侧边栏入口 | **keyed 缝（`sidebar.panel` 待开）** | sidebar 整列 single 由 **ui-sidebar** 占用（`ui-layout/index.ts:39` 声明、`ui-sidebar/src/client/index.ts:38-49` 注册）；`sidebar.workspaces`/`sidebar.settings` 是 ui-sidebar 声明的两个 child——`sidebar.panel` 缝应归 **ui-sidebar**（shell）声明+渲染，非 ui-layout/workspace |
+| 侧边栏入口 | **list 缝（`sidebar.panel`，已开）** | sidebar 整列 single 由 ui-sidebar 占用（`ui-layout/index.ts:39` 声明、`ui-sidebar` 注册）；`sidebar.panel` 缝归 ui-sidebar（list 槽，shell 直接 renderSlot 渲染全部条目） |
 | 打开新页 | **`conversation.view` list 槽（视图环）** | `apply.ts:121-123`（注册条目 = 一个视图 tab）——Obsidian `registerView` 等价物，但**session 作用域**（随会话切换重挂，F9） |
 | Agent 列表 | `useSessions`/`useWorkspaces` | standard kit |
 | 分派任务 | `ctx.sessions.openSubagent` 等注入动作 | `runtime/client/sessions/service.ts:328` |
@@ -77,8 +77,8 @@
 | kind | 匹配方式 | 场景对应 |
 |---|---|---|
 | `single` | 固定位置（整列/整区） | sidebar、conversation 主区 |
-| `list` | 多条目列表 | **`conversation.view` 视图环（S5 新页）**、设置页项 |
-| `keyed` | 按维度键匹配（开放取值空间） | 工具名（toolview）、**sessionRow（行内缝）**、**sidebar.panel（待开）**、卡片类型（S4） |
+| `list` | 多条目列表（渲染全部） | **`conversation.view` 视图环（S5 新页）**、**`sidebar.panel`（侧边栏面板入口，S5）**、设置页项 |
+| `keyed` | 按维度键匹配（开放取值空间） | 工具名（toolview）、**sessionRow（行内缝）**、卡片类型（S4） |
 | `chain` | 按内容判别式路由（**整槽接管**，命中隐藏 fallback） | composer 接管；**S3 需扩展 per-item 回退语义**（当前不覆盖） |
 
 **scope 轴（评审 F5）**：`root` / `session` / `session-maybe` 决定插件能拿到哪些 standard-kit 钩子——root 只有 `useSessions`/`useWorkspaces`，session 才有 `sessionId`/`useSession`/`useProjection`（`web-react/scoped-slots.tsx:289-310`）。**scope 决定数据通道**，与 §2 呼应；开发者漏学 scope 会踩「组件为什么拿不到 useSession」。
@@ -112,7 +112,7 @@
 
 | 件 | 场景 | 改动面 | 性质 |
 |---|---|---|---|
-| `sidebar.panel` keyed 缝 | S5 | **ui-sidebar** 声明 + SidebarRoot 渲染（shell 归属） | 开一类缝 |
+| `sidebar.panel` list 缝 | S5（已开） | **ui-sidebar** 声明 + SidebarRoot panelArea 渲染（shell 归属） | 开一类缝 |
 | `useTasks` client 投影 | S2 | **新线协议（task 事件帧）+ client 适配器 + session 作用域钩子** | 数据投影，最高成本 |
 | 内容流 per-item 回退缝 | S3 | **新开流级缝 + 渲染点 + 回退语义**（chain 扩展或新形态） | 机制扩展 |
 | 卡片 marker + keyed 缝 | S4 | marker 识别（线协议/fence 约定）+ 渲染点（有 slots 的层） | 两件 |
