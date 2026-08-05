@@ -35,5 +35,5 @@ dsh plugin enable vlln/turn-fold
 
 ## 已知限制
 
-- **折叠判别只基于 flow item**：select 是 owner 纯函数，无法读 turn 结束状态（如 `turnEnds`）——本示例按"工具组已完成"（全 tool-result）判别；需要会话级状态（如"仅折叠已结束 turn"）的判别需数据投影（如 `useSession` 在组件内、select 保持纯）。
+- **判别是 owner 纯函数**：select 只读 owner 携带的 turn 上下文（`turnEnds`/`answerSeqs`），不读会话实时状态——"已结束 turn"由 ChatView 在 owner 里提供的 turn 结束映射判定；正在运行的 turn 不折叠（保持实时过程可见）。
 - 折叠行是纯展示（无展开交互）；展开/详情留待后续。
