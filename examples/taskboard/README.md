@@ -23,6 +23,7 @@ dsh plugin enable vlln/taskboard
 
 - 安装/启用 → boot graph 含 `vlln/taskboard` 行（rev 对应当前 bundle）
 - 真实 Chrome DOM：`<div class="panelArea"><button>Task Board</button></div>` 出现在侧边栏（regionArea 与 footArea 之间）
+- **点击行为**：点击「Task Board」按钮 → 浮层出现（`useState` toggle，含会话数 + 占位分派按钮）——CDP 模拟点击确认 overlay 渲染
 - 服务器日志无错误；导航条（navbar）共存正常
 
 ## 前置：官方 `sidebar.panel` 缝
@@ -35,5 +36,6 @@ dsh plugin enable vlln/taskboard
 
 ## 已知限制
 
-- **入口仅验证缝机制**：按钮无 onClick——「打开新页 + Agent 卡片 + 分派」未实现。原因：活动视图由 session 作用域的 chat store 持有（`actions.setView`），root 作用域触发器**没有跨槽通道**切视图；tasks 数据也无 client 投影。两者都是设计开放项（F9/S2）。
+- **点击 = 自渲染浮层**：不做会话视图切换——活动视图由 session 作用域 chat store 持有（`actions.setView`），root 触发器无跨槽通道（F9 未实现，设计开放项）。此处用 root 作用域自渲染浮层替代（零官方改动）。
+- **Agent 卡片/分派是占位**：tasks 数据无 client 投影（S2 最高成本项），浮层只显示会话数。
 - 侧边栏折叠（rail 态）下按钮仍渲染为宽行（`SidebarPanelOwnerProps.wide` 已传，但本示例未做 `!wide` 图标化，rail 下会被裁切）——与 ui-settings 触发器的 rail 模式对照可改进。

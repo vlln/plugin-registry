@@ -134,7 +134,7 @@
   - **发现（印证 F6）**：导航点只覆盖已渲染行——`data-chat-*` 契约化 + 跨窗口导航待补；`z-index:900`（官方模态之下）。
   - **审查修复**：初版 observer 观察 body，render 重建又触发 observer 无限循环冻结；修复为限定 `[data-chat-flow=""]`，单测锁定。
   - **后续**：通用容器落地后，导航条可替换为 `ctx.ui.mount`。
-- **S5 冒烟 ✅ sidebar.panel 缝已开 + 入口落地（`examples/taskboard`）**：ui-sidebar 开 `sidebar.panel` list 缝（`034c03fa`）；`vlln/taskboard` 注册 React 入口，Chrome DOM 确认按钮出现。剩余（session 作用域）留后续。
+- **S5 冒烟 ✅ sidebar.panel 缝 + 入口 + 点击（`examples/taskboard`）**：ui-sidebar 开 `sidebar.panel` list 缝（`034c03fa`）；`vlln/taskboard` 注册 React 入口，点击展开浮层（CDP 确认）。**F9 决策**：root→session 视图切换无现成通道（`setView` 在 session 作用域），用 root 自渲染浮层替代；真切换需官方跨槽通道。Agent 卡片依赖 tasks 投影（S2）。
 - **数据投影**：`useTasks` 单测（投影正确性 + 响应式 + session 作用域隔离）。
 - **安全**：S4 拒绝 html 内嵌的测试（markdown 渲染器对 `<script>` 的处置）。
 - **性能（F10）**：S3/S4 的流内分发不破坏 ChatView 的渲染预算（节点级 memo、chunk 风暴只重渲 StreamingTail）——加性能冒烟。
@@ -143,7 +143,7 @@
 
 1. **缝的覆盖面**：官方按「结构类型」开缝的节奏与优先级（先 sidebar.panel 还是先卡片缝）——由官方产品决策。
 2. **chain 的 per-item 回退语义（F1）**：S3 依赖「未命中回退官方 item 渲染」，官方 chain 无此语义——拍板：扩展 chain（条目内注入 fallback）vs 新形态（per-item transform list）vs 接受插件整流接管。
-3. **task board 作用域（F9）**：per-session（现 `conversation.view` 环可用，tasks 本身 session 隔离）vs root 级（需新 root 视图环或由 sidebar.panel 承载）——直接决定 S5 是否闭环。
+3. **task board 作用域（F9，部分定）**：MVP 用 root 自渲染浮层（已验证）；真视图切换需官方加 root→session 跨槽通道（per-session 视图由 chat store 持有）——S5 闭环前置。
 4. **S4 marker 线协议（F3）**：新 AssistantBlock kind（动 host + 回放兼容）vs fence 语言约定（零 host 改动但易与 shiki 高亮冲突）。
 5. **useTasks 线协议（F4）**：新事件帧的宿主侧来源、任务跨页面/跨 session 存活语义、投影节流。
 6. **数据投影范围**：tasks 之后还有哪些 host 服务值得投影（按插件需求热度）。
