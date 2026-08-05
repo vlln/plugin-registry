@@ -1,0 +1,9 @@
+{
+  "id": "vlln/turn-fold",
+  "version": "0.1.0",
+  "main": "./index.mjs",
+  "description": "示例插件：内容流 per-item 回退缝（conversation.chat.item chain）——折叠已完成的工具调用组，未匹配 item 走官方渲染（S3 场景）",
+  "engines": { "dsh": ">=0.0.1" },
+  "contributes": { "tools": [], "skills": [] },
+  "client": { "main": "./client.js" }
+}

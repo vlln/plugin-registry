@@ -25,6 +25,8 @@ dsh plugin install ./my-tool && dsh plugin enable <publisher>/<name>
 
 浏览器端示例：`examples/greeter` 带 client half（`client` 声明 + `client.js` bundle），启用后 Web 刷新可见右下角问候标记——演示插件同时拥有 Node 侧工具与浏览器侧 UI，见 [`examples/greeter/README.md`](greeter/README.md)。
 
+UI 缝示例（官方 `ui-conversation`/`ui-sidebar` 机制件）：`examples/navbar`（S1 自渲染导航条）、`examples/taskboard`（S5 sidebar.panel 入口 + 视图切换 + S2 useTasks 真实任务）、`examples/turn-fold`（S3 内容流 per-item 折叠）——见各目录 README 与 [统一心智模型](../docs/client-ui-extension-model.md)。
+
 ## 一个插件 = 清单 + Cordis 入口
 
 | 文件 | 必须 | 说明 |

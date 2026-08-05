@@ -33,14 +33,14 @@
 
 **落地（评审 F4 修正）**：线协议取**完整快照姿势**（非初稿增量帧）——每变更广播 session 全量列表，重连基线免费；host 侧 `onChanged` + `listOwned` + api-proxy 广播 + **mux 打开推基线**（连接前任务不可见，已修）。tasks 是 session 作用域，`useTasks` 是 session 钩子；列表含 settled 历史（到 owner 销毁）。
 
-### S3 Turn 折叠 ⚠️ 内容流分发维度需扩展
+### S3 Turn 折叠 ✅ 已实现（conversation.chat.item per-item 回退缝）
 
 | 要素 | 机制 | 证据 |
 |---|---|---|
 | 数据 | `node.turn` + `streaming` 标志已存在 | `conversation.ts:92`、`AssistantMarkdown` props |
-| 渲染控制 | 需**按 turn 分组接管**（非单 node） | `ChatFlowItem` 是 node 级（`chat-flow.ts:16-18`），无 turn 级 item |
+| 渲染控制 | **逐 flow item 过判别式，未命中回退官方渲染** | `conversation.chat.item` chain 槽（`ChatView.tsx` renderItem 外包） |
 
-**缺口（评审 F1 修正）**：内容流钩子若只按 `node.kind` 路由，覆盖不了 turn 级折叠。且**官方 chain 语义是「整槽接管」（命中条目替换并隐藏 fallback），不支持「每 item 逐条回退官方渲染」**——turn 折叠需要每个 flow item 过判别式、未命中仍走官方渲染。需二选一：(a) 扩展 chain 语义支持条目内注入 fallback（对齐 Obsidian `registerMarkdownPostProcessor` 的逐元素形态）；(b) 承认内容流需要第 5 种形态（per-item transform list）。**当前没有现成机制覆盖**，不是「把 turn 纳入分发维度」这么简单——真正工作是「新开流级缝 + 渲染点 + 回退语义」。
+**落地（评审 F1 拍板）**：方案 (a)——**复用 chain 语义**：select 本就是 per-render 纯函数，ChatView 对**每个 flow item** 调 `renderSlotChain('conversation.chat.item', { item }, { fallback: 官方渲染 })`——条目判 item、未命中走 fallback，正是 per-item transform，零新槽形态。`vlln/turn-fold` 示例已验证（浏览器：工具组折叠 + 文本官方渲染）。
 
 ### S4 动态卡片 ⚠️ 需数据侧 marker + 渲染点（安全版）
 
@@ -114,7 +114,7 @@
 |---|---|---|---|
 | `sidebar.panel` list 缝 | S5（已开） | **ui-sidebar** 声明 + SidebarRoot panelArea 渲染（shell 归属） | 开一类缝 |
 | `useTasks` client 投影 | S2（已落地） | **`task/snapshot` 帧 + client 适配器 + session 钩子**（`onChanged`/`listOwned` + mux 基线） | 数据投影 |
-| 内容流 per-item 回退缝 | S3 | **新开流级缝 + 渲染点 + 回退语义**（chain 扩展或新形态） | 机制扩展 |
+| 内容流 per-item 回退缝 | S3（已落地） | **`conversation.chat.item` chain 槽**（逐 item 分发 + fallback 官方渲染） | 机制扩展 |
 | 卡片 marker + keyed 缝 | S4 | marker 识别（线协议/fence 约定）+ 渲染点（有 slots 的层） | 两件 |
 | CSS 变量契约文档化 | 主题 | 文档 | 零代码 |
 | `data-chat-*` 锚点属性契约化 | S1 | 文档（现为未版本化实现细节） | 文档 |
@@ -142,7 +142,7 @@
 ## 开放决策
 
 1. **缝的覆盖面**：官方按「结构类型」开缝的节奏与优先级（先 sidebar.panel 还是先卡片缝）——由官方产品决策。
-2. **chain 的 per-item 回退语义（F1）**：S3 依赖「未命中回退官方 item 渲染」，官方 chain 无此语义——拍板：扩展 chain（条目内注入 fallback）vs 新形态（per-item transform list）vs 接受插件整流接管。
+2. **chain 的 per-item 回退语义（F1，已定）**：复用 chain 的 per-render select——新增 `conversation.chat.item` 槽逐 item 分发、fallback 官方渲染（方案 a）；无需新形态。
 3. **task board 作用域（已实现）**：`ctx.conversation.setView` 已加；「跨 session 全局看板」仍需 root 级视图环（开放项）。
 4. **S4 marker 线协议（F3）**：新 AssistantBlock kind（动 host + 回放兼容）vs fence 语言约定（零 host 改动但易与 shiki 高亮冲突）。
 5. **useTasks 线协议（F4，已定）**：`task/snapshot` 完整快照帧，mux 打开推基线；剩余开放：任务跨页面存活语义、输出流投影（当前只投影状态）、投影节流。
