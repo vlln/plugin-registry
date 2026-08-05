@@ -4,7 +4,7 @@ DeepSeek Harness 的本地插件系统：清单协议、安装/启停、Web 管�
 
 ## 快速上手
 
-### 使用 registry（插件用户）
+### 使用 registry
 
 ```sh
 dsh plugin create acme/cool-tool   # 脚手架：生成 dsh.plugin.json + index.mjs + README
@@ -19,7 +19,7 @@ dsh plugin list                    # 列表
 
 要定时循环能力（轮询部署、照看 PR、build-fix-test 循环）？安装 `examples/loop`：`dsh plugin install ./examples/loop && dsh plugin enable acme/loop`，然后 `/loop 5m check the deploy`。
 
-### 安装 registry（DSH 开发者）
+### 安装 registry
 
 ```sh
 node scripts/install-into-dsh.mjs <dsh-monorepo路径>
