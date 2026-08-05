@@ -30,7 +30,7 @@ The `dsh` binary owns the commands; this package owns the operations behind them
 
 | Field | Default | Meaning |
 |---|---|---|
-| `dshHome` | `$DSH_HOME` or `~/.dsh` | Harness home whose `plugins` directory is mounted, resolved by [`@deepseek-ai/dsh-paths`](../../util/paths/README.md) |
+| `dshHome` | `$DSH_HOME` or `~/.dsh` | Harness home whose `plugins` directory is mounted, resolved by `@deepseek-ai/dsh-paths` |
 | `harnessVersion` | `0.0.1` | The running dsh version checked against `engines.dsh` at install; deployments should set it to their real version |
 
 ## Service
