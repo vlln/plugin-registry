@@ -74,7 +74,10 @@ export function TurnFoldRow(
     if (node.kind === 'tool-result') {
       processSeqs.push(node.seq)
       if (node.call !== null) toolNames.push(node.call.name)
-    } else if (node.kind === 'assistant' && !answerSeqs.has(node.seq)) {
+    } else if (node.kind === 'assistant' && !answerSeqs.has(node.seq)
+      && node.blocks.some(b => (b.kind === 'text' || b.kind === 'reasoning') && b.text.trim() !== '')) {
+      // 只聚合流内中间文本：tool-call head（空 assistant）被 deriveChatFlow
+      // 跳过、不在 flow items 里——算进来会让流内首项的 selfSeq 判定失败。
       processSeqs.push(node.seq)
     }
   }

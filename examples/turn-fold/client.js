@@ -50,7 +50,7 @@ window.__ModuleLoader__.load({
 				if (node.kind === "tool-result") {
 					processSeqs.push(node.seq);
 					if (node.call !== null) toolNames.push(node.call.name);
-				} else if (node.kind === "assistant" && !answerSeqs.has(node.seq)) processSeqs.push(node.seq);
+				} else if (node.kind === "assistant" && !answerSeqs.has(node.seq) && node.blocks.some((b) => (b.kind === "text" || b.kind === "reasoning") && b.text.trim() !== "")) processSeqs.push(node.seq);
 			}
 			if (processSeqs.length === 0) return null;
 			if ((item.kind === "tool-group" ? item.results[0].seq : item.node.seq) !== Math.min(...processSeqs)) return null;

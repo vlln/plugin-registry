@@ -6,7 +6,7 @@
 
 官方 `ui-conversation` 新增 `conversation.chat.item` chain 槽（S3 落地）：`ChatView` 对**每个 flow item**（user/assistant 节点、tool-group 工具组）调 `renderSlotChain`——条目 select 判 item、未命中走 `fallback`（官方渲染）。**per-item transform**，非整槽接管。本插件：
 
-- **注册**：`deferRegistration` → `ctx.slots.register({ name: 'conversation.chat.item', select, locale: NS }, TurnFoldRow)` —— select 判 `tool-group`（已完成工具组）折叠，其余 item 未命中走官方渲染
+- **注册**：`deferRegistration` → `ctx.slots.register({ name: 'conversation.chat.item', select, locale: NS }, TurnFoldRow)` —— select 判「已结束 turn 的执行过程」接管（返回 turn）；组件聚合该 turn 的执行过程为一个可展开折叠块，其余执行过程 item 渲染 null（内容已聚合）
 - **Node half**：空 apply（纯 UI 插件）
 - **bundle**：tsdown client preset 构建（React + JSX，react 走平台模块）
 
@@ -17,7 +17,7 @@ dsh plugin install ./examples/turn-fold
 dsh plugin enable vlln/turn-fold
 ```
 
-启用后刷新 Web 页面：对话内容流中的工具调用组（bash/工具行）折叠成一行摘要，用户消息与最终回答仍官方渲染。
+启用后刷新 Web 页面：每次**完成的 turn** 的执行过程（工具调用 + 中间文本）聚合折叠成一行（点击可展开查看），该 turn 的最后一条回答（Answer）与用户消息仍官方渲染。
 
 ## 已验证（真实 web 组合，bundle 与源码同步）
 
@@ -35,5 +35,5 @@ dsh plugin enable vlln/turn-fold
 
 ## 已知限制
 
-- **判别是 owner 纯函数**：select 只读 owner 携带的 turn 上下文（`turnEnds`/`answerSeqs`），不读会话实时状态——"已结束 turn"由 ChatView 在 owner 里提供的 turn 结束映射判定；正在运行的 turn 不折叠（保持实时过程可见）。
-- 折叠行是纯展示（无展开交互）；展开/详情留待后续。
+- **判别是 owner 纯函数**：select 只读 owner 携带的 turn 上下文（`turnEnds`/`answerSeqs`）；正在运行的 turn 不折叠（保持实时过程可见）。
+- **聚合只含流内执行过程**：组件用 `useSession` 聚合该 turn 的执行过程时跳过 tool-call head（空 assistant，不在 flow items 里）——否则首项判定失败；展开内容当前只列工具名，完整过程详情留待后续。
