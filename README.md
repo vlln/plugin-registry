@@ -68,4 +68,4 @@ dsh plugin list                    # 列表
 
 ## 版权
 
-本仓库代码版权归作者所有，供 dsh 内测成员在 dsh-external 组织内使用与协作。未经作者许可请勿公开分发。
+BSD-3-Clause License，与 DSH 官方仓库（dsh2026/test-vlln）一致。见 [LICENSE](LICENSE)。
