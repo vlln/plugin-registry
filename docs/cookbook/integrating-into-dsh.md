@@ -63,6 +63,28 @@ dsh plugin list    # enabled acme/smoke@0.1.0
 dsh plugin uninstall acme/smoke
 ```
 
+## 运行
+
+构建并启动 Web（含插件面板）：
+
+```sh
+pnpm install            # 一键脚本已执行则跳过
+npm run build           # tsc -b + tsdown（lib 与 web bundle）
+node --import tsx/esm apps/cli/src/bin.ts web   # 启动，默认端口见启动日志
+```
+
+也可以用根脚本 `pnpm run demo:web`（等价于 build + 上面的启动命令）。启动后浏览器打开日志打印的 URL（如 `http://127.0.0.1:8890`），设置页出现「插件」面板。
+
+**验证 registry 生效**：
+
+```sh
+dsh plugin list        # 输出 no plugins installed（命令可用）
+dsh plugin install ./examples/greeter && dsh plugin enable acme/greeter
+dsh plugin list        # enabled acme/greeter@0.2.0
+```
+
+**注意**：用 tsx 源码启动时，确保 `TSX_TSCONFIG_PATH` 指向**这个 monorepo 的 tsconfig.json**（不要残留指向其他 DSH 树的路径），否则 paths 会把 `@deepseek-ai/*` 解析到别的源码树导致服务双注册冲突（如 `service "bashEnv" has been registered`）。
+
 ## 常见问题
 
 - **补丁 apply 失败**：基线快照不一致 → `git apply --3way`，冲突处对照 `packages/plugin/plugin/src/` 手动对齐。
