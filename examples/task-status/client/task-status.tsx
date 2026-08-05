@@ -76,6 +76,7 @@ export function TaskStatusBar(
   const tasks = useTasks(s => s)
   const [inChat, setInChat] = useState(false)
   const [open, setOpen] = useState(false)
+  const [expandedTask, setExpandedTask] = useState<string | null>(null)
 
   // 对话页探针：flow 列存在性（navbar 同信号）。body 级 observer 只跑
   // querySelector，回调轻量；view 切换（flow 移除/重建）都触发。
@@ -90,9 +91,10 @@ export function TaskStatusBar(
   }, [])
 
   if (!inChat) return null
-  const running = tasks.filter(task => task.status === 'running').length
-  const finished = tasks.length - running
-  if (tasks.length === 0) return null
+  // 只显示活跃任务：settled（completed/killed/failed）随终态帧到达即消失。
+  const active = tasks.filter(task => task.status === 'running' || task.status === 'stopping')
+  const running = active.filter(task => task.status === 'running').length
+  if (active.length === 0) return null
 
   const statusOf = (status: string): { color: string; glyph: string; label: string } =>
     STATUS_META[status] ?? { color: 'var(--dsw-alias-label-caption)', glyph: '·', label: status }
@@ -103,20 +105,15 @@ export function TaskStatusBar(
         display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '4px 5px 4px 12px',
         cursor: tasks.length > 1 ? 'pointer' : 'default',
       }}
-      onClick={tasks.length > 1 ? () => setOpen(v => !v) : undefined}
+      onClick={active.length > 1 ? () => setOpen(v => !v) : undefined}
     >
       <span style={{ width: 16, fontSize: 14, lineHeight: '16px', textAlign: 'center', color: 'var(--dsw-alias-label-tertiary)' }}>
         ⚙
       </span>
       <span style={{ flex: 1, fontSize: 13, lineHeight: '24px', fontWeight: 500, color: 'var(--dsw-alias-label-primary)' }}>
         {t('status.running', { count: running })}
-        {finished > 0 && (
-          <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--dsw-alias-label-tertiary)' }}>
-            · {t('status.finished', { count: finished })}
-          </span>
-        )}
       </span>
-      {tasks.length > 1 && (
+      {active.length > 1 && (
         <span style={{ padding: '0 8px', fontSize: 12, color: 'var(--dsw-alias-label-caption)' }}>
           {open ? t('status.close') : t('status.open')}
         </span>
@@ -124,31 +121,52 @@ export function TaskStatusBar(
     </div>
   )
 
-  const row = (task: { id: string; label: string; status: string; detail?: string }): ReactNode => {
+  const timeText = (task: { startedAt: number; finishedAt?: number }): string => {
+    const start = new Date(task.startedAt)
+    const pad = (n: number): string => String(n).padStart(2, '0')
+    const time = `${pad(start.getHours())}:${pad(start.getMinutes())}:${pad(start.getSeconds())}`
+    return task.finishedAt === undefined
+      ? `${time} 起`
+      : `${time} → ${pad(new Date(task.finishedAt).getHours())}:${pad(new Date(task.finishedAt).getMinutes())}`
+  }
+
+  const row = (task: { id: string; kind: string; label: string; status: string; detail?: string; startedAt: number; finishedAt?: number }): ReactNode => {
     const meta = statusOf(task.status)
+    const expanded = expandedTask === task.id
     return (
-      <div
-        key={task.id}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 12px',
-          borderRadius: 8,
-        }}
-        title={task.detail}
-      >
-        <span style={{ width: 16, fontSize: 14, lineHeight: '16px', textAlign: 'center', color: meta.color }}>
-          {meta.glyph}
-        </span>
-        <span style={{ flex: 1, fontSize: 13, lineHeight: '20px', color: 'var(--dsw-alias-label-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {task.label}
-        </span>
-        <span style={{ fontSize: 12, color: meta.color, whiteSpace: 'nowrap' }}>
-          {t(meta.label as TaskStatusKey)}
-        </span>
+      <div key={task.id}>
+        <div
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 12px',
+            borderRadius: 8, cursor: 'pointer',
+            background: expanded ? 'var(--dsw-alias-interactive-bg-hover)' : undefined,
+          }}
+          onClick={() => setExpandedTask(expanded ? null : task.id)}
+        >
+          <span style={{ width: 16, fontSize: 14, lineHeight: '16px', textAlign: 'center', color: meta.color }}>
+            {meta.glyph}
+          </span>
+          <span style={{ flex: 1, fontSize: 13, lineHeight: '20px', color: 'var(--dsw-alias-label-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {task.label}
+          </span>
+          <span style={{ fontSize: 12, color: 'var(--dsw-alias-label-caption)', whiteSpace: 'nowrap' }}>
+            {timeText(task)}
+          </span>
+          <span style={{ fontSize: 12, color: meta.color, whiteSpace: 'nowrap' }}>
+            {t(meta.label as TaskStatusKey)}
+          </span>
+        </div>
+        {expanded && (
+          <div style={{ padding: '0 12px 8px 34px', fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary)', display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span>类型：{task.kind} · {timeText(task)}</span>
+            {task.detail !== undefined && <span>详情：{task.detail}</span>}
+          </div>
+        )}
       </div>
     )
   }
 
-  return (
+  const card = (body: ReactNode): ReactNode => (
     <div
       data-task-status-bar=""
       style={{
@@ -163,13 +181,25 @@ export function TaskStatusBar(
         fontFamily: 'system-ui',
       }}
     >
+      {body}
+    </div>
+  )
+
+  // 单任务：直接渲染该行（可点击展开 detail），无计数头。
+  if (active.length === 1) {
+    const single = active[0]
+    if (single !== undefined) return card(row(single))
+    return null
+  }
+  return card(
+    <>
       {header}
       {open && (
         <div style={{ maxHeight: 180, overflowY: 'auto', borderTop: '1px solid var(--dsw-alias-border-l1)' }}>
-          {tasks.map(row)}
+          {active.map(row)}
         </div>
       )}
-    </div>
+    </>,
   )
 }
 

@@ -72,6 +72,7 @@ window.__ModuleLoader__.load({
 			const tasks = useTasks((s) => s);
 			const [inChat, setInChat] = (0, react.useState)(false);
 			const [open, setOpen] = (0, react.useState)(false);
+			const [expandedTask, setExpandedTask] = (0, react.useState)(null);
 			(0, react.useEffect)(() => {
 				const check = () => {
 					setInChat(document.querySelector("[data-chat-flow=\"\"]") !== null);
@@ -87,9 +88,9 @@ window.__ModuleLoader__.load({
 				};
 			}, []);
 			if (!inChat) return null;
-			const running = tasks.filter((task) => task.status === "running").length;
-			const finished = tasks.length - running;
-			if (tasks.length === 0) return null;
+			const active = tasks.filter((task) => task.status === "running" || task.status === "stopping");
+			const running = active.filter((task) => task.status === "running").length;
+			if (active.length === 0) return null;
 			const statusOf = (status) => STATUS_META[status] ?? {
 				color: "var(--dsw-alias-label-caption)",
 				glyph: "·",
@@ -104,7 +105,7 @@ window.__ModuleLoader__.load({
 					padding: "4px 5px 4px 12px",
 					cursor: tasks.length > 1 ? "pointer" : "default"
 				},
-				onClick: tasks.length > 1 ? () => setOpen((v) => !v) : void 0,
+				onClick: active.length > 1 ? () => setOpen((v) => !v) : void 0,
 				children: [
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 						style: {
@@ -116,7 +117,7 @@ window.__ModuleLoader__.load({
 						},
 						children: "⚙"
 					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 						style: {
 							flex: 1,
 							fontSize: 13,
@@ -124,16 +125,9 @@ window.__ModuleLoader__.load({
 							fontWeight: 500,
 							color: "var(--dsw-alias-label-primary)"
 						},
-						children: [t("status.running", { count: running }), finished > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-							style: {
-								marginLeft: 8,
-								fontWeight: 400,
-								color: "var(--dsw-alias-label-tertiary)"
-							},
-							children: ["· ", t("status.finished", { count: finished })]
-						})]
+						children: t("status.running", { count: running })
 					}),
-					tasks.length > 1 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					active.length > 1 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 						style: {
 							padding: "0 8px",
 							fontSize: 12,
@@ -143,18 +137,27 @@ window.__ModuleLoader__.load({
 					})
 				]
 			});
+			const timeText = (task) => {
+				const start = new Date(task.startedAt);
+				const pad = (n) => String(n).padStart(2, "0");
+				const time = `${pad(start.getHours())}:${pad(start.getMinutes())}:${pad(start.getSeconds())}`;
+				return task.finishedAt === void 0 ? `${time} 起` : `${time} → ${pad(new Date(task.finishedAt).getHours())}:${pad(new Date(task.finishedAt).getMinutes())}`;
+			};
 			const row = (task) => {
 				const meta = statusOf(task.status);
-				return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				const expanded = expandedTask === task.id;
+				return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 					style: {
 						display: "flex",
 						alignItems: "center",
 						gap: 6,
 						height: 36,
 						padding: "0 12px",
-						borderRadius: 8
+						borderRadius: 8,
+						cursor: "pointer",
+						background: expanded ? "var(--dsw-alias-interactive-bg-hover)" : void 0
 					},
-					title: task.detail,
+					onClick: () => setExpandedTask(expanded ? null : task.id),
 					children: [
 						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 							style: {
@@ -181,15 +184,39 @@ window.__ModuleLoader__.load({
 						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 							style: {
 								fontSize: 12,
+								color: "var(--dsw-alias-label-caption)",
+								whiteSpace: "nowrap"
+							},
+							children: timeText(task)
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							style: {
+								fontSize: 12,
 								color: meta.color,
 								whiteSpace: "nowrap"
 							},
 							children: t(meta.label)
 						})
 					]
-				}, task.id);
+				}), expanded && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					style: {
+						padding: "0 12px 8px 34px",
+						fontSize: 12,
+						lineHeight: "18px",
+						color: "var(--dsw-alias-label-tertiary)",
+						display: "flex",
+						flexDirection: "column",
+						gap: 2
+					},
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: [
+						"类型：",
+						task.kind,
+						" · ",
+						timeText(task)
+					] }), task.detail !== void 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: ["详情：", task.detail] })]
+				})] }, task.id);
 			};
-			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+			const card = (body) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 				"data-task-status-bar": "",
 				style: {
 					width: `calc(100% - 2 * ${SIDE_CLEARANCE} - 4 * ${DOCK_INSET})`,
@@ -202,15 +229,21 @@ window.__ModuleLoader__.load({
 					fontSize: 13,
 					fontFamily: "system-ui"
 				},
-				children: [header, open && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-					style: {
-						maxHeight: 180,
-						overflowY: "auto",
-						borderTop: "1px solid var(--dsw-alias-border-l1)"
-					},
-					children: tasks.map(row)
-				})]
+				children: body
 			});
+			if (active.length === 1) {
+				const single = active[0];
+				if (single !== void 0) return card(row(single));
+				return null;
+			}
+			return card(/* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [header, open && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+				style: {
+					maxHeight: 180,
+					overflowY: "auto",
+					borderTop: "1px solid var(--dsw-alias-border-l1)"
+				},
+				children: active.map(row)
+			})] }));
 		}
 		/** 需要此插件声明的服务：slots + locale。 */
 		const inject = ["slots", "locale"];
