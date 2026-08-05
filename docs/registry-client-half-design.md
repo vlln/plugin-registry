@@ -49,18 +49,19 @@ unregisterExternal(id: string): void
 - **路由零改动**：`serveBundle` 按 `/plugins/<id>/client.js` 查 `clientPath(id)` 读文件——id 含斜杠（`acme/greeter`）与 scoped 包名同构，`pathname.slice(prefix.length, -suffix.length)` 已支持（现有注释即声明此意）。
 - **注入零改动**：`injectBootManifest` 读 `this.composed`，外部行与扫描行一样进入 `__DSH_BOOT__`。
 - **依赖方向**：`@deepseek-ai/dsh-plugin`（第三方 registry 包）调用 `@deepseek-ai/dsh-client-modules`（官方包）——官方包不被第三方反向依赖，方向正确。
-- **id 碰撞不变式**：manifest id regex 为 `[a-z0-9-]+\/[a-z0-9-]+`（`manifest.ts:31`），不含 `@`/点，与官方 loader entry 名（npm 包名）不可能碰撞——作为 `registerExternal` 的注释不变式，无需防御代码。
-- **时序**：页面加载时 `__DSH_BOOT__` 已固定；运行时 register 的变更对**已加载页面**不生效，下次页面刷新（或 HMR 桥）后可见——MVP 接受「启用后刷新生效」。
+- **id 碰撞不变式**：manifest id regex 为 `^[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*$`（registry `manifest.ts:31`，每段首字符必须字母数字），不含 `@`/点，与官方 loader entry 名（npm 包名）不可能碰撞——作为 `registerExternal` 的注释不变式，无需防御代码（评审 N4：入口仍按此 regex 校验 id 形状，防 `..`/`?` 破坏 url 契约）。
+- **时序**：页面加载时 `__DSH_BOOT__` 已固定；运行时 register 的变更对**已加载页面**不生效，下次页面刷新后可见（评审 N6：dev 下 HMR 只对**已在图中**的行生效，运行中新增的行仍需刷新）——MVP 接受「启用后刷新生效」。
 
 ### 补登记：host 缺席时怎么办（评审 R1）
 
-`plugin-local` 激活即跑 `reconcile()`（`src/index.ts:84-86`，`inject = []`）；`ClientModuleHostService` 要等 `httpServer`+`loader`（`static inject = ['httpServer', 'loader']`）。web.cordis.yml 明示行序无加载语义——两者**无顺序保证**，且倾向 plugin-local 先激活。mount 期间 root 属性读 `clientModuleHost` 得 undefined → 登记静默跳过，且无再触发 → **进程重启后已启用插件的 client half 从 boot graph 永久消失**。
+`plugin-local` 激活即跑 `reconcile()`（`plugin/src/index.ts:64-68`，`inject = []`）；`ClientModuleHostService` 要等 `httpServer`+`loader`（`static inject = ['httpServer', 'loader']`）。web.cordis.yml 明示行序无加载语义——两者**无顺序保证**，且倾向 plugin-local 先激活。mount 期间 root 属性读 `clientModuleHost` 得 undefined → 登记静默跳过，且无再触发 → **进程重启后已启用插件的 client half 从 boot graph 永久消失**。
 
 **选型：`ctx.inject` 延迟补登记（推荐）**。`ctx.inject(['clientModuleHost'], cb)` 是 cordis 标准「等服务就绪再执行」机制（`this.mixin("registry", ["inject", "plugin"])`，任何 ctx 可用；`vendor/cordis/lib/index.js:743,1583-1596`）：
 
 - `PluginLocalService` 在 apply 内注册一个惰性补登记：`this.ctx.inject(['clientModuleHost'], () => this.retryExternalRegistrations())`。
 - `mount(id)` 时：host 存在 → 立即 `registerExternal`；host 缺席 → 把 id 记入 `pendingExternal` 集合。
-- `retryExternalRegistrations()`：遍历 `pendingExternal` 逐项登记（host 此时已就绪）。
+- `unmount(id)` 时：**同步从 `pendingExternal` 删除该 id**（评审 N1）——否则启动窗口内「入 pending → 程序化 disable → host 就绪」会把**已禁用**插件的 client half 登记进 boot graph，违反「只有 enable 才登记」不变式。
+- `retryExternalRegistrations()`：遍历 `pendingExternal` 逐项**复查「当前仍 mounted 且 enabled」（以 `mounts` 集合为准）**后再登记（评审 N1）；逐项 try/catch，**单项失败（如 bundle 事后被删）保留在 pending，不阻断其余项**，随下一次 `onGraphChanged` 或重装/重启用例重试（评审 N2）。
 - 纤维生命周期：inject 纤维由 cordis 管理，host 就绪时自动启动、plugin-local 卸载时自动释放。
 
 **备选（不采用，记录理由）**：① 订阅 `internal/service` 事件（`reflect.js:226` 每次服务提供/变更 emit）——事件从提供者 ctx 向上冒泡，plugin-local 与 modules 是兄弟 ctx，监听可达性依赖 isolate 过滤，脆弱；② modules 构造完成后广播补扫——官方包反向感知第三方包，破坏依赖方向。`ctx.inject` 无事件耦合、无反向依赖，是唯一干净选项。
@@ -88,7 +89,7 @@ unregisterExternal(id: string): void
 | `inject` | 可选 | **图元数据**：声明插件依赖的 client 服务，进 `__DSH_BOOT__` 行（对齐官方 `dshClient.inject` 语义）；浏览器 fiber 的实际 inject 由 bundle 自身导出决定 |
 | `immediately` | 可选 | 是否 stage-one 预取；缺省 false（懒加载） |
 
-校验（评审 O2）：`installPlugin` 已检查 `manifest.main` 存在（`registry.ts:135-137`），**平行检查 `client.main`**（若声明）——坏声明在**安装时**暴露，而不是启用时把仅浏览器侧缺陷放大为 web 组合启动失败。`parseManifest` 对 `client` 做结构校验（main 字符串、inject 字符串数组、immediately 布尔）。
+校验（评审 O2）：`installPlugin` 已检查 `manifest.main` 存在（`registry.ts:134-136`），**平行检查 `client.main`**（若声明）——坏声明在**安装时**暴露，而不是启用时把仅浏览器侧缺陷放大为 web 组合启动失败。`parseManifest` 对 `client` 做结构校验（main 字符串、inject 字符串数组、immediately 布尔）。
 
 路径安全（评审 Y1）：`client.main` resolve 后断言仍在插件根内（`join(pluginRoot, client.main)` 可越出根，如 `../secret.js`；插件本身是用户显式启用的可信代码，风险有限但校验成本极低）。
 
@@ -142,11 +143,11 @@ registry 插件的 client bundle 必须满足浏览器侧加载契约，与官�
 
 ## 开放决策
 
-1. **白名单强制点（评审 O4）**：`client.inject` 白名单若做，强制点在**构建期 externals 子集**（registry 专用 `CLIENT_EXTERNALS` 白名单，构建时校验）而非浏览器 loader——模块边界（bundle 只能 require 平台模块）与服务边界（fiber 可 inject 哪些服务）是两回事；不设白名单则接受「用户启用即信任」的文档级约束（与现有信任模型一致），设计需明说选哪个。
+1. **白名单强制点（评审 O4/O7，已拍板）**：**MVP 不设 `client.inject` 白名单**，接受「用户启用即信任」的文档级约束——与现有信任模型（安装默认禁用、显式启用才执行）一致；强制点仅在**构建期 externals 子集**（registry 专用 `CLIENT_EXTERNALS` 白名单，构建时校验 bundle 只能 require 平台模块），模块边界与服务边界是两回事，前者构建期强制、后者文档约束。standalone 作者文档写明此信任模型。
 2. **HMR（评审 O3，大半免费）**：`rebuilt()`/`onGraphChanged`/HMR watch 同步都泛化于 table/graph 通用结构——外部行登记后**自动**获得 bundle 内容 watch、rebuilt 帧与浏览器端 reload（对 boot 时已在图中的行）。真正缺失的只有：运行中 enable 的新行在浏览器端没有对应 entry 创建（hmr client 的 graph frame v1 未用）——超出「不改浏览器侧」范围，记为后续。
 3. **多 bundle**：一个插件只支持一个 client bundle（本文假设）还是可声明多个（按 surface）——MVP 取一个。
 4. **单实例假设**：`clientModuleHost` 每进程一个，`registerExternal` 的 table 是进程内存态；多 `dshHome`/多 web 组合场景不讨论（MVP 可接受，实现时一句声明）。
-5. **升级原子性（评审 Q4）**：同 id 重装新版本（带新 bundle）时 `registerExternal` 替换行覆盖 rev 更新，enable 状态与行替换之间无中间态——补一条测试锁定。
+5. **升级原子性（评审 Q4/N8）**：同 id 重装新版本（带新 bundle）时 `registerExternal` 替换**原子**、rev 覆盖更新——补一条测试锁定。真实重装路径是 `uninstall → unmount（行注销）→ install → enable（重登记）`，期间行消失再出现属正常中间态；「原子」仅指替换调用本身。
 
 ## 参考
 
