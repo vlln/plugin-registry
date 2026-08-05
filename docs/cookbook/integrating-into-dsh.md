@@ -2,7 +2,14 @@
 
 目标：把 plugin-registry 集成进 DSH 源码环境，让 `dsh plugin` 命令与 Web 设置页插件面板可用。集成方式与社区其他扩展一致：**复制包 + git apply 补丁 + 组合启用**。
 
-## 一键安装（推荐）
+两条路径等价：**一键安装**（脚本代劳）或**手动安装**（四步，适合想看清每一步、或基线有差异需对齐时）。
+
+## 前置条件
+
+- DSH 源码环境：官方 0805 快照 `20260805T134133Z` 或兼容布局，pnpm workspace。
+- 仓库根目录可 `git apply`（补丁基于官方 0805 快照生成）。
+
+## 一键安装
 
 ```sh
 node scripts/install-into-dsh.mjs <dsh-monorepo路径>
@@ -10,12 +17,9 @@ node scripts/install-into-dsh.mjs <dsh-monorepo路径>
 
 自动完成：复制 `packages/plugin`、`packages/ui-plugin-manager` 进 monorepo → `git apply` 接线补丁（先 dry-run）→ `pnpm install`。脚本校验目标必须是 DSH monorepo 根（含 `package.json` + `pnpm-workspace.yaml`），补丁基线不匹配时提示用 `--3way` 手动对齐。
 
-## 前置条件
+## 手动安装
 
-- DSH 源码环境：官方 0805 快照 `20260805T134133Z` 或兼容布局，pnpm workspace。
-- 仓库根目录可 `git apply`（补丁基于官方 0805 快照生成）。
-
-## 1. 放插件
+### 1. 放插件
 
 把 `packages/plugin/`、`packages/ui-plugin-manager/` 复制到 DSH monorepo 对应路径：
 
@@ -24,7 +28,7 @@ cp -r packages/plugin DSH_MONOREPO/packages/
 cp -r packages/ui-plugin-manager DSH_MONOREPO/packages/client/
 ```
 
-## 2. 打接线补丁
+### 2. 打接线补丁
 
 ```sh
 git apply patches/dsh-plugin-registry.patch   # 在 DSH monorepo 根目录执行
@@ -34,7 +38,7 @@ git apply patches/dsh-plugin-registry.patch   # 在 DSH monorepo 根目录执行
 
 **验证点**：`git apply --check` 无输出（干净应用）；`git status` 显示改动文件数符合预期。
 
-## 3. 启用插件
+### 3. 启用插件
 
 ```yaml
 # base.cordis.yml（或你的组合）
@@ -51,7 +55,7 @@ Web 组合再挂载面板：
 
 **验证点**：`pnpm install` 后 `dsh plugin list` 输出 `no plugins installed`（命令可用）；启动 Web 后设置页出现「插件」面板。
 
-## 4. 冒烟
+### 4. 冒烟
 
 ```sh
 dsh plugin create acme/smoke && dsh plugin install ./smoke && dsh plugin enable acme/smoke
