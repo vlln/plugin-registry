@@ -38,7 +38,7 @@ export default {
   background: rgba(128, 128, 140, .45); cursor: pointer; flex: none;
   transition: width .22s ease, background .22s ease, transform .22s ease;
 }
-[data-vlln-dot]:hover { background: rgba(128, 128, 140, .8); transform: scale(1.25); }
+[data-vlln-dot]:hover { background: var(--dsw-alias-interactive-bg-hover); transform: scale(1.25); }
 [data-vlln-dot].active {
   width: 22px; border-radius: 999px;
   background: var(--dsw-alias-text-accent, #4c9aff);
