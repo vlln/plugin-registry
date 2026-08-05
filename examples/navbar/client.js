@@ -138,7 +138,8 @@ window.__ModuleLoader__.load({
             var dot = document.createElement('button');
             dot.type = 'button';
             dot.setAttribute('data-vlln-dot', '');
-            dot.title = 'user #' + (i + 1) + '（点击跳转）';
+            // aria-label 而非 title：title 会叠加浏览器原生 tooltip（与预览卡重复）。
+            dot.setAttribute('aria-label', 'user #' + (i + 1) + '（点击跳转）');
             (function (row, d) {
               d.addEventListener('mouseenter', function () { showPreview(row, d); });
               d.addEventListener('mouseleave', hidePreview);
