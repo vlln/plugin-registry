@@ -50,7 +50,11 @@ export default {
         dot.textContent = String(index + 1)
         dot.style.cssText = 'width:20px;height:20px;border-radius:50%;border:1px solid rgba(255,255,255,.4);background:transparent;color:#fff;font-size:11px;cursor:pointer;'
         dot.addEventListener('click', () => {
-          row.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          // auto（非 smooth）：官方 ChatView 在非 wheel 滚动且 pinned-to-bottom
+          // 时把 scrollTop 拉回底部（follow 逻辑）；smooth 动画每帧触发
+          // scroll 事件 → 每帧被拉回 → 滚动永远到不了目标，无限滚动循环
+          // 拖死主线程（整页假死）。auto 一次性滚动，至多被拉回一次。
+          row.scrollIntoView({ behavior: 'auto', block: 'start' })
         })
         bar.appendChild(dot)
       })

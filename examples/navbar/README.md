@@ -27,7 +27,7 @@ dsh plugin enable vlln/navbar
 - **锚点是内部实现细节**：属性未版本化，官方改动可能破坏——`data-chat-*` 契约文档化是待补机制件。行内 CallRow/SubCallRow 另有 `data-chat-anchor-key="call:<callId>"`（行级 wrapper 无锚点，子行有）。
 - **页面内 disable 不清除**：disposer 只在 fiber 卸载时执行（页面生命周期终点/HMR 重建）——页面内 disable 插件不触发，刷新后生效（与 client half 一致）。
 - **单会话作用域假设**：扫描是 document 级；多会话流并挂（未来 split view）时会把不可见会话的 user 行混入。
-- **流式期间跳转可能被拉回**：官方 follow 逻辑（流式时保持底部）可能覆盖 smooth 滚动——demo 级，静态会话无竞态。
+- **跳转可能被官方 follow 拉回**：官方 ChatView 在 pinned-to-bottom 时把非 wheel 的程序化滚动拉回底部（保持跟随）——导航点用 `behavior:'auto'` 一次性滚动（至多被拉回一次；smooth 动画会被每帧拉回形成循环，故禁用）。跨窗口导航的官方 seam 是设计文档 F6 的待补项。
 
 ## 测试
 

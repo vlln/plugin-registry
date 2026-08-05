@@ -42,7 +42,10 @@ window.__ModuleLoader__.load({
             dot.textContent = String(index + 1);
             dot.style.cssText = 'width:20px;height:20px;border-radius:50%;border:1px solid rgba(255,255,255,.4);background:transparent;color:#fff;font-size:11px;cursor:pointer;';
             dot.addEventListener('click', function () {
-              row.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              // auto（非 smooth）：官方 follow 逻辑在非 wheel 滚动且
+              // pinned-to-bottom 时拉回底部；smooth 动画每帧被拉回会形成
+              // 无限滚动循环拖死主线程（整页假死）。auto 至多被拉回一次。
+              row.scrollIntoView({ behavior: 'auto', block: 'start' });
             });
             bar.appendChild(dot);
           });
