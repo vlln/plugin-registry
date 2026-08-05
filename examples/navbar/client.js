@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
           style.id = STYLE_ID;
           style.textContent = [
             '[data-vlln-navbar]{position:fixed;top:50%;transform:translateY(-50%);z-index:900;display:flex;flex-direction:column;gap:10px;padding:8px;border-radius:12px;font-family:system-ui;max-height:calc(100vh - 32px);overflow-y:auto;background:transparent;border:1px solid transparent;transition:background .18s ease,border-color .18s ease}',
-            '[data-vlln-navbar]:hover{background:transparent;border-color:rgba(128,128,140,.35)}',
+            '[data-vlln-navbar]:hover{background:transparent;border-color:transparent}',
             '[data-vlln-dot]{width:7px;height:7px;border-radius:999px;padding:0;border:none;background:rgba(128,128,140,.45);cursor:pointer;flex:none;transition:width .22s ease,background .22s ease,transform .22s ease}',
             '[data-vlln-dot]:hover{background:rgba(128,128,140,.8);transform:scale(1.25)}',
             '[data-vlln-dot].active{width:22px;border-radius:999px;background:var(--dsw-alias-text-accent,#4c9aff)}',
@@ -71,14 +71,17 @@ window.__ModuleLoader__.load({
         var computeActive = function () {
           var rows = userRows();
           if (rows.length === 0) return -1;
-          var mid = window.innerHeight * 0.35;
-          var idx = 0;
+          // 当前页面查看到的 user 消息：视口内离视口中央最近的一条。
+          var mid = window.innerHeight * 0.5;
+          var best = 0;
+          var bestDist = Number.POSITIVE_INFINITY;
           for (var i = 0; i < rows.length; i++) {
             var top = rows[i].getBoundingClientRect().top;
-            if (top <= mid) idx = i;
-            else break;
+            if (top >= window.innerHeight) break; // 视口下方不可见
+            var dist = Math.abs(top - mid);
+            if (dist < bestDist) { bestDist = dist; best = i; }
           }
-          return idx;
+          return best;
         };
         var WINDOW = 11;
         var HALF_WINDOW = 5;
@@ -92,8 +95,8 @@ window.__ModuleLoader__.load({
           preview.textContent = text;
           preview.style.display = 'block';
           var r = anchor.getBoundingClientRect();
-          var x = r.left - 320 - 14;
-          preview.style.left = Math.max(8, x) + 'px';
+          // right 定位：卡片右缘贴 dot 左缘 - 14px（内容短的卡片也贴紧）。
+          preview.style.right = (window.innerWidth - r.left + 14) + 'px';
           preview.style.top = Math.min(window.innerHeight - 120, r.top - 12) + 'px';
         };
         var hidePreview = function () { preview.style.display = 'none'; };

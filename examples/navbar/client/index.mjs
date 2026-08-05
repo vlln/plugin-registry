@@ -31,8 +31,7 @@ export default {
   transition: background .18s ease, border-color .18s ease;
 }
 [data-vlln-navbar]:hover {
-  background: transparent;
-  border-color: rgba(128, 128, 140, .35);
+  /* 无背景无边框：用户不要悬停时的胶囊圆角矩形（节点自身 hover 已够）。 */
 }
 [data-vlln-dot] {
   width: 7px; height: 7px; border-radius: 999px; padding: 0; border: none;
@@ -113,14 +112,18 @@ export default {
     const computeActive = (): number => {
       const rows = userRows()
       if (rows.length === 0) return -1
-      const mid = window.innerHeight * 0.35 // 阅读头参考线
-      let idx = 0
+      // 当前页面查看到的 user 消息：视口内离视口中央最近的一条
+      // （不是"最后一条经过参考线的"——那可能是已滚过的旧消息）。
+      const mid = window.innerHeight * 0.5
+      let best = 0
+      let bestDist = Number.POSITIVE_INFINITY
       for (let i = 0; i < rows.length; i++) {
         const top = rows[i]!.getBoundingClientRect().top
-        if (top <= mid) idx = i
-        else break
+        if (top >= window.innerHeight) break // 视口下方不可见
+        const dist = Math.abs(top - mid)
+        if (dist < bestDist) { bestDist = dist; best = i }
       }
-      return idx
+      return best
     }
 
     const WINDOW = 11 // 超过则滑动窗口
@@ -133,9 +136,9 @@ export default {
       preview.textContent = text
       preview.style.display = 'block'
       const r = anchor.getBoundingClientRect()
-      const cardW = 320
-      const x = r.left - cardW - 14
-      preview.style.left = `${Math.max(8, x)}px`
+      // right 定位：卡片右缘贴 dot 左缘 - 14px（内容短的卡片也贴紧，
+      // 用 left + 固定 320 宽会在卡片与 dot 之间留空隙）。
+      preview.style.right = `${window.innerWidth - r.left + 14}px`
       preview.style.top = `${Math.min(window.innerHeight - 120, r.top - 12)}px`
     }
     const hidePreview = (): void => { preview.style.display = 'none' }
