@@ -5,5 +5,6 @@
   "docs/registry-client-half-design.md": 10600,
   "docs/cookbook/creating-a-plugin.md": 3500,
   "docs/cookbook/integrating-into-dsh.md": 3500,
-  "docs/cookbook/distributing-plugins.md": 3500
+  "docs/cookbook/distributing-plugins.md": 3500,
+  "docs/cookbook/adding-a-client-half.md": 3500
 }

@@ -1,6 +1,6 @@
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from 'cordis'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import { ToolRegistry } from '@deepseek-ai/dsh-tools'
@@ -11,6 +11,7 @@ import {
   installPlugin,
   readIndex,
   setEnabled,
+  writeIndex,
 } from '../src/index.ts'
 
 declare module 'cordis' {
@@ -366,6 +367,101 @@ describe('PluginLocalService list', () => {
     const service = new PluginLocalService(app, dshHome, '0.2.0')
     try {
       await expect(service.list()).resolves.toEqual([])
+    } finally {
+      await service.dispose()
+    }
+  })
+})
+
+describe('client half registration', () => {
+  /** Install a plugin root that declares a client half with a real bundle file. */
+  async function installClientEntry(id: string): Promise<string> {
+    const source = join(tempDir, `client-source-${id}`)
+    await mkdir(source, { recursive: true })
+    await writeFile(join(source, MANIFEST_FILE_NAME), JSON.stringify({
+      id, version: '0.1.0', main: './index.mjs', client: { main: './client.js' },
+    }))
+    await writeFile(join(source, 'index.mjs'), ENTRY)
+    await writeFile(join(source, 'client.js'), 'window.__ModuleLoader__.load({ id: "x", factory: () => ({}) })\n')
+    await installPlugin(source, { dshHome, harnessVersion: '0.2.0' })
+    return join(dshHome, 'plugins', ...id.split('/'))
+  }
+
+  it('registers the client half on mount and unregisters on unmount when the host is present', async () => {
+    const id = `acme/client-${sequence}`
+    await installClientEntry(id)
+    const app = new Context()
+    const registerExternal = vi.fn<(id: string, options: { clientPath: string }) => string>(() => 'rev123')
+    const unregisterExternal = vi.fn<(id: string) => void>()
+    app.provide('clientModuleHost', { registerExternal, unregisterExternal })
+    const service = new PluginLocalService(app, dshHome, '0.2.0')
+    try {
+      await service.mount(id)
+      expect(registerExternal).toHaveBeenCalledTimes(1)
+      const [calledId, options] = registerExternal.mock.calls[0] ?? []
+      expect(calledId).toBe(id)
+      expect(options?.clientPath).toContain('client.js')
+      expect(unregisterExternal).not.toHaveBeenCalled()
+
+      await service.unmount(id)
+      expect(unregisterExternal).toHaveBeenCalledTimes(1)
+      expect(unregisterExternal).toHaveBeenCalledWith(id)
+    } finally {
+      await service.dispose()
+    }
+  })
+
+  it('skips client registration when the plugin declares no client half', async () => {
+    const id = `acme/plain-${sequence}`
+    await installEntry(id)
+    const app = new Context()
+    const registerExternal = vi.fn<(id: string, options: { clientPath: string }) => string>()
+    const unregisterExternal = vi.fn<(id: string) => void>()
+    app.provide('clientModuleHost', { registerExternal, unregisterExternal })
+    const service = new PluginLocalService(app, dshHome, '0.2.0')
+    try {
+      await service.mount(id)
+      expect(registerExternal).not.toHaveBeenCalled()
+    } finally {
+      await service.dispose()
+    }
+  })
+
+  it('mounts fine without a clientModuleHost (CLI/headless compositions)', async () => {
+    const id = `acme/cli-${sequence}`
+    await installClientEntry(id)
+    const app = new Context()
+    const service = new PluginLocalService(app, dshHome, '0.2.0')
+    try {
+      // No host on the root: mount must not throw and must not register.
+      await expect(service.mount(id)).resolves.toBeUndefined()
+    } finally {
+      await service.dispose()
+    }
+  })
+
+  it('rejects a client main that escapes the plugin root', async () => {
+    const id = `acme/escape-${sequence}`
+    // installPlugin already rejects a client.main escaping the source root, so
+    // construct the installed state directly to reach the mount-time guard.
+    const installedDir = join(dshHome, 'plugins', ...id.split('/'))
+    await mkdir(installedDir, { recursive: true })
+    await writeFile(join(installedDir, MANIFEST_FILE_NAME), JSON.stringify({
+      id, version: '0.1.0', main: './index.mjs', client: { main: '../outside.js' },
+    }))
+    await writeFile(join(installedDir, 'index.mjs'), ENTRY)
+    const index = await readIndex(dshHome)
+    index[id] = { version: '0.1.0', enabled: false, installedAt: new Date().toISOString() }
+    await writeIndex(dshHome, index)
+
+    const app = new Context()
+    app.provide('clientModuleHost', {
+      registerExternal: vi.fn<(id: string, options: { clientPath: string }) => string>(),
+      unregisterExternal: vi.fn<(id: string) => void>(),
+    })
+    const service = new PluginLocalService(app, dshHome, '0.2.0')
+    try {
+      await expect(service.mount(id)).rejects.toThrow(/escapes the plugin root/)
     } finally {
       await service.dispose()
     }

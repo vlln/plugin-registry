@@ -23,6 +23,8 @@ dsh plugin install ./my-tool && dsh plugin enable <publisher>/<name>
 
 进阶示例：`examples/loop` 演示命令 + 工具双形态（`/loop` 命令 + `loop` 工具 + `ctx.interval` 定时 + `agent.followup` 每轮驱动），需要定时循环能力时直接安装它：`dsh plugin install ./examples/loop && dsh plugin enable acme/loop`。
 
+浏览器端示例：`examples/greeter` 带 client half（`client` 声明 + `client.js` bundle），启用后 Web 刷新可见右下角问候标记——演示插件同时拥有 Node 侧工具与浏览器侧 UI，见 [`examples/greeter/README.md`](greeter/README.md)。
+
 ## 一个插件 = 清单 + Cordis 入口
 
 | 文件 | 必须 | 说明 |

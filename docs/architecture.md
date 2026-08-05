@@ -62,19 +62,29 @@ registry 插件是**消费者**：`inject: ['tasks']` 登记自己的后台任�
 - 启用是**实时**的：服务立即挂载，索引更新只在挂载成功后持久化；挂载失败（如声明的工具未注册）报错并回滚，不产生半挂载状态。
 - 安装/启停经过按 `dshHome` 的串行队列（`withRegistryLock`），索引写入用同目录 `.tmp` + `rename` 原子提交，安装失败回滚已复制的目录——并发与崩溃下索引不损坏。
 
-## web 边界：registry 插件不是 client 插件
+## web 边界：registry 插件的 client half
 
-「web 插件」分两种：**被 Web 面板管理**（浏览/搜索/安装/启停/卸载——`ui-plugin-manager` 面板，✅）与**在浏览器里跑**（带 UI 的 client 插件，❌ 当前不支持）。
+「web 插件」分两种：**被 Web 面板管理**（浏览/搜索/安装/启停/卸载——`ui-plugin-manager` 面板，✅）与**在浏览器里跑**（带 UI 的 client 插件，✅ 经 `client` 声明支持）。
 
-浏览器端插件的加载通道与 registry 挂载通道无关：
+### 加载通道：官方 client 插件 vs registry client half
+
+浏览器端插件的加载通道（`packages/client/modules`）：
 
 1. 浏览器侧：`apps/web` 启动时解析 `window.__DSH_BOOT__`（boot graph），按行加载每个 client 插件的 bundle。
-2. Node 侧：`ClientModuleHostService` **只扫描 Loader 配置树的 entries**，找带 `dshClient` 声明的包，把 `exports["./client"]` 的构建产物编进 boot graph。
-3. registry 插件经 `ctx.plugin()` 运行时挂载，**不在 Loader entries 里**——扫描对无 entry 的 fiber（手动挂载/子插件）直接丢弃。
+2. Node 侧：`ClientModuleHostService` 扫描 **Loader 配置树 entries**（`dshClient` 声明 + `exports["./client"]`）组成 graph，也接受 **`registerExternal` 动态登记**（registry 插件通道）。
+3. registry 插件经 `ctx.plugin()` 运行时挂载，不在 Loader entries 里——通过 `ClientModuleHostService.registerExternal` 在启用时把 client half 直接建成一行 table 记录，`compose`/`/plugins` 路由/`__DSH_BOOT__` 注入全部复用。
 
-所以 registry 插件的浏览器 bundle 永远进不了 `__DSH_BOOT__`。client 插件应做成**独立 `dsh-client-*` 包**（`dshClient` 声明 + `exports ./client` + tsdown client preset + web roster 行），走官方组合通道——`ui-plugin-manager` 自己就是这个形态。
+两条通道并存：**官方 client 插件**（`dsh-client-*` 包，随产品发布，进 Loader 树）与 **registry client half**（用户安装，运行时登记）。前者是产品结构，后者是用户扩展；同一能力建议先做官方包。
 
-**若要让 registry 插件带 client half**，需要打通两条路（登记：`ClientModuleHostService` 增加动态 dshClient 来源；分发：tarball 携带 client bundle，`/plugins` 路由可服务）。完整机制设计见 [registry client half 设计稿](registry-client-half-design.md)（未实现）。
+### registry client half 机制
+
+- **声明**：`dsh.plugin.json` 可选 `client` 对象（`main` 指向构建好的 bundle、`inject` 图元数据、`immediately` 预取标记）；`client.main` 在**安装时**校验存在（与 `manifest.main` 平行）。
+- **登记**：`PluginLocalService` 启用挂载成功后 `registerExternal(id, { clientPath, ... })`；`unmount`/`disable`/`uninstall` 时 `unregisterExternal`。浏览器 fiber 的 `inject` 由 **bundle 自身导出**决定，manifest `client.inject` 只是图元数据。
+- **补登记**：`plugin-local` 激活先于 `clientModuleHost` 就绪（无顺序保证），用 `ctx.inject(['clientModuleHost'])` 延迟补登记——host 缺席时挂载进 pending 集合，host 就绪后复查仍 mounted 再登记，避免重启后已启用插件的 client half 静默消失。
+- **分发**：tarball/目录携带构建产物，安装时整目录复制进 `<dshHome>/plugins/`，`/plugins/<publisher>/<name>/client.js` 路由直接可服务。
+- **构建契约**：bundle 调用 `window.__ModuleLoader__.load({ id, factory })`（id 必须等于插件 id），factory 返回 **Cordis 插件导出面**；外部依赖只允许平台模块，其余内联。生产构建用 tsdown client preset 或等价 bundler。
+
+完整机制与设计决策见 [registry client half 设计稿](registry-client-half-design.md)（已实现）。示例：`examples/greeter` 带可安装的 client half。
 
 ## 与 pi-mono 插件的对比
 

@@ -15,6 +15,19 @@ export interface PluginContributes {
 }
 
 /**
+ * The browser-side half of a plugin: a prebuilt client bundle served to the
+ * web shell. Optional — a plugin without this field is Node-only.
+ */
+export interface PluginClient {
+  /** Relative path from the plugin root to the built client bundle. */
+  main: string
+  /** Graph metadata declaring client-service dependencies (informational; the fiber's actual inject comes from the bundle's own export). */
+  inject?: string[]
+  /** Stage-one prefetch mark for the boot manifest; absent means lazy (fetched on demand). */
+  immediately?: boolean
+}
+
+/**
  * Engine compatibility declarations. Each value is a semver range satisfied by
  * the running harness version at install and mount time.
  */
@@ -40,6 +53,8 @@ export interface PluginManifest {
   engines: PluginEngines
   /** Declared model-facing contributions (informational at install time). */
   contributes: PluginContributes
+  /** Optional browser-side half; a plugin without it is Node-only. */
+  client?: PluginClient
 }
 
 /** One record in the local plugin index: install state keyed by plugin id. */

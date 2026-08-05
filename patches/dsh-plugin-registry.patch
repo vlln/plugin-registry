@@ -238,16 +238,13 @@ index 00000000..57dfce62
 +  }
 +}
 diff --git a/apps/cli/tests/args.spec.ts b/apps/cli/tests/args.spec.ts
-index 3acbdf0b..ef6122af 100644
+index 3acbdf0b..ed221fab 100644
 --- a/apps/cli/tests/args.spec.ts
 +++ b/apps/cli/tests/args.spec.ts
-@@ -28,6 +28,17 @@ describe('parseDshArgs', () => {
+@@ -28,6 +28,14 @@ describe('parseDshArgs', () => {
      expect(parse(['web', '--config', 'web.yml'])).toEqual({ mode: 'web', dev: false, config: 'web.yml' })
      expect(parse(['web', '--host', '0.0.0.0', '--port', '8080', '--dev', '--workspace-root', '/w']))
        .toEqual({ mode: 'web', host: '0.0.0.0', port: 8080, dev: true, workspaceRoot: '/w' })
-+    // Guided fresh-session entries carry nothing: bare mode discriminant only.
-+    expect(parse(['upgrade', '--experimental'])).toEqual({ mode: 'upgrade' })
-+    expect(parse(['upgrade'], true)).toEqual({ mode: 'upgrade' })
 +    // Plugin registry subcommands carry their action and one argument.
 +    expect(parse(['plugin', 'install', '/tmp/demo'])).toEqual({ mode: 'plugin', action: 'install', path: '/tmp/demo' })
 +    expect(parse(['plugin', 'create', 'acme/tool'])).toEqual({ mode: 'plugin', action: 'create', id: 'acme/tool' })
@@ -259,7 +256,7 @@ index 3acbdf0b..ef6122af 100644
      expect(parse(['web', '--trusted-host', 'harness.internal:3080', 'lab.internal', '--trusted-host', '10.0.0.9']))
        .toEqual({ mode: 'web', dev: false, trustedHosts: ['harness.internal:3080', 'lab.internal', '10.0.0.9'] })
    })
-@@ -45,6 +56,18 @@ describe('parseDshArgs', () => {
+@@ -45,6 +53,18 @@ describe('parseDshArgs', () => {
        .toEqual({ mode: 'dump-config', surface: 'web', defaultOnly: true })
    })
  
@@ -292,6 +289,18 @@ index b9b2eeea..f9791f22 100644
      {
        "path": "../../packages/session-query/session-query-sqlite"
      },
+diff --git a/packages/README.i18n.yaml b/packages/README.i18n.yaml
+index 88bcc063..06004658 100644
+--- a/packages/README.i18n.yaml
++++ b/packages/README.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write packages/README.md
+-README.md: 4832fffbc8963b8a7b1f8332e691083195bf94bc
+-README.zh.md: 076b4f877070fcf0ee6b98d2310d1121cbbe63d6
++README.md: f70cd372bc3c690514ad74cff44e6711e69f8444
++README.zh.md: c75cc48393f45f7e832e7cc30227f0c8295e6e1b
 diff --git a/packages/README.md b/packages/README.md
 index 4832fffb..f70cd372 100644
 --- a/packages/README.md
@@ -391,6 +400,196 @@ index a612494f..7313aa5a 100644
    /** When true, streams never fire onOpen (misbehaving-carrier material for the handshake timeout guard). */
    suppressStreamOpen = false
  
+diff --git a/packages/client/modules/src/index.ts b/packages/client/modules/src/index.ts
+index ec3822e5..c21fd407 100644
+--- a/packages/client/modules/src/index.ts
++++ b/packages/client/modules/src/index.ts
+@@ -265,6 +265,64 @@ export class ClientModuleHostService extends Service {
+     return this.table.get(id)?.clientPath
+   }
+ 
++  /**
++   * Register one external client row — a bundle that is not a Loader entry
++   * (e.g. a plugin-registry plugin mounted at runtime via `ctx.plugin()`).
++   * The row joins the same table the Loader scan fills, so composition, the
++   * `/plugins/<id>/client.js` route, and boot-manifest injection all serve it
++   * unchanged. A re-registration of an existing id replaces the row
++   * atomically and fires {@link onRebuilt} when the bundle rev changed (the
++   * dev HMR path), mirroring {@link rebuilt}.
++   * @param id - the external row id (`publisher/name` shape, slash allowed).
++   * @param options - the bundle path and optional graph metadata.
++   * @returns the bundle's content rev.
++   * @throws when the id is not a valid registry id, the bundle is unreadable,
++   * or the client path is missing.
++   */
++  registerExternal(id: string, options: {
++    clientPath: string
++    inject?: string[]
++    immediately?: boolean
++  }): string {
++    // Registry ids never collide with npm package names (no `@`/`.`), and the
++    // shape check keeps `/plugins/<id>/client.js` slicing and URL parsing sound.
++    if (!/^[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*$/.test(id)) {
++      throw new Error(`client-modules: invalid external id "${id}" (expected publisher/name)`)
++    }
++    const rev = this.initialBundleRevision(id, options.clientPath)
++    const existing = this.table.get(id)
++    this.table.set(id, {
++      entry: graphRow(id, rev, options.inject, options.immediately === true),
++      clientPath: options.clientPath,
++    })
++    this.composed = this.compose()
++    this.notifyGraphChanged()
++    // A replaced row with a changed rev is the dev HMR contract (same as
++    // rebuilt()): the browser hot-reloads only on a rebuilt frame, so an
++    // upgrade must fire onRebuilt or the new bundle never arrives in dev.
++    if (existing !== undefined && existing.entry.rev !== rev) {
++      for (const notify of this.rebuildListeners) {
++        try {
++          notify(id, rev)
++        } catch (error) {
++          this.ctx.logger.error(error)
++        }
++      }
++    }
++    return rev
++  }
++
++  /**
++   * Remove a previously registered external row. A row that is not in the
++   * table (never registered, or already removed) is a no-op.
++   * @param id - the external row id.
++   */
++  unregisterExternal(id: string): void {
++    if (!this.table.delete(id)) return
++    this.composed = this.compose()
++    this.notifyGraphChanged()
++  }
++
+   /**
+    * Re-hash one bundle (the HMR watch's registration hook — the only entry
+    * point through which bundle content changes reach the graph).
+diff --git a/packages/client/modules/tests/node-half.spec.ts b/packages/client/modules/tests/node-half.spec.ts
+index 186cfe10..ea93cb17 100644
+--- a/packages/client/modules/tests/node-half.spec.ts
++++ b/packages/client/modules/tests/node-half.spec.ts
+@@ -133,3 +133,116 @@ describe('client bundle activation', () => {
+     expect(body).toBe(map)
+   })
+ })
++
++describe('external client rows (registerExternal/unregisterExternal)', () => {
++  /** Write a registry-style client bundle at a caller-chosen path. */
++  function writeExternalBundle(contents = 'module.exports = {}\n'): { id: string; clientPath: string } {
++    root ??= realpathSync(mkdtempSync(join(tmpdir(), 'dsh-client-modules-')))
++    const id = 'acme/greeter'
++    const clientPath = join(root, 'plugins', ...id.split('/'), 'client.js')
++    mkdirSync(dirname(clientPath), { recursive: true })
++    writeFileSync(clientPath, contents)
++    return { id, clientPath }
++  }
++
++  it('adds a row to the graph and serves its bundle through the /plugins route', async () => {
++    const { id, clientPath } = writeExternalBundle('module.exports = { greet: 1 }\n')
++    const { service, route } = constructWithRoute([])
++
++    const rev = service.registerExternal(id, { clientPath })
++
++    expect(service.graph().entries).toHaveLength(1)
++    expect(service.graph().entries[0]).toMatchObject({ id, rev })
++    expect(service.clientPath(id)).toBe(clientPath)
++
++    let status = 0
++    let body = ''
++    const response = {
++      writeHead(nextStatus: number) {
++        status = nextStatus
++        return response
++      },
++      end(chunk?: Uint8Array) {
++        body = chunk === undefined ? '' : Buffer.from(chunk).toString('utf8')
++        return response
++      },
++    } as unknown as ServerResponse
++    await route.handler({
++      method: 'GET',
++      url: `/plugins/${id}/client.js?rev=${rev}`,
++    } as IncomingMessage, response)
++
++    expect(status).toBe(200)
++    expect(body).toBe('module.exports = { greet: 1 }\n')
++  })
++
++  it('replaces an existing row atomically and fires onRebuilt on a rev change', () => {
++    const { id, clientPath } = writeExternalBundle('module.exports = { v: 1 }\n')
++    const { service } = constructWithRoute([])
++    const firstRev = service.registerExternal(id, { clientPath })
++
++    const rebuilt: Array<{ id: string; rev: string }> = []
++    service.onRebuilt((nextId, nextRev) => rebuilt.push({ id: nextId, rev: nextRev }))
++
++    writeFileSync(clientPath, 'module.exports = { v: 2 }\n')
++    const secondRev = service.registerExternal(id, { clientPath })
++
++    expect(secondRev).not.toBe(firstRev)
++    expect(service.graph().entries).toHaveLength(1)
++    expect(rebuilt).toEqual([{ id, rev: secondRev }])
++  })
++
++  it('does not fire onRebuilt when a replacement rev is unchanged', () => {
++    const { id, clientPath } = writeExternalBundle('module.exports = { v: 1 }\n')
++    const { service } = constructWithRoute([])
++    const firstRev = service.registerExternal(id, { clientPath })
++
++    const rebuilt: Array<{ id: string; rev: string }> = []
++    service.onRebuilt((nextId, nextRev) => rebuilt.push({ id: nextId, rev: nextRev }))
++
++    expect(service.registerExternal(id, { clientPath })).toBe(firstRev)
++    expect(rebuilt).toEqual([])
++  })
++
++  it('removes a row from the graph and returns 404 for its bundle', async () => {
++    const { id, clientPath } = writeExternalBundle()
++    const { service, route } = constructWithRoute([])
++    service.registerExternal(id, { clientPath })
++    service.unregisterExternal(id)
++
++    expect(service.graph().entries).toHaveLength(0)
++    expect(service.clientPath(id)).toBeUndefined()
++
++    let status = 0
++    const response = {
++      writeHead(nextStatus: number) {
++        status = nextStatus
++        return response
++      },
++      end() {
++        return response
++      },
++    } as unknown as ServerResponse
++    await route.handler({
++      method: 'GET',
++      url: `/plugins/${id}/client.js`,
++    } as IncomingMessage, response)
++    expect(status).toBe(404)
++  })
++
++  it('unregistering an unknown id is a no-op', () => {
++    writeExternalBundle() // initializes the temp root the service anchors on
++    const { service } = constructWithRoute([])
++    expect(() => { service.unregisterExternal('acme/never-registered') }).not.toThrow()
++    expect(service.graph().entries).toHaveLength(0)
++  })
++
++  it('rejects a malformed id loud before touching the table', () => {
++    const { clientPath } = writeExternalBundle()
++    const { service } = constructWithRoute([])
++    for (const bad of ['NoSlash', '../escape', 'acme/../up', 'acme/name?query', '@scope/name', 'a/b/c']) {
++      expect(() => service.registerExternal(bad, { clientPath })).toThrow(/expected publisher\/name/)
++    }
++    expect(service.graph().entries).toHaveLength(0)
++  })
++})
 diff --git a/packages/client/runtime/tests/fake-api.ts b/packages/client/runtime/tests/fake-api.ts
 index 3c0b86fe..05a0efbb 100644
 --- a/packages/client/runtime/tests/fake-api.ts

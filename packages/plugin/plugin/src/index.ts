@@ -26,6 +26,7 @@ export { MANIFEST_FILE_NAME } from './types.ts'
 export type {
   CatalogEntry,
   InstalledRecord,
+  PluginClient,
   PluginContributes,
   PluginEngines,
   PluginIndex,

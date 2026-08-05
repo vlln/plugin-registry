@@ -94,6 +94,39 @@ describe('installPlugin', () => {
     await expect(installPlugin(source, { dshHome, harnessVersion: '0.2.0' })).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
+  it('accepts a plugin with a client bundle present at install', async () => {
+    const source = join(tempDir, 'client-source')
+    await writePluginRoot(source)
+    await writeFile(join(source, 'client.js'), 'window.__ModuleLoader__.load({ id: "acme/cool-tool", factory: () => ({}) })\n')
+    const manifest = { ...MANIFEST, client: { main: './client.js' } }
+    await writeFile(join(source, MANIFEST_FILE_NAME), JSON.stringify(manifest))
+
+    const installed = await installPlugin(source, { dshHome, harnessVersion: '0.2.0' })
+
+    expect(installed.manifest.client).toEqual({ main: './client.js', inject: [] })
+    await expect(readFile(join(pluginDir(dshHome, 'acme/cool-tool'), 'client.js'), 'utf8')).resolves.toContain('__ModuleLoader__')
+  })
+
+  it('rejects a plugin declaring a client main that is missing on disk', async () => {
+    const source = join(tempDir, 'client-missing-source')
+    await writePluginRoot(source)
+    const manifest = { ...MANIFEST, client: { main: './client.js' } }
+    await writeFile(join(source, MANIFEST_FILE_NAME), JSON.stringify(manifest))
+
+    await expect(installPlugin(source, { dshHome, harnessVersion: '0.2.0' }))
+      .rejects.toThrow(/client entry "\.\/client\.js" is missing/)
+  })
+
+  it('rejects a plugin with an empty client block', async () => {
+    const source = join(tempDir, 'client-empty-source')
+    await writePluginRoot(source)
+    const manifest = { ...MANIFEST, client: {} }
+    await writeFile(join(source, MANIFEST_FILE_NAME), JSON.stringify(manifest))
+
+    await expect(installPlugin(source, { dshHome, harnessVersion: '0.2.0' }))
+      .rejects.toThrow(/client entry is missing a main path/)
+  })
+
   it('rejects an already installed plugin id', async () => {
     const source = join(tempDir, 'source')
     await writePluginRoot(source)

@@ -1,6 +1,6 @@
 # 设计：registry 插件支持 client half（浏览器端 UI 插件）
 
-状态：**设计稿（v2，经 subagent 评审修订），未实现**。目标：让 registry 插件（如 `acme/greeter`）安装/启用后，其浏览器端 bundle 能进入 `window.__DSH_BOOT__` boot graph 并在 Web 端呈现/运行——即把 [architecture.md](architecture.md#web-边界registry-插件不是-client-插件) 的「未实现扩展方向」落地。本文基于对官方 client 插件通道的源码调研与独立评审，覆盖现状链路、断点、登记/分发机制、构建契约、生命周期联动、验证方案与开放决策。
+状态：**已实现（v3）**。本文记录从设计到实现的全过程：现状链路、断点、登记/分发机制、构建契约、生命周期联动，以及两轮 subagent 评审的结论与修订。实现位于 `packages/client/modules`（`registerExternal`/`unregisterExternal`）与 `packages/plugin/plugin`（`client` 声明、`PluginLocalService` 联动、`ctx.inject` 补登记）；示例见 `examples/greeter`。本文的「设计」各节描述落地后的机制，与源码一致；「开放决策」记录拍板结论。
 
 ## 目标与范围
 
@@ -131,7 +131,7 @@ registry 插件的 client bundle 必须满足浏览器侧加载契约，与官�
 | `reconcile()`（load 时） | 逐个 mount enabled | 随 mount 登记（host 缺席走 pending + 补登记） |
 | host 就绪（补登记） | — | `retryExternalRegistrations()` 遍历 pending 登记 |
 
-**可选服务模式**：`clientModuleHost` 只在 Web 组合存在（CLI/headless 组合无 modules 包）。`mount` 内用 root 属性读（与 `verifyContributions` 读 `tools` 同模式）：`(this.ctx.root as { clientModuleHost?: ClientModuleHostService }).clientModuleHost`，undefined 时跳过登记——CLI-only 环境不受影响。`@deepseek-ai/dsh-plugin` 将 `@deepseek-ai/dsh-client-modules` 加入 peerDependencies（type-only import，运行时经 root 属性访问）；更简替代：在 dsh-plugin 内定义最小结构接口（`{ registerExternal(...): string; unregisterExternal(id): void }`）消除整个 peer 依赖（评审 O5，二者皆可，实现时择一）。
+**可选服务模式**：`clientModuleHost` 只在 Web 组合存在（CLI/headless 组合无 modules 包）。`mount` 内用 root 属性读（与 `verifyContributions` 读 `tools` 同模式）：`(this.ctx.root as { clientModuleHost?: ClientModuleHost }).clientModuleHost`，undefined 时跳过登记——CLI-only 环境不受影响。**实现选择了评审 O5 的更简替代**：`PluginLocalService` 内定义最小结构接口 `ClientModuleHost`（`registerExternal`/`unregisterExternal`），消除对官方包的 peer 依赖（`@deepseek-ai/dsh-plugin` 的 peerDependencies 不变）。
 
 **登记回滚（评审 Y2）**：`registerExternal` 放在 `verifyContributions` 成功之后，且与 fiber 创建同处一个失败回滚路径（`service.ts:75-84` 已有「verify 失败 → dispose fiber → 删 mounts」模式）——register 抛错同样回滚，避免「fiber 已挂载但 client 行未登记」半状态。
 

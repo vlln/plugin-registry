@@ -26,6 +26,24 @@ export const ContributesSchema: Schema<PluginManifest['contributes']> = z.object
   skills: z.array(z.string()).default([]),
 })
 
+/**
+ * Schemastery validator for the manifest `client` block. The `.default(undefined)`
+ * is load-bearing: schemastery fills a missing object field with the schema's
+ * default (an object's default is `{}`), so without it an absent `client`
+ * would come back as `{}` instead of being omitted. `main` cannot be marked
+ * required here for the same reason — a nested `.required()` would reject a
+ * manifest that omits `client` entirely; the caller (installPlugin) checks
+ * `client.main` presence instead.
+ */
+export const ClientSchema: Schema<NonNullable<PluginManifest['client']>> = z.object({
+  main: z.string(),
+  inject: z.array(z.string()),
+  immediately: z.boolean(),
+  // `never` satisfies the `default(value: T)` signature where T is the full
+  // object type; the runtime default is deliberately undefined so an absent
+  // `client` field stays omitted instead of becoming `{}`.
+}).default(undefined as never)
+
 /** Schemastery validator for the whole {@link PluginManifest}. */
 export const ManifestSchema: Schema<PluginManifest> = z.object({
   id: z.string().pattern(/^[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*$/),
@@ -34,6 +52,7 @@ export const ManifestSchema: Schema<PluginManifest> = z.object({
   description: z.string().default(''),
   engines: EnginesSchema.default({ dsh: '>=0.0.1' }),
   contributes: ContributesSchema.default({ tools: [], skills: [] }),
+  client: ClientSchema,
 })
 
 /** The plugin id for a publisher and name pair, as validated by the schema. */

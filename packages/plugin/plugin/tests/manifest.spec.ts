@@ -90,3 +90,43 @@ describe('manifest schema surfaces', () => {
     await expect(readManifest(join(tempDir, 'nested'))).resolves.toEqual(FULL_MANIFEST)
   })
 })
+
+describe('parseManifest client block', () => {
+  it('parses a full client declaration', () => {
+    const manifest = parseManifest(JSON.stringify({
+      ...FULL_MANIFEST,
+      client: { main: './client.js', inject: ['@deepseek-ai/dsh-client-connection'], immediately: true },
+    }), 'dsh.plugin.json')
+    expect(manifest.client).toEqual({
+      main: './client.js',
+      inject: ['@deepseek-ai/dsh-client-connection'],
+      immediately: true,
+    })
+  })
+
+  it('omits the client field entirely when absent', () => {
+    const manifest = parseManifest(JSON.stringify(FULL_MANIFEST), 'dsh.plugin.json')
+    expect(manifest.client).toBeUndefined()
+  })
+
+  it('defaults optional client subfields when absent', () => {
+    const manifest = parseManifest(JSON.stringify({
+      ...FULL_MANIFEST,
+      client: { main: './client.js' },
+    }), 'dsh.plugin.json')
+    // schemastery fills arrays with their default (`[]`); booleans stay absent.
+    expect(manifest.client).toEqual({ main: './client.js', inject: [] })
+    expect(manifest.client?.immediately).toBeUndefined()
+  })
+
+  it('fails loud on a malformed client declaration', () => {
+    expect(() => parseManifest(JSON.stringify({
+      ...FULL_MANIFEST,
+      client: { main: 42 },
+    }), 'dsh.plugin.json')).toThrow(/main/)
+    expect(() => parseManifest(JSON.stringify({
+      ...FULL_MANIFEST,
+      client: { main: './client.js', inject: 'not-an-array' },
+    }), 'dsh.plugin.json')).toThrow(/inject/)
+  })
+})

@@ -134,6 +134,17 @@ async function installPluginLocked(sourceDir: string, options: InstallOptions): 
   if (!(await exists(join(sourceDir, manifest.main)))) {
     throw new Error(`plugin ${manifest.id} manifest entry ${JSON.stringify(manifest.main)} is missing`)
   }
+  if (manifest.client !== undefined) {
+    // A `client: {}` (or non-string main) passes schemastery, which omits
+    // absent fields — surface it here so a broken declaration fails at
+    // install, not at web-boot.
+    if (typeof manifest.client.main !== 'string' || manifest.client.main === '') {
+      throw new Error(`plugin ${manifest.id} client entry is missing a main path`)
+    }
+    if (!(await exists(join(sourceDir, manifest.client.main)))) {
+      throw new Error(`plugin ${manifest.id} client entry ${JSON.stringify(manifest.client.main)} is missing`)
+    }
+  }
   await mkdir(pluginsRoot(options.dshHome), { recursive: true })
   await cp(sourceDir, target, { recursive: true })
   const record: InstalledRecord = {

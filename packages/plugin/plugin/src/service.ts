@@ -9,10 +9,11 @@
  */
 
 import { pathToFileURL } from 'node:url'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { Context, Service, type Fiber } from 'cordis'
 import type { ToolRegistry } from '@deepseek-ai/dsh-tools'
 import { normalizePlugin } from './load.ts'
+import type { PluginClient } from './types.ts'
 
 declare module 'cordis' {
   interface Context {
@@ -23,6 +24,41 @@ declare module 'cordis' {
 import { readManifest, type PluginManifest } from './manifest.ts'
 import { installFromCatalog, readCatalog } from './catalog.ts'
 import { listPlugins, pluginDir, readIndex, setEnabled, uninstallPlugin, type ListedPlugin } from './registry.ts'
+
+/**
+ * Minimal structural face of the web client-modules host service
+ * (`ClientModuleHostService`). Kept structural to avoid a peer dependency on
+ * the official package: the service is reached through a root property read
+ * (non-strict reflection), and only these two methods are consumed.
+ */
+interface ClientModuleHost {
+  registerExternal(id: string, options: { clientPath: string; inject?: string[]; immediately?: boolean }): string
+  unregisterExternal(id: string): void
+}
+
+/** One pending external client registration, deferred until the web host is available. */
+interface PendingExternal {
+  id: string
+  clientPath: string
+  inject?: string[]
+  immediately?: boolean
+}
+
+/**
+ * Resolve a plugin's client bundle path from its root, rejecting a path that
+ * escapes the plugin root (a `client.main` of `../secret.js` would otherwise
+ * be served by the web bundle route).
+ * @param pluginRoot - the installed plugin's directory.
+ * @param clientMain - the manifest `client.main` value.
+ * @returns the absolute bundle path.
+ */
+function resolveClientPath(pluginRoot: string, clientMain: string): string {
+  const resolved = resolve(pluginRoot, clientMain)
+  if (resolved !== pluginRoot && !resolved.startsWith(`${pluginRoot}/`)) {
+    throw new Error(`plugin client entry ${JSON.stringify(clientMain)} escapes the plugin root`)
+  }
+  return resolved
+}
 
 /** One row of the plugin browse list served to the web panel. */
 export interface PluginEntryView {
@@ -46,6 +82,8 @@ export interface PluginEntryView {
 export class PluginLocalService extends Service {
   private group: Fiber
   private mounts = new Map<string, Fiber>()
+  /** External client registrations deferred until the web client-modules host exists. */
+  private pendingExternal = new Map<string, PendingExternal>()
 
   /**
    * Create the service and its group fiber.
@@ -56,6 +94,24 @@ export class PluginLocalService extends Service {
   constructor(ctx: Context, private dshHome: string, private harnessVersion: string) {
     super(ctx, 'plugins')
     this.group = ctx.plugin({ name: 'plugin-local', apply: () => {} })
+    // Deferred re-registration: plugin-local has no inject (it activates
+    // immediately), while the web client-modules host waits on httpServer +
+    // loader — no ordering guarantees between them. Without this, enabled
+    // plugins' client halves would silently vanish from the boot graph after
+    // every restart. ctx.inject waits for the host, then flushes the pending
+    // set; the fiber is cordis-owned and disposed with this service.
+    ctx.inject(['clientModuleHost'], () => { this.retryExternalRegistrations() })
+  }
+
+  /**
+   * The web client-modules host service, or undefined in non-web compositions
+   * (CLI/headless). Root property read: the host writes its isolate key on the
+   * root context, whose non-runtime property read returns undefined for an
+   * absent service — unlike this fiber's ctx, which throws for an uninjected
+   * name.
+   */
+  private get clientModuleHost(): ClientModuleHost | undefined {
+    return (this.ctx.root as { clientModuleHost?: ClientModuleHost }).clientModuleHost
   }
 
   /**
@@ -74,13 +130,93 @@ export class PluginLocalService extends Service {
     this.mounts.set(id, fiber)
     try {
       this.verifyContributions(id, manifest)
+      this.registerClient(id, manifest)
     } catch (error) {
-      // A declared-but-unregistered contribution is a broken mount: unwind the
-      // fiber and the mounts entry so a failed verification never leaves a
-      // half-mounted plugin behind.
+      // A broken mount (unregistered contribution, or an unresolvable client
+      // half) unwinds the fiber, the mounts entry, and any pending client row
+      // so a failed mount never leaves a half-mounted plugin behind.
       await fiber.dispose()
       this.mounts.delete(id)
+      this.pendingExternal.delete(id)
       throw error
+    }
+  }
+
+  /**
+   * Register the plugin's client half with the web host, or defer it until the
+   * host exists. A plugin without a `client` manifest field has no browser
+   * surface and is skipped.
+   * @param id - the installed plugin id.
+   * @param manifest - the plugin's manifest, read at mount time.
+   */
+  private registerClient(id: string, manifest: PluginManifest): void {
+    if (manifest.client === undefined) return
+    const clientPath = resolveClientPath(pluginDir(this.dshHome, id), manifest.client.main)
+    const host = this.clientModuleHost
+    if (host === undefined) {
+      this.pendingExternal.set(id, {
+        id,
+        clientPath,
+        ...(manifest.client.inject !== undefined ? { inject: manifest.client.inject } : {}),
+        ...(manifest.client.immediately !== undefined ? { immediately: manifest.client.immediately } : {}),
+      })
+      return
+    }
+    this.registerWithHost(host, id, clientPath, manifest.client)
+  }
+
+  /**
+   * Register one client half with the web host and drop any pending row for
+   * the same id (a direct registration supersedes a deferred one).
+   * @param host - the web client-modules host.
+   * @param id - the installed plugin id.
+   * @param clientPath - the resolved bundle path.
+   * @param client - the manifest client declaration.
+   */
+  private registerWithHost(host: ClientModuleHost, id: string, clientPath: string, client: PluginClient): void {
+    host.registerExternal(id, {
+      clientPath,
+      ...(client.inject !== undefined ? { inject: client.inject } : {}),
+      ...(client.immediately !== undefined ? { immediately: client.immediately } : {}),
+    })
+    this.pendingExternal.delete(id)
+  }
+
+  /**
+   * Unregister the plugin's client half (if any) and drop its pending row.
+   * @param id - the installed plugin id.
+   */
+  private unregisterClient(id: string): void {
+    this.pendingExternal.delete(id)
+    this.clientModuleHost?.unregisterExternal(id)
+  }
+
+  /**
+   * Flush deferred client registrations once the web host is available. Only
+   * plugins still mounted are registered (an unmount in the startup window
+   * dropped the row — the enable-only invariant); each registration is
+   * isolated so one broken bundle neither blocks the rest nor is silently
+   * lost — it stays pending for the next flush or re-mount.
+   */
+  private retryExternalRegistrations(): void {
+    const host = this.clientModuleHost
+    if (host === undefined) return
+    for (const [id, pending] of [...this.pendingExternal]) {
+      if (!this.mounts.has(id)) {
+        this.pendingExternal.delete(id)
+        continue
+      }
+      try {
+        host.registerExternal(id, {
+          clientPath: pending.clientPath,
+          ...(pending.inject !== undefined ? { inject: pending.inject } : {}),
+          ...(pending.immediately !== undefined ? { immediately: pending.immediately } : {}),
+        })
+        this.pendingExternal.delete(id)
+      } catch (error) {
+        // Keep the row pending: a later flush (or re-mount) retries it.
+        this.ctx.logger.error(error)
+      }
     }
   }
 
@@ -112,7 +248,7 @@ export class PluginLocalService extends Service {
 
   /**
    * Unmount one installed plugin, disposing its fiber and every registration
-   * it made. A plugin not mounted is a no-op.
+   * it made (including the client half). A plugin not mounted is a no-op.
    * @param id - the installed plugin id.
    */
   async unmount(id: string): Promise<void> {
@@ -120,6 +256,7 @@ export class PluginLocalService extends Service {
     if (fiber === undefined) return
     await fiber.dispose()
     this.mounts.delete(id)
+    this.unregisterClient(id)
   }
 
   /**
@@ -222,6 +359,7 @@ export class PluginLocalService extends Service {
    */
   dispose(): Promise<void> {
     this.mounts.clear()
+    this.pendingExternal.clear()
     return this.group.dispose()
   }
 }
