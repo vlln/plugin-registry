@@ -21,7 +21,7 @@ window.__ModuleLoader__.load({
             '[data-vlln-dot]{width:7px;height:7px;border-radius:999px;padding:0;border:none;background:rgba(128,128,140,.45);cursor:pointer;flex:none;transition:width .22s ease,background .22s ease,transform .22s ease}',
             '[data-vlln-dot]:hover{background:var(--dsw-alias-interactive-bg-hover);transform:scale(1.25)}',
             '[data-vlln-dot].active{width:22px;border-radius:999px;background:var(--dsw-alias-text-accent,#4c9aff)}',
-                        '[data-vlln-preview]{position:fixed;z-index:910;max-width:320px;min-width:200px;padding:10px 12px;border-radius:10px;font-size:12px;line-height:1.55;color:var(--dsw-alias-text-1,#eee);background:rgba(24,24,28,.72);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.1);box-shadow:0 4px 14px rgba(0,0,0,.28);overflow:hidden;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;pointer-events:none}',
+                        '[data-vlln-preview]{position:fixed;z-index:910;width:244px;box-sizing:border-box;padding:12px 16px;border-radius:12px;font-size:12px;line-height:1.55;color:var(--dsw-alias-text-1,#eee);background:var(--dsw-hovercard-bg,#2C2C2E);box-shadow:var(--dsw-shadow-lv3);overflow:hidden;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;pointer-events:none}',
             '[data-vlln-more]{width:3px;height:3px;border-radius:999px;background:rgba(128,128,140,.5);flex:none}',
             '@media (prefers-reduced-motion: reduce){[data-vlln-navbar],[data-vlln-dot],[data-vlln-dot].active{transition:none;animation:none}}',
           ].join('');
@@ -86,19 +86,30 @@ window.__ModuleLoader__.load({
         var lo = 0;
 
         // 预览：消息开头（CSS line-clamp 6 行截断）。
-        var showPreview = function (row, anchor) {
-          // 消息文本 = 气泡内文本（排除时间戳/操作按钮/分支提示）。
-          var bubble = row.querySelector('[class*="bubble"]');
-          var text = ((bubble !== null ? bubble : row).textContent || '').trim();
-          if (text === '') return;
-          preview.textContent = text;
-          preview.style.display = 'block';
+        var previewTimer = null;
+        var positionPreview = function (anchor) {
           var r = anchor.getBoundingClientRect();
           // right 定位：卡片右缘贴 dot 左缘 - 14px（内容短的卡片也贴紧）。
           preview.style.right = (window.innerWidth - r.left + 14) + 'px';
           preview.style.top = Math.min(window.innerHeight - 120, r.top - 12) + 'px';
         };
-        var hidePreview = function () { preview.style.display = 'none'; };
+        var showPreview = function (row, anchor) {
+          // 消息文本 = 气泡内文本（排除时间戳/操作按钮/分支提示）；CSS
+          // line-clamp 6 行截断。延迟 500ms（对齐官方 HoverCard 行为）。
+          if (previewTimer !== null) clearTimeout(previewTimer);
+          previewTimer = setTimeout(function () {
+            var bubble = row.querySelector('[class*="bubble"]');
+            var text = ((bubble !== null ? bubble : row).textContent || '').trim();
+            if (text === '') return;
+            preview.textContent = text;
+            preview.style.display = 'block';
+            positionPreview(anchor);
+          }, 500);
+        };
+        var hidePreview = function () {
+          if (previewTimer !== null) clearTimeout(previewTimer);
+          preview.style.display = 'none';
+        };
 
         // 渲染节点串：等距节点 + 滑动窗口（>11 显示激活 ± 5，端点细点）。
         var render = function () {

@@ -44,13 +44,13 @@ export default {
   background: var(--dsw-alias-text-accent, #4c9aff);
 }
 [data-vlln-preview] {
-  position: fixed; z-index: 910; max-width: 320px; min-width: 200px;
-  padding: 10px 12px; border-radius: 10px; font-size: 12px; line-height: 1.55;
+  /* 与官方 session 预览卡（HoverCard）同款：实色 #2C2C2E 双主题一致、
+   * 244 宽、r12、lv3 阴影——同类型 hover 预览卡视觉统一，不用玻璃。 */
+  position: fixed; z-index: 910; width: 244px; box-sizing: border-box;
+  padding: 12px 16px; border-radius: 12px; font-size: 12px; line-height: 1.55;
   color: var(--dsw-alias-text-1, #eee);
-  background: rgba(24, 24, 28, .72);
-  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, .1);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, .28);
+  background: var(--dsw-hovercard-bg, #2C2C2E);
+  box-shadow: var(--dsw-shadow-lv3);
   overflow: hidden; white-space: pre-wrap; word-break: break-word;
   display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical;
   pointer-events: none;
@@ -126,18 +126,31 @@ export default {
     let lo = 0
 
     // 预览：显示消息开头（最多 6 行，CSS line-clamp 截断）。
-    const showPreview = (row: HTMLElement, anchor: HTMLElement): void => {
-      const text = (row.textContent ?? '').trim()
-      if (text === '') return
-      preview.textContent = text
-      preview.style.display = 'block'
+    let previewTimer: ReturnType<typeof setTimeout> | null = null
+    const positionPreview = (anchor: HTMLElement): void => {
       const r = anchor.getBoundingClientRect()
-      // right 定位：卡片右缘贴 dot 左缘 - 14px（内容短的卡片也贴紧，
-      // 用 left + 固定 320 宽会在卡片与 dot 之间留空隙）。
+      // right 定位：卡片右缘贴 dot 左缘 - 14px（内容短的卡片也贴紧）。
       preview.style.right = `${window.innerWidth - r.left + 14}px`
       preview.style.top = `${Math.min(window.innerHeight - 120, r.top - 12)}px`
     }
-    const hidePreview = (): void => { preview.style.display = 'none' }
+    const showPreview = (row: HTMLElement, anchor: HTMLElement): void => {
+      // 消息文本 = 气泡内文本（排除时间戳/操作按钮/分支提示——整行
+      // textContent 会混入 actions 和官方提示文案）；CSS line-clamp 6 行
+      // 截断。延迟 500ms 显示（对齐官方 HoverCard 行为）。
+      if (previewTimer !== null) clearTimeout(previewTimer)
+      previewTimer = setTimeout(() => {
+        const bubble = row.querySelector('[class*="bubble"]')
+        const text = ((bubble ?? row).textContent ?? '').trim()
+        if (text === '') return
+        preview.textContent = text
+        preview.style.display = 'block'
+        positionPreview(anchor)
+      }, 500)
+    }
+    const hidePreview = (): void => {
+      if (previewTimer !== null) clearTimeout(previewTimer)
+      preview.style.display = 'none'
+    }
 
     // 渲染节点串：等距节点 + 滑动窗口（>11 时显示激活 ± 5，端点细点）。
     const render = (): void => {
