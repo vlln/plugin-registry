@@ -1,6 +1,6 @@
 # @deepseek-ai/dsh-plugin
 
-English | [中文](README.md)
+[English](README.md) | 中文
 
 本地插件注册表与清单协议：从本地文件系统安装、启用并挂载第三方插件。
 

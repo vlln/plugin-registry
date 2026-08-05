@@ -54,8 +54,21 @@ export function indexFile(dshHome: string): string {
   return join(pluginsRoot(dshHome), INDEX_FILE_NAME)
 }
 
-/** The installed directory for one plugin id. */
+/**
+ * The installed directory for one plugin id. Rejects an id whose first
+ * segment is `node_modules`: such a path would resolve through the shared
+ * dependency link (deps-link.ts) into the checkout's node_modules — install
+ * would overwrite real packages and uninstall would delete them. The manifest
+ * schema already rejects `node_modules` (underscore not in the id alphabet),
+ * but the guard keeps this choke point safe if the schema ever widens.
+ * @param dshHome - harness home whose registry is addressed.
+ * @param id - the plugin id.
+ * @returns the plugin's directory under the registry root.
+ */
 export function pluginDir(dshHome: string, id: string): string {
+  if (id.split('/')[0] === 'node_modules') {
+    throw new Error(`plugin id ${JSON.stringify(id)} is reserved (first segment is node_modules)`)
+  }
   return join(pluginsRoot(dshHome), id)
 }
 

@@ -80,6 +80,15 @@ describe('ensureDepsLink', () => {
     await expect(ensureDepsLink(dshHome, checkout)).resolves.toBe(false)
     expect(existsSync(join(pluginsRoot(dshHome), 'node_modules'))).toBe(false)
   })
+
+  it('never deletes a real directory occupying the link path', async () => {
+    const checkout = await makeCheckout('checkout', true)
+    const linkDir = join(pluginsRoot(dshHome), 'node_modules')
+    await mkdir(linkDir, { recursive: true })
+    await writeFile(join(linkDir, 'keep.txt'), 'data')
+    await expect(ensureDepsLink(dshHome, checkout)).resolves.toBe(false)
+    expect(existsSync(join(linkDir, 'keep.txt'))).toBe(true)
+  })
 })
 
 describe('built-form dependency resolution', () => {

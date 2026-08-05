@@ -18,7 +18,7 @@
 
 import { execFileSync } from 'node:child_process'
 import { existsSync, realpathSync } from 'node:fs'
-import { mkdir, rm, symlink } from 'node:fs/promises'
+import { lstat, mkdir, rm, symlink } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { pluginsRoot } from './registry.ts'
@@ -87,7 +87,14 @@ export async function ensureDepsLink(
   const target = join(checkout, 'node_modules')
   if (!existsSync(target)) return false
   const link = join(pluginsRoot(dshHome), 'node_modules')
-  await mkdir(pluginsRoot(dshHome), { recursive: true })
+  try {
+    await mkdir(pluginsRoot(dshHome), { recursive: true })
+  } catch {
+    // Unwritable harness home: the registry still works for plugins that
+    // never import checkout packages — the link is best-effort, not a
+    // contract.
+    return false
+  }
   try {
     // An existing link is kept while it still resolves to the current
     // target; a checkout upgrade rotates the path, so a stale link must be
@@ -95,6 +102,18 @@ export async function ensureDepsLink(
     if (realpathSync(link) === realpathSync(target)) return true
   } catch {
     // stale link (target gone) or no link at all: rebuild below
+  }
+  // Only ever remove a symlink/junction at the link path. A real directory
+  // there (user-created, or a plugin id from a laxer schema) must never be
+  // recursively deleted.
+  let existing: Awaited<ReturnType<typeof lstat>> | undefined
+  try {
+    existing = await lstat(link)
+  } catch {
+    // ENOENT — nothing occupies the link path: proceed to create.
+  }
+  if (existing !== undefined && !existing.isSymbolicLink()) {
+    return false
   }
   await rm(link, { recursive: true, force: true })
   try {
@@ -105,8 +124,13 @@ export async function ensureDepsLink(
     }
     return true
   } catch {
-    // No privilege or a filesystem that refuses links: plugins that never
-    // import checkout packages are unaffected.
-    return false
+    // A concurrent ensure may have created the link between our check and
+    // creation — treat an already-correct link as success. Otherwise (no
+    // privilege, a filesystem that refuses links) report unavailable.
+    try {
+      return realpathSync(link) === realpathSync(target)
+    } catch {
+      return false
+    }
   }
 }

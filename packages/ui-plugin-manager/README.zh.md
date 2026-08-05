@@ -1,6 +1,6 @@
 # @deepseek-ai/dsh-client-ui-plugin-manager
 
-English | [中文](README.md)
+[English](README.md) | 中文
 
 管理本地插件注册表的 web 设置面板：浏览、搜索、安装、启用/禁用与卸载。
 

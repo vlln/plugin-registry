@@ -51,6 +51,14 @@ describe('registry paths', () => {
     expect(indexFile(dshHome)).toBe(join(dshHome, PLUGINS_DIR_NAME, INDEX_FILE_NAME))
     expect(pluginDir(dshHome, 'acme/cool-tool')).toBe(join(dshHome, PLUGINS_DIR_NAME, 'acme/cool-tool'))
   })
+
+  it('rejects a node_modules-first-segment id at the path choke point', () => {
+    // Such an id would resolve through the shared dependency link into the
+    // checkout's node_modules (install overwrites, uninstall deletes real
+    // packages); the schema also rejects it, this guard is the second line.
+    expect(() => pluginDir(dshHome, 'node_modules/tsx')).toThrow(/reserved/)
+    expect(() => pluginDir(dshHome, 'node_modules')).toThrow(/reserved/)
+  })
 })
 
 describe('readIndex / writeIndex', () => {

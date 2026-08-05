@@ -46,7 +46,10 @@ export const ClientSchema: Schema<NonNullable<PluginManifest['client']>> = z.obj
 
 /** Schemastery validator for the whole {@link PluginManifest}. */
 export const ManifestSchema: Schema<PluginManifest> = z.object({
-  id: z.string().pattern(/^[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*$/),
+  // The negative lookahead keeps the first segment off `node_modules`, which
+  // would resolve through the shared dependency link into the checkout (see
+  // pluginDir's guard — the schema is the earlier, louder failure).
+  id: z.string().pattern(/^(?!node_modules\/)[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*$/),
   version: z.string(),
   main: z.string(),
   description: z.string().default(''),

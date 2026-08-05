@@ -56,6 +56,11 @@ describe('parseManifest', () => {
       .toThrow(/id/)
   })
 
+  it('rejects a node_modules-first-segment id (would escape through the dependency link)', () => {
+    expect(() => parseManifest(JSON.stringify({ ...FULL_MANIFEST, id: 'node_modules/tsx' }), 'dsh.plugin.json'))
+      .toThrow(/id/)
+  })
+
   it('fails loud on a non-object payload', () => {
     expect(() => parseManifest('42', 'dsh.plugin.json')).toThrow()
   })
