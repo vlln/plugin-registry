@@ -10,6 +10,10 @@ One package with four surfaces. **Manifest protocol**: a plugin root ships `dsh.
 
 Installation records a plugin as **disabled**; only an explicit enable (CLI, API, or the web panel) mounts it. Enable and disable are **live**: the service mounts or unmounts the plugin immediately, and the index update persists only after a successful mount. This is the trust boundary of the MVP: code executes only after a human explicitly opts in, and enablement is per-install, never implicit.
 
+## Plugin dependency resolution
+
+Installed plugins live under `<dshHome>/plugins`, outside the checkout, so standard Node bare-specifier resolution can never reach the checkout's `node_modules`. The registry keeps one shared `node_modules` directory link at `<dshHome>/plugins/node_modules` pointing at the checkout's `node_modules` (`ensureDepsLink`, ensured at install/mount/reconcile, rebuilt when a checkout upgrade rotates the path, junction on Windows), so `@deepseek-ai/*`, `cordis`, and any package in the checkout's dependency closure import with standard Node semantics in every runtime form — source under tsx or built under plain Node. The link is best-effort: a plugin that never imports a checkout package needs no link, and a deployment that cannot resolve a checkout (e.g. a single-file bundle) skips it. A plugin cannot declare its own npm dependencies (`dsh.plugin.json` has no `dependencies` field), so the usable closure is the checkout's.
+
 ## CLI
 
 The `dsh` binary owns the commands; this package owns the operations behind them.
@@ -30,7 +34,7 @@ The `dsh` binary owns the commands; this package owns the operations behind them
 
 | Field | Default | Meaning |
 |---|---|---|
-| `dshHome` | `$DSH_HOME` or `~/.dsh` | Harness home whose `plugins` directory is mounted, resolved by `@deepseek-ai/dsh-paths` |
+| `dshHome` | `$DSH_HOME` or `~/.dsh` | Harness home whose `plugins` directory is mounted, resolved by [`@deepseek-ai/dsh-paths`](../../util/paths/README.md) |
 | `harnessVersion` | `0.0.1` | The running dsh version checked against `engines.dsh` at install; deployments should set it to their real version |
 
 ## Service
@@ -69,5 +73,5 @@ Prefix-stable while the mounted set and each plugin's definitions are unchanged;
 - **Web client bundles not distributed** — the panel manages host-side plugins only; a third-party plugin's browser bundle has no `dshClient`/`__DSH_BOOT__` distribution path yet.
 - **`contributes.tools` is verified, `contributes.skills` is not** — a mounted plugin that declares a tool it never registers fails the mount with the missing names; the declared skill list is still informational.
 - **Trust boundary is human opt-in only** — mounted plugins are in-process code with full service access; the sandbox (`ctx.sandbox`) confines tool calls, not plugins. No signing, publisher identity, or review.
-- **Whole-directory copy** — `installPlugin` copies the source tree including `node_modules` and build artifacts; no dependency resolution or pruning.
+- **Whole-directory copy** — `installPlugin` copies the source tree including `node_modules` and build artifacts; dependency resolution is the shared checkout link above, not a per-plugin dependency install — a plugin cannot declare its own npm dependencies, and there is no pruning.
 - **No REAL-composition snapshot yet** — mounting and the web panel are covered by unit/component tests; an assembled-application transcript that boots a leaf with `plugin-local` mounted is deferred.

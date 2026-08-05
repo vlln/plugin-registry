@@ -290,7 +290,7 @@ index b9b2eeea..f9791f22 100644
        "path": "../../packages/session-query/session-query-sqlite"
      },
 diff --git a/packages/README.i18n.yaml b/packages/README.i18n.yaml
-index 88bcc063..06004658 100644
+index 88bcc063..b8a4677b 100644
 --- a/packages/README.i18n.yaml
 +++ b/packages/README.i18n.yaml
 @@ -2,5 +2,5 @@
@@ -300,7 +300,7 @@ index 88bcc063..06004658 100644
 -README.md: 4832fffbc8963b8a7b1f8332e691083195bf94bc
 -README.zh.md: 076b4f877070fcf0ee6b98d2310d1121cbbe63d6
 +README.md: f70cd372bc3c690514ad74cff44e6711e69f8444
-+README.zh.md: c75cc48393f45f7e832e7cc30227f0c8295e6e1b
++README.zh.md: 75d0068647060416c835f56a3b1408606860d24b
 diff --git a/packages/README.md b/packages/README.md
 index 4832fffb..f70cd372 100644
 --- a/packages/README.md
@@ -340,10 +340,10 @@ index 4832fffb..f70cd372 100644
  | [`settings/`](settings/README.md) | User-settings seam + file-backed provider | Product — stable surface |
  | [`credentials/`](credentials/README.md) | Credential-reference seam + env-over-`.env` provider | Product — stable surface |
 diff --git a/packages/README.zh.md b/packages/README.zh.md
-index 076b4f87..c75cc483 100644
+index 076b4f87..75d00686 100644
 --- a/packages/README.zh.md
 +++ b/packages/README.zh.md
-@@ -30,6 +30,7 @@
+@@ -30,10 +30,11 @@
  | [`web/`](web/README.md) | Web 能力系列：seam、搜索／获取提供方实现和面向模型的 Web 工具 | 产品：稳定表面 |
  | [`spill/`](spill/README.md) | 溢出能力系列：存储 seam、本地实现、工具结果溢出策略 | 产品：稳定表面 |
  | [`todo/`](todo/README.md) | 面向模型的 `todo_write` 工具 | 产品：稳定表面 |
@@ -351,6 +351,11 @@ index 076b4f87..c75cc483 100644
  | [`plan/`](plan/README.md) | Plan 协作状态，提供直接进入命令与经评审的退出 | 产品：稳定表面 |
  | [`timeout/`](timeout/README.md) | 工具调用超时策略：`tools/execute` 截止时间强制执行器 | 产品：稳定表面 |
  | [`guard/`](guard/README.md) | 循环卫生守卫：建议性重复调用提醒 | 产品：稳定表面 |
+-| [`cordis/`](cordis/README.md) | Cordis 运行时集成：自检／模型编写的临时 Plugin，以及受限 repository Plugin 加载 | 产品：稳定表面 |
++| [`cordis/`](cordis/README.md) | Cordis 运行时集成：自检／模型编写的临时 Plugin，以及受限 repository Plugin 加载（[设计](../.agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.md)） | 产品：稳定表面 |
+ | [`hooks/`](hooks/README.md) | 钩子桥接 + 共享 Claude Code／Codex 协议格式库 | 产品：稳定表面 |
+ | [`session-persistence/`](session-persistence/README.md) | 持久化 seam + JSONL/SQLite 后端 | 产品：稳定表面 |
+ | [`session-projection/`](session-projection/README.md) | 投影 seam：领域折叠单元供给全量值 | 产品：稳定表面 |
 diff --git a/packages/client/connection/src/client/fixture.ts b/packages/client/connection/src/client/fixture.ts
 index dd877227..f6c6a125 100644
 --- a/packages/client/connection/src/client/fixture.ts

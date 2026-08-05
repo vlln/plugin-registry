@@ -1,6 +1,6 @@
 # @deepseek-ai/dsh-plugin
 
-English | [中文](README.zh.md)
+English | [中文](README.md)
 
 本地插件注册表与清单协议：从本地文件系统安装、启用并挂载第三方插件。
 
@@ -9,6 +9,10 @@ English | [中文](README.zh.md)
 一个包，四个面。**清单协议**：插件根目录携带 `dsh.plugin.json`，声明身份（`publisher/name` 形式的 id）、语义化 `version`、相对路径 `main` 入口（一个 Cordis 插件）、`engines.dsh` 兼容范围，以及声明的 `contributes`（tools 与 skills）。**注册表**：`<dshHome>/plugins` 下每个已安装插件一个目录，外加 `index.json` 记录安装状态（`version`、`enabled`、`installedAt`）；`installPlugin` / `setEnabled` / `uninstallPlugin` / `listPlugins` 以纯文件系统事实的方式操作它。**目录**：`$DSH_HOME/plugins-catalog.json` 列出可发现的插件，每项带一个本地源目录——web 面板的浏览/安装数据源，形状对齐 Obsidian 的社区插件列表，将来远程注册中心可替换该文件而无需改动 API 或 UI。**运行时服务**：`plugin-local` 函数插件（`name` / `inject` / `Config` / `apply`，无默认导出）提供 `ctx.plugins`（`PluginLocalService`），并把每个已启用插件的 `main` 入口挂为一个组 fiber 的子项，dispose 时统一卸载。
 
 安装后插件记录为**已禁用**；只有显式启用（CLI、API 或 web 面板）后才会挂载它。启用与禁用是**实时的**：服务立即挂载或卸载插件，且只有挂载成功后索引更新才会持久化。这是 MVP 的信任边界：代码只在人类显式选择后才执行，启用是逐插件、永不隐式的。
+
+## 插件依赖解析
+
+已装插件在 `<dshHome>/plugins`（checkout 树外），标准 Node 裸名解析永远够不到 checkout 的 `node_modules`。注册表在 `<dshHome>/plugins/node_modules` 维护一个指向 checkout node_modules 的共享目录链接（`ensureDepsLink`：安装/挂载/启动扫描时确保，checkout 升级轮转路径后重建，Windows 用 junction），于是 `@deepseek-ai/*`、`cordis` 以及 checkout 依赖闭包内的任意包，在任何运行形态下（tsx 源码或 built 纯 Node）都按标准 Node 语义解析。链接尽力而为：不 import 官方包的插件无需它，解析不到 checkout 的部署（如单文件 bundle）跳过。插件不能声明自己的 npm 依赖（`dsh.plugin.json` 无 `dependencies` 字段），可用依赖闭包 = checkout 的。
 
 ## CLI
 
@@ -30,7 +34,7 @@ English | [中文](README.zh.md)
 
 | 字段 | 默认 | 含义 |
 |---|---|---|
-| `dshHome` | `$DSH_HOME` 或 `~/.dsh` | 要挂载其 `plugins` 目录的 Harness home，由 `@deepseek-ai/dsh-paths` 解析 |
+| `dshHome` | `$DSH_HOME` 或 `~/.dsh` | 要挂载其 `plugins` 目录的 Harness home，由 [`@deepseek-ai/dsh-paths`](../../util/paths/README.md) 解析 |
 | `harnessVersion` | `0.0.1` | 安装时对照 `engines.dsh` 校验的当前 dsh 版本；部署时应设为真实版本 |
 
 ## Service
@@ -69,5 +73,5 @@ Prefix-stable while the mounted set and each plugin's definitions are unchanged;
 - **不分发 web client bundle** —— 面板只管理 host 端插件；第三方插件的浏览器 bundle 尚无 `dshClient`/`__DSH_BOOT__` 分发路径。
 - **`contributes.tools` 已校验、`contributes.skills` 未校验** —— 声明了工具却未注册的插件会在挂载时失败并列出缺失名；技能声明仍仅供参考。
 - **信任边界仅为人工 opt-in** —— 被挂载插件是进程内代码，拥有完整服务访问权；沙箱（`ctx.sandbox`）只约束工具调用，不约束插件。没有签名、发布者身份或审核。
-- **整目录拷贝** —— `installPlugin` 拷贝整个源树，包括 `node_modules` 与构建产物；没有依赖解析或裁剪。
+- **整目录拷贝** —— `installPlugin` 拷贝整个源树，包括 `node_modules` 与构建产物；依赖解析是上面所述的共享 checkout 链接，不是按插件的依赖安装——插件不能声明自己的 npm 依赖，也没有裁剪。
 - **尚无 REAL-composition 快照** —— 挂载与 web 面板由单元/组件测试覆盖；装配了 `plugin-local` 的 leaf 的整应用转录延后。

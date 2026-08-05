@@ -1,6 +1,6 @@
 # plugin/ — 第三方插件注册表家族
 
-English | [中文](README.zh.md)
+English | [中文](README.md)
 
 本地插件注册表 MVP：清单协议、安装/启用管理，以及第三方插件的运行时挂载。目前是单个 **product** 包 —— 注册表是纯文件系统状态，尚无接口/实现 seam 可拆；市场、发布者工具链与更新延后（见 [issue #171](https://github.com/dsh2026/issues/issues/171)）。
 

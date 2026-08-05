@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/plugin/README.md
 README.md: 1fff9aa661dfe6c08e1653921fbc5ecff8599fc6
-README.zh.md: 999f68515c39e385096e75dd92891dc1aa43a816
+README.zh.md: d92ab72fd64d7d563feabb27d8d0e4d9e9625366
