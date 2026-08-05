@@ -1,6 +1,6 @@
 # vlln/navbar
 
-示例插件：user 消息导航条——每条 user 消息一个圆点，点击滚动跳转到对应消息。验证设计文档 [S1 场景](../../docs/client-ui-extension-model.md) 的「自渲染 + DOM 锚点契约」主张。
+示例插件：**对话节点导航条**（issue dsh-external/issues#144 规格）——对话区右缘等距节点串，每条 user 消息一个节点：激活药丸跟随阅读位置、悬停/聚焦玻璃预览卡（6 行截断）、点击平滑滚动 + 品牌蓝高亮环、>11 节点滑动窗口、平时隐形悬停浮现磨砂胶囊、`prefers-reduced-motion`、<2 条 user 消息自动隐藏。验证设计文档 [S1 场景](../../docs/client-ui-extension-model.md) 的「自渲染 + DOM 锚点契约」主张。
 
 ## 原理
 
