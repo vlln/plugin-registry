@@ -31,8 +31,9 @@ window.__ModuleLoader__.load({
           });
         };
         render();
+        var flowRoot = document.querySelector('[data-chat-flow=""]');
         var observer = new MutationObserver(function () { render(); });
-        observer.observe(body, { childList: true, subtree: true });
+        if (flowRoot !== null) observer.observe(flowRoot, { childList: true, subtree: true });
         return function () {
           observer.disconnect();
           bar.remove();

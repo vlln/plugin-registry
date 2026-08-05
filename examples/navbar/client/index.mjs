@@ -37,9 +37,12 @@ export default {
     }
     render()
 
-    // 官方重渲染（新消息/翻页）后重建：MutationObserver 监听会话流区域。
+    // 官方重渲染（新消息/翻页）后重建。观察范围必须限定会话流区域：
+    // 观察整个 body 会把导航条自身的重建也计入变更，render() 清空重建
+    // bar 再次触发 observer → 无限微任务循环、冻结页面。
+    const flowRoot = document.querySelector('[data-chat-flow=""]')
     const observer = new MutationObserver(() => { render() })
-    observer.observe(body, { childList: true, subtree: true })
+    if (flowRoot !== null) observer.observe(flowRoot, { childList: true, subtree: true })
     // 插件生命周期：unload 时清理（fiber dispose → apply 返回的 disposer）。
     return () => {
       observer.disconnect()
