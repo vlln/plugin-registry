@@ -23,12 +23,13 @@ dsh plugin enable vlln/taskboard
 
 - 安装/启用 → boot graph 含 `vlln/taskboard` 行（rev 对应当前 bundle）
 - 真实 Chrome DOM：`<div class="panelArea"><button>Task Board</button></div>` 出现在侧边栏（regionArea 与 footArea 之间）
-- **点击行为**：点击「Task Board」按钮 → 浮层出现（`useState` toggle，含会话数 + 占位分派按钮）——CDP 模拟点击确认 overlay 渲染
+- **点击行为（有当前会话）**：经 `ctx.conversation.setView('taskboard')` 切到 task board 视图（F9 跨槽通道，官方 `005d8061`）；无当前会话时退回自渲染浮层
 - 服务器日志无错误；导航条（navbar）共存正常
 
-## 前置：官方 `sidebar.panel` 缝
+## 前置：官方改动
 
-本插件依赖 ui-sidebar 的 `sidebar.panel` 缝（worktree 分支已开，随 PR 合并；未合并时需该改动在官方树）。
+- ui-sidebar 的 `sidebar.panel` 缝（`034c03fa`）
+- ui-conversation 的 `ctx.conversation.setView` 跨槽通道（`005d8061`）
 
 ## 构建（保持 bundle 与源码同步）
 
@@ -36,6 +37,6 @@ dsh plugin enable vlln/taskboard
 
 ## 已知限制
 
-- **点击 = 自渲染浮层**：不做会话视图切换——活动视图由 session 作用域 chat store 持有（`actions.setView`），root 触发器无跨槽通道（F9 未实现，设计开放项）。此处用 root 作用域自渲染浮层替代（零官方改动）。
-- **Agent 卡片/分派是占位**：tasks 数据无 client 投影（S2 最高成本项），浮层只显示会话数。
+- **点击切视图需当前会话**：`ctx.conversation.setView` 是 scope-addressed（无会话时 root 调用抛错），本插件无会话时退回浮层。**浏览器验证受环境限制**（webtest home 无持久化当前会话，headless 无法选中）；setView 机制由官方单测覆盖（`service-orchestration.spec.ts`）。
+- **Agent 卡片/分派是占位**：tasks 数据无 client 投影（S2 最高成本项）。
 - 侧边栏折叠（rail 态）下按钮仍渲染为宽行（`SidebarPanelOwnerProps.wide` 已传，但本示例未做 `!wide` 图标化，rail 下会被裁切）——与 ui-settings 触发器的 rail 模式对照可改进。

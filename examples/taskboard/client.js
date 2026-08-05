@@ -11,29 +11,33 @@ window.__ModuleLoader__.load({
 		const NS = "taskboard";
 		const zh = {
 			"panel.trigger": "Task Board",
-			"panel.overlayTitle": "Task Board",
-			"panel.empty": "暂无会话",
-			"panel.sessions": "会话：",
-			"panel.dispatch": "分派任务（占位）"
+			"view.title": "Task Board",
+			"view.empty": "暂无会话",
+			"view.dispatch": "分派任务（占位）",
+			"panel.overlayTitle": "Task Board"
 		};
 		const en = {
 			"panel.trigger": "Task Board",
-			"panel.overlayTitle": "Task Board",
-			"panel.empty": "No sessions",
-			"panel.sessions": "Sessions: ",
-			"panel.dispatch": "Dispatch (placeholder)"
+			"view.title": "Task Board",
+			"view.empty": "No sessions",
+			"view.dispatch": "Dispatch (placeholder)",
+			"panel.overlayTitle": "Task Board"
 		};
-		/** sidebar.panel 入口按钮：点击展开浮层。 */
+		/** sidebar.panel 入口按钮：有当前会话则 setView 切视图，否则展开浮层。 */
 		function TaskBoardTrigger(props) {
-			const { t, useSessions } = props;
+			const { t, sessions } = props;
 			const [open, setOpen] = (0, react.useState)(false);
-			const list = useSessions((s) => s);
-			const count = list === void 0 ? 0 : Object.keys(list.byId).length;
+			const go = () => {
+				const current = sessions.list.getSnapshot().current;
+				if (current !== void 0) {
+					(sessions.scope(current)?.get("conversation"))?.setView("taskboard");
+					return;
+				}
+				setOpen((v) => !v);
+			};
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 				type: "button",
-				onClick: () => {
-					setOpen((v) => !v);
-				},
+				onClick: go,
 				style: {
 					width: "100%",
 					padding: "6px 10px",
@@ -58,38 +62,49 @@ window.__ModuleLoader__.load({
 					borderRadius: 8,
 					fontFamily: "system-ui"
 				},
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h3", {
+					style: {
+						margin: "0 0 10px",
+						fontSize: 14
+					},
+					children: t("panel.overlayTitle")
+				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+					style: { fontSize: 13 },
+					children: t("view.empty")
+				})]
+			})] });
+		}
+		/** conversation.view 视图：task board 内容（Agent 卡片占位）。 */
+		function TaskBoardView(props) {
+			const { t } = props;
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				style: {
+					padding: 16,
+					fontFamily: "system-ui"
+				},
 				children: [
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h3", {
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h2", {
 						style: {
-							margin: "0 0 10px",
-							fontSize: 14
+							margin: "0 0 12px",
+							fontSize: 15
 						},
-						children: t("panel.overlayTitle")
+						children: t("view.title")
 					}),
-					count === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-						style: {
-							fontSize: 13,
-							color: "var(--dsw-alias-label-tertiary, #888)"
-						},
-						children: t("panel.empty")
-					}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 						style: { fontSize: 13 },
-						children: [t("panel.sessions"), count]
+						children: t("view.empty")
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 						type: "button",
-						onClick: () => {
-							setOpen(false);
-						},
 						style: {
-							marginTop: 10,
+							marginTop: 8,
 							padding: "6px 12px",
 							fontSize: 13
 						},
-						children: t("panel.dispatch")
+						children: t("view.dispatch")
 					})
 				]
-			})] });
+			});
 		}
 		/** 需要此插件声明的服务：slots + locale + sessions。 */
 		const inject = [
@@ -103,13 +118,21 @@ window.__ModuleLoader__.load({
 				en
 			}), "taskboard: dictionaries");
 			ctx.effect(() => {
-				const deferred = (0, _deepseek_ai_dsh_client_ui_slots.deferRegistration)(ctx.slots, "sidebar.panel", TaskBoardTrigger, () => ctx.slots.register({
+				const deferred = [];
+				deferred.push((0, _deepseek_ai_dsh_client_ui_slots.deferRegistration)(ctx.slots, "sidebar.panel", TaskBoardTrigger, () => ctx.slots.register({
 					name: "sidebar.panel",
 					id: "taskboard",
+					locale: NS,
+					inject: () => ({ sessions: ctx.sessions })
+				}, TaskBoardTrigger)));
+				deferred.push((0, _deepseek_ai_dsh_client_ui_slots.deferRegistration)(ctx.slots, "conversation.view", TaskBoardView, () => ctx.slots.register({
+					name: "conversation.view",
+					id: "taskboard",
+					label: () => "Task Board",
 					locale: NS
-				}, TaskBoardTrigger));
+				}, TaskBoardView)));
 				return () => {
-					deferred.dispose();
+					for (const entry of deferred) entry.dispose();
 				};
 			}, "taskboard: registrations");
 		}
@@ -118,6 +141,7 @@ window.__ModuleLoader__.load({
 		const name = "taskboard";
 		//#endregion
 		exports.TaskBoardTrigger = TaskBoardTrigger;
+		exports.TaskBoardView = TaskBoardView;
 		exports.apply = apply;
 		exports.inject = inject;
 		exports.name = name;
