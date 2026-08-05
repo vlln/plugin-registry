@@ -23,8 +23,12 @@ window.__ModuleLoader__.load({
         var position = function () {
           var flow = flowOf();
           if (flow === null) return;
-          var next = Math.round(flow.getBoundingClientRect().right + 12) + 'px';
-          if (bar.style.left !== next) bar.style.left = next;
+          // 贴近对话流列右缘 + 12px，但钳制在视口内（窄视口/详情面板展开
+          // 下列右缘可能贴近或越过视口，溢出会盖住滚动条和交互区）。
+          var right = flow.getBoundingClientRect().right;
+          var next = Math.round(Math.min(right + 12, window.innerWidth - bar.offsetWidth - 8));
+          var nextLeft = Math.max(8, next) + 'px';
+          if (bar.style.left !== nextLeft) bar.style.left = nextLeft;
         };
         // 重建导航点：每个 user 消息一个可导航点；点数未变跳过重建。
         var render = function () {

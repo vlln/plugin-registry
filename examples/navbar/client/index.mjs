@@ -26,8 +26,13 @@ export default {
     const position = (): void => {
       const flow = flowOf()
       if (flow === null) return
-      const next = `${Math.round(flow.getBoundingClientRect().right + 12)}px`
-      if (bar.style.left !== next) bar.style.left = next
+      // 贴近对话流列右缘 + 12px 间距，但钳制在视口内（不溢出右缘——窄
+      // 视口/详情面板展开下列右缘可能贴近甚至越过视口，溢出会盖住滚动条
+      // 和交互区）。offsetWidth 读取会触发一次 reflow，仅在列移动时调用。
+      const right = flow.getBoundingClientRect().right
+      const next = Math.round(Math.min(right + 12, window.innerWidth - bar.offsetWidth - 8))
+      const nextLeft = `${Math.max(8, next)}px`
+      if (bar.style.left !== nextLeft) bar.style.left = nextLeft
     }
     const flowOf = (): HTMLElement | null => document.querySelector('[data-chat-flow=""]')
 
