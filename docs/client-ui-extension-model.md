@@ -7,7 +7,7 @@
 | # | 场景 | 一句话 |
 |---|---|---|
 | S1 | 导航条 | 侧边一条 user message 导航，点击跳转 |
-| S2 | 后台任务 UI | 对话页**对话框上方**显示该会话的后台任务（数据投影已实现；UI 位置待调整）|
+| S2 | 后台任务 UI | 对话页**对话框上方**的任务状态条（数据投影 + UI 位置均已落地）|
 | S3 | Turn 折叠 | turn 结束折叠执行过程（**不可行**：区间折叠需官方折叠容器；per-item 回退缝已落地）|
 | S4 | 动态卡片 | Agent 输出结构化标记 → 插件渲染动态卡片 |
 | S5 | Task board | 用户**委派任务给 Agent** 的委派台（**工作区级**，与 workspace 平级，非 session 归属）——**暂不做** |
@@ -29,11 +29,11 @@
 | 要素 | 机制 | 证据 |
 |---|---|---|
 | 数据 | **`task/snapshot` 帧（完整快照，对齐 `session/queue`）→ client 适配器 → `useTasks`** | events.ts 帧变体；session.ts 消费；provide tasks hook → standard kit 自动生成 |
-| UI 位置 | **对话页对话框（composer）上方的附加任务状态区**（非独立视图） | 待落地 |
+| UI 位置 | **对话页对话框（composer）上方的任务状态条**（`conversation.input.dock`，与 queue/todo 同 strip） | taskboard 示例已落地 |
 
 **数据投影已实现（评审 F4 修正）**：线协议取**完整快照姿势**——每变更广播 session 全量列表，重连基线免费；host 侧 `onChanged` + `listOwned` + api-proxy 广播 + **mux 打开推基线**。tasks 是 session 作用域，`useTasks` 是 session 钩子；列表含 settled 历史。
 
-**UI 位置修正**：S2 正确形态是对话页**对话框上方**显示该会话后台任务（进度/状态条），非独立页面——当前 taskboard 示例把任务列表放进独立视图（位置不对）；composer 上方附加区待落地（可复用 `conversation.composer.dock` 类槽或 mount 附加）。
+**UI 位置已落地**：对话页**对话框上方**状态条——taskboard 经 `conversation.input.dock` 注册 `TaskStatusBar`，`useTasks` 实时渲染（复验通过）。
 
 ### S3 Turn 折叠 ⚠️ per-item 回退缝已落地，turn 折叠不可行
 
