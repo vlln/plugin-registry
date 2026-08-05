@@ -51,7 +51,14 @@ export function TaskBoardTrigger(
     if (current !== undefined) {
       const scoped = sessions.scope(current)
       const conversation = scoped?.get('conversation') as { setView(view: string): void } | undefined
-      conversation?.setView('taskboard')
+      if (conversation === undefined) {
+        // ui-conversation absent or older than the setView channel: fail loud
+        // instead of a dead click (the overlay is the no-conversation path).
+        console.error('taskboard: conversation service unavailable (needs setView channel)')
+        setOpen(true)
+        return
+      }
+      conversation.setView('taskboard')
       return
     }
     setOpen(v => !v) // no current session: fall back to the overlay
@@ -111,7 +118,7 @@ export function apply(ctx: Context): void {
       ctx.slots.register({
         name: 'conversation.view',
         id: 'taskboard',
-        label: () => 'Task Board',
+        label: 'Task Board',
         locale: NS,
       }, TaskBoardView)))
     return () => { for (const entry of deferred) entry.dispose() }

@@ -23,13 +23,17 @@ dsh plugin enable vlln/taskboard
 
 - 安装/启用 → boot graph 含 `vlln/taskboard` 行（rev 对应当前 bundle）
 - 真实 Chrome DOM：`<div class="panelArea"><button>Task Board</button></div>` 出现在侧边栏（regionArea 与 footArea 之间）
-- **点击行为（有当前会话）**：经 `ctx.conversation.setView('taskboard')` 切到 task board 视图（F9 跨槽通道，官方 `005d8061`）；无当前会话时退回自渲染浮层
 - 服务器日志无错误；导航条（navbar）共存正常
+
+## 点击切视图：代码路径已接线，机制待 F1 修复后浏览器复验
+
+点击按钮的完整链路已接线：`TaskBoardTrigger` onClick → `sessions.scope(current).get('conversation').setView('taskboard')`（F9 跨槽通道）→ 视图环切到本插件注册的 `conversation.view` 视图。**浏览器端尚未复验**：早期 headless 环境无持久化当前会话，且审查发现 setView 曾写进一次性 store 实例（F1 孤儿实例，官方 `b5cf95a9` 修复为写共享实例）——修复前浏览器验证无意义。无会话时按钮退回自渲染浮层并打 `console.error`（F4 降级）。
 
 ## 前置：官方改动
 
 - ui-sidebar 的 `sidebar.panel` 缝（`034c03fa`）
 - ui-conversation 的 `ctx.conversation.setView` 跨槽通道（`005d8061`）
+- F1 修复：setView 写共享会话 store 实例（`b5cf95a9`）
 
 ## 构建（保持 bundle 与源码同步）
 
@@ -37,6 +41,6 @@ dsh plugin enable vlln/taskboard
 
 ## 已知限制
 
-- **点击切视图需当前会话**：`ctx.conversation.setView` 是 scope-addressed（无会话时 root 调用抛错），本插件无会话时退回浮层。**浏览器验证受环境限制**（webtest home 无持久化当前会话，headless 无法选中）；setView 机制由官方单测覆盖（`service-orchestration.spec.ts`）。
+- **点击切视图需当前会话且待复验**：`ctx.conversation.setView` 是 scope-addressed（无会话时 root 调用抛错，本插件降级为浮层）；有会话时的真实浏览器切换尚未复验（见上节）；setView 写共享实例的机制由官方单测覆盖（`service-orchestration.spec.ts`）。
 - **Agent 卡片/分派是占位**：tasks 数据无 client 投影（S2 最高成本项）。
 - 侧边栏折叠（rail 态）下按钮仍渲染为宽行（`SidebarPanelOwnerProps.wide` 已传，但本示例未做 `!wide` 图标化，rail 下会被裁切）——与 ui-settings 触发器的 rail 模式对照可改进。

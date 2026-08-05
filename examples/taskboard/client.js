@@ -30,7 +30,13 @@ window.__ModuleLoader__.load({
 			const go = () => {
 				const current = sessions.list.getSnapshot().current;
 				if (current !== void 0) {
-					(sessions.scope(current)?.get("conversation"))?.setView("taskboard");
+					const conversation = sessions.scope(current)?.get("conversation");
+					if (conversation === void 0) {
+						console.error("taskboard: conversation service unavailable (needs setView channel)");
+						setOpen(true);
+						return;
+					}
+					conversation.setView("taskboard");
 					return;
 				}
 				setOpen((v) => !v);
@@ -128,7 +134,7 @@ window.__ModuleLoader__.load({
 				deferred.push((0, _deepseek_ai_dsh_client_ui_slots.deferRegistration)(ctx.slots, "conversation.view", TaskBoardView, () => ctx.slots.register({
 					name: "conversation.view",
 					id: "taskboard",
-					label: () => "Task Board",
+					label: "Task Board",
 					locale: NS
 				}, TaskBoardView)));
 				return () => {

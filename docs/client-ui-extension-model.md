@@ -1,6 +1,6 @@
 # 设计：client UI 扩展统一心智模型（场景驱动）
 
-状态：**设计稿，未实现**。目的：取代「专用孔 / 通用容器 / 内容流钩子 / 3 块」的割裂叙事，用**真实插件场景**推导出一个统一模型——**一个 slot 体系 + 四种匹配 + 数据投影**。本文基于对官方源码的逐项核实（worktree `feat/plugin-registry-mvp`），每个场景的结论都有源码证据。
+状态：**设计稿，未实现**。目的：取代「专用孔 / 通用容器 / 内容流钩子 / 3 块」的割裂叙事，用**真实插件场景**推导出一个统一模型——**一个 slot 体系 + 四种匹配 + 数据投影**。结论均有源码证据（逐项核实 worktree `feat/plugin-registry-mvp`）。
 
 ## 场景清单
 
@@ -31,7 +31,7 @@
 | 数据 | **缺失**：tasks 是 host 侧服务，无 client 投影，且 **connection 无 task 事件帧**（连 wire 面都没有） | `packages/tasks/tasks/src/index.ts`（Node 侧）、`connection/src` 无 task 事件 |
 | UI 位置 | 通用容器 | 同上 |
 
-**缺口（F4）**：需新线协议（task/start、task/done 事件帧）→ client 适配器 → provide 钩子——是清单**最高成本项**（不是「仿 sessions」那么简单）。且 `TaskService` 是 **session 作用域**（owned-task 按 session 隔离），`useTasks` 应为 session 作用域钩子。
+**缺口（F4）**：需新线协议（task/start、task/done 事件帧）→ client 适配器 → provide 钩子——是清单**最高成本项**（不是「仿 sessions」那么简单），且 tasks 是 session 作用域（详见 §2）。
 
 ### S3 Turn 折叠 ⚠️ 内容流分发维度需扩展
 
@@ -59,12 +59,12 @@
 | 要素 | 机制 | 证据 |
 |---|---|---|
 | 侧边栏入口 | **list 缝（`sidebar.panel`，已开）** | sidebar 整列 single 由 ui-sidebar 占用（`ui-layout/index.ts:39` 声明、`ui-sidebar` 注册）；`sidebar.panel` 缝归 ui-sidebar（list 槽，shell 直接 renderSlot 渲染全部条目） |
-| 打开新页 | **`conversation.view` list 槽（视图环）** | `apply.ts:121-123`（注册条目 = 一个视图 tab）——Obsidian `registerView` 等价物；**session 作用域**；root 经 `ctx.conversation.setView` 切换（F9 已实现） |
+| 打开新页 | **`conversation.view` list 槽（视图环）** | `apply.ts:121-123`（注册条目 = 一个视图 tab）——Obsidian `registerView` 等价物；**session 作用域**；root 经 `ctx.conversation.setView` 切换 |
 | Agent 列表 | `useSessions`/`useWorkspaces` | standard kit |
 | 分派任务 | `ctx.sessions.openSubagent` 等注入动作 | `runtime/client/sessions/service.ts:328` |
 | 卡片渲染 | 视图 tab 内自渲染 | 插件自由 |
 
-**作用域（F9 已实现）**：`conversation.view` 是 session 作用域——「每 session 的后台看板」用现环 + `ctx.conversation.setView` 切换；「跨 session 全局看板」仍需 root 级视图环（开放项）。
+**作用域**：`conversation.view` 是 session 作用域——「每 session 的后台看板」用现环 + `ctx.conversation.setView` 切换；「跨 session 全局看板」仍需 root 级视图环（开放项）。
 
 ## 统一心智模型：一个 slot 体系 + 四种匹配 + 数据投影
 
@@ -81,7 +81,7 @@
 | `keyed` | 按维度键匹配（开放取值空间） | 工具名（toolview）、**sessionRow（行内缝）**、卡片类型（S4） |
 | `chain` | 按内容判别式路由（**整槽接管**，命中隐藏 fallback） | composer 接管；**S3 需扩展 per-item 回退语义**（当前不覆盖） |
 
-**scope 轴（评审 F5）**：`root` / `session` / `session-maybe` 决定插件能拿到哪些 standard-kit 钩子——root 只有 `useSessions`/`useWorkspaces`，session 才有 `sessionId`/`useSession`/`useProjection`（`web-react/scoped-slots.tsx:289-310`）。**scope 决定数据通道**，与 §2 呼应；开发者漏学 scope 会踩「组件为什么拿不到 useSession」。
+**scope 轴（评审 F5）**：`root` / `session` / `session-maybe` 决定插件能拿到哪些 standard-kit 钩子——root 只有 `useSessions`/`useWorkspaces`，session 才有 `sessionId`/`useSession`/`useProjection`（`web-react/scoped-slots.tsx:289-310`）。**scope 决定数据通道**，与 §2 呼应；漏学会踩「组件为什么拿不到 useSession」。
 
 **开发者只需知道**：「我的插件要往哪个结构挂内容 → 找对应类型的缝（含 scope）→ 注册组件」。不需要知道「内容流」「专用孔」这些词。
 
@@ -134,7 +134,7 @@
   - **发现（印证 F6）**：导航点只覆盖已渲染行——`data-chat-*` 契约化 + 跨窗口导航待补；`z-index:900`（官方模态之下）。
   - **审查修复**：初版 observer 观察 body，render 重建又触发 observer 无限循环冻结；修复为限定 `[data-chat-flow=""]`，单测锁定。
   - **后续**：通用容器落地后，导航条可替换为 `ctx.ui.mount`。
-- **S5 冒烟 ✅ sidebar.panel 缝 + 入口 + 视图切换（`examples/taskboard`）**：ui-sidebar 开 `sidebar.panel` list 缝（`034c03fa`）；ui-conversation 加 `ctx.conversation.setView`（`005d8061`，F9 闭环）；`vlln/taskboard` 注册 React 入口 + 视图，点击经 setView 切换（无会话退回浮层）。setView 有官方单测；Agent 卡片依赖 tasks 投影（S2）。
+- **S5 冒烟 ✅ sidebar.panel 缝 + 入口 + 视图切换（`examples/taskboard`）**：ui-sidebar 开 `sidebar.panel` list 缝（`034c03fa`）；ui-conversation 加 `ctx.conversation.setView`（`005d8061`，F9 闭环）；F1 孤儿实例（setView 曾写一次性 store）由 `b5cf95a9` 修复为写共享实例；`vlln/taskboard` 注册 React 入口 + 视图，点击经 setView 切换（无会话退回浮层）。setView 有官方单测；浏览器点击复验待办（headless 无持久化会话）；Agent 卡片依赖 tasks 投影（S2）。
 - **数据投影**：`useTasks` 单测（投影正确性 + 响应式 + session 作用域隔离）。
 - **安全**：S4 拒绝 html 内嵌的测试（markdown 渲染器对 `<script>` 的处置）。
 - **性能（F10）**：S3/S4 的流内分发不破坏 ChatView 的渲染预算（节点级 memo、chunk 风暴只重渲 StreamingTail）——加性能冒烟。
@@ -143,7 +143,7 @@
 
 1. **缝的覆盖面**：官方按「结构类型」开缝的节奏与优先级（先 sidebar.panel 还是先卡片缝）——由官方产品决策。
 2. **chain 的 per-item 回退语义（F1）**：S3 依赖「未命中回退官方 item 渲染」，官方 chain 无此语义——拍板：扩展 chain（条目内注入 fallback）vs 新形态（per-item transform list）vs 接受插件整流接管。
-3. **task board 作用域（F9，已实现）**：`ctx.conversation.setView` 已加；「跨 session 全局看板」仍需 root 级视图环（开放项）。
+3. **task board 作用域（已实现）**：`ctx.conversation.setView` 已加；「跨 session 全局看板」仍需 root 级视图环（开放项）。
 4. **S4 marker 线协议（F3）**：新 AssistantBlock kind（动 host + 回放兼容）vs fence 语言约定（零 host 改动但易与 shiki 高亮冲突）。
 5. **useTasks 线协议（F4）**：新事件帧的宿主侧来源、任务跨页面/跨 session 存活语义、投影节流。
 6. **数据投影范围**：tasks 之后还有哪些 host 服务值得投影（按插件需求热度）。
