@@ -2,42 +2,6 @@
 
 DeepSeek Harness 的本地插件系统：清单协议、安装/启停、Web 管理面板、声明校验、脚手架与 tarball 分发。
 
-## 文档
-
-| 文档 | 内容 |
-|---|---|
-| [架构](docs/architecture.md) | 两层插件模型、加载路径、能力面 vs 声明面、服务关系、信任边界、web 边界（client half）、与 pi-mono 对比 |
-| [创建插件](docs/cookbook/creating-a-plugin.md) | 从零开发：脚手架 → 入口 → contributes 同步 → 安装启用 |
-| [加 client half](docs/cookbook/adding-a-client-half.md) | 给插件带浏览器端 UI：client 声明 → bundle 契约 → 构建 → 验证 |
-| [集成到 dsh](docs/cookbook/integrating-into-dsh.md) | 复制包 + 补丁 + 组合启用，接入 DSH 源码环境 |
-| [分发插件](docs/cookbook/distributing-plugins.md) | tarball 分发与社区目录模式 |
-| [client half 设计稿](docs/registry-client-half-design.md) | client half 机制的设计与评审记录（已实现） |
-| [通用渲染容器设计稿](docs/generic-client-render-container-design.md) | client UI 的 Obsidian 式通用挂载容器（未实现） |
-| [文档标准](docs/AGENTS.md) | 文档分层、写作规则、字数预算 |
-
-## 内容
-
-| 目录 | 说明 |
-|---|---|
-| `packages/plugin/plugin` | 核心包 `@deepseek-ai/dsh-plugin`：清单协议、本地注册表、运行时服务、校验、脚手架、tarball 安装 |
-| `packages/ui-plugin-manager` | Web 设置页插件面板：浏览 / 搜索 / 安装 / 启停 / 卸载 |
-| `examples/greeter` | 可直接安装的示例插件：Node 侧 greet 工具 + 浏览器端 client half（清单 + 双入口），见 [`examples/greeter/README.md`](examples/greeter/README.md) |
-| `examples/loop` | 定时循环插件：`/loop` 命令 + `loop` 工具，按间隔向当前 agent 重复投递 prompt（对齐 Claude Code `/loop`），见 [`examples/loop/README.md`](examples/loop/README.md) |
-| `skills/plugin-registry-create` | Agent Skill：指导快速创建 registry 插件（脚手架 → 写入口 → 安装启用） |
-| `patches/dsh-plugin-registry.patch` | 基于官方 0804 快照的接线补丁（33 个文件，仅本仓库核心机制的官方改动） |
-
-## 展示
-
-Web 设置页「插件」面板：
-
-![插件管理面板 1](screenshots/plugin-panel-1.png)
-
-插件列表：搜索框、状态徽章（已启用/已禁用/未安装）、版本与描述、操作按钮。
-
-![插件管理面板 2](screenshots/plugin-panel-2.png)
-
-操作后状态：启用实时生效（徽章变绿胶囊）、禁用与卸载的反馈。
-
 ## 快速上手
 
 ```sh
@@ -53,9 +17,17 @@ dsh plugin list                    # 列表
 
 要定时循环能力（轮询部署、照看 PR、build-fix-test 循环）？安装 `examples/loop`：`dsh plugin install ./examples/loop && dsh plugin enable acme/loop`，然后 `/loop 5m check the deploy`。
 
-## Agent Skill
+## 展示
 
-仓库自带 `plugin-registry-create` Skill（`skills/plugin-registry-create/SKILL.md`），指导 agent 快速创建 registry 插件：选 id → 脚手架 → 写 Cordis 入口 → 同步 `contributes` → 安装启用验证，含常见坑（默认禁用、声明面 vs 能力面、Loader 树边界等）。与官方 harness 的 `dsh-*` skills / `cordis` 工具集命名区分，避免混淆。
+Web 设置页「插件」面板：
+
+![插件管理面板 1](screenshots/plugin-panel-1.png)
+
+插件列表：搜索框、状态徽章（已启用/已禁用/未安装）、版本与描述、操作按钮。
+
+![插件管理面板 2](screenshots/plugin-panel-2.png)
+
+操作后状态：启用实时生效（徽章变绿胶囊）、禁用与卸载的反馈。
 
 ## 能力一览
 
@@ -66,6 +38,25 @@ dsh plugin list                    # 列表
 - **client half**：插件可带浏览器端 bundle，启用后进入 `__DSH_BOOT__` 在 Web 端运行（`client` 声明 + 运行时登记）
 - **信任边界**：安装默认禁用，显式启用才执行
 - **脚手架**：`dsh plugin create <id>` 一键生成标准插件根
+
+## 示例插件
+
+| 示例 | 说明 |
+|---|---|
+| [`examples/greeter`](examples/greeter/README.md) | Node 侧 greet 工具 + 浏览器端 client half（清单 + 双入口） |
+| [`examples/loop`](examples/loop/README.md) | `/loop` 命令 + `loop` 工具，按间隔向当前 agent 重复投递 prompt（对齐 Claude Code `/loop`） |
+
+## Agent Skill
+
+仓库自带 `plugin-registry-create` Skill（`skills/plugin-registry-create/SKILL.md`），指导 agent 快速创建 registry 插件：选 id → 脚手架 → 写 Cordis 入口 → 同步 `contributes` → 安装启用验证，含常见坑（默认禁用、声明面 vs 能力面、Loader 树边界等）。与官方 harness 的 `dsh-*` skills / `cordis` 工具集命名区分，避免混淆。
+
+## 文档
+
+- [创建插件](docs/cookbook/creating-a-plugin.md) — 从零开发：脚手架 → 入口 → contributes 同步 → 安装启用
+- [加 client half](docs/cookbook/adding-a-client-half.md) — 给插件带浏览器端 UI：client 声明 → bundle 契约 → 构建 → 验证
+- [集成到 dsh](docs/cookbook/integrating-into-dsh.md) — 复制包 + 补丁 + 组合启用，接入 DSH 源码环境
+- [分发插件](docs/cookbook/distributing-plugins.md) — tarball 分发与社区目录模式
+- [架构](docs/architecture.md) — 两层插件模型的系统地图（好奇者阅读）
 
 ## 版权
 
