@@ -20,14 +20,19 @@ window.__ModuleLoader__.load({
 			"fold.collapse": "Collapse"
 		};
 		/**
-		* 聚合折叠已结束 turn 的执行过程：一次 turn 完成，把该 turn 的中间过程
-		* （工具调用组 + 中间文本）聚合进一个可展开的折叠块；该 turn 的最后一条
-		* content assistant（Answer）不折叠、仍官方渲染。
+		* 原样折叠已结束 turn 的执行过程：一次 turn 完成，把该 turn 的中间过程
+		* （工具调用组 + 中间文本）默认折叠成一行；**点击展开后渲染官方原生
+		* 内容**（每个 tool 调用、上下文注入、thinking 原样显示）——不是自制
+		* 组件替代。
 		*
-		* 聚合策略：select 对"已结束 turn 的执行过程 item"都接管（返回 turn），
-		* 但组件只让**该 turn 的第一个执行过程 item** 渲染折叠块——其余执行过程
-		* item 渲染 null（内容已聚合进折叠块，避免重复）；组件用 useSession 读
-		* 会话节点聚合该 turn 的全部执行过程。
+		* 机制：chain 的 elected 组件注入 `fallback`（官方原生渲染，官方
+		* scoped-slots 支持）；组件读展开集（默认全折叠）——折叠中渲染折叠行，
+		* 展开时渲染 `props.fallback`（原生）。select 始终接管「已结束 turn 的
+		* 执行过程」，展开与否由组件层决定，select 保持纯。
+		*
+		* 聚合策略：折叠态只让该 turn 第一个流内执行过程 item 渲染折叠行、其余
+		* 渲染 null；展开态每个执行过程 item 都渲染自己的 fallback——原生 items
+		* 原样恢复（tool 调用、上下文注入、thinking 全在）。
 		*/
 		/** 每 turn 最后一条有内容 assistant 的 seq（= Answer 判别，官方语义的本地复制）。 */
 		function lastAssistantSeqs(nodes) {
@@ -39,23 +44,36 @@ window.__ModuleLoader__.load({
 			}
 			return new Set(lastByTurn.values());
 		}
+		/** 展开集：默认全部折叠（空集），点击折叠行加入 turn 显示原生。 */
+		let expanded = /* @__PURE__ */ new Set();
+		const expandListeners = /* @__PURE__ */ new Set();
+		function toggleExpanded(turn) {
+			expanded = new Set(expanded);
+			if (expanded.has(turn)) expanded.delete(turn);
+			else expanded.add(turn);
+			for (const fn of [...expandListeners]) fn();
+		}
+		const subscribeExpanded = (fn) => {
+			expandListeners.add(fn);
+			return () => {
+				expandListeners.delete(fn);
+			};
+		};
 		function TurnFoldRow(props) {
-			const { t, matched, useSession, item } = props;
+			const { t, matched, useSession, item, fallback } = props;
 			const nodes = useSession((s) => s.nodes);
 			const answerSeqs = lastAssistantSeqs(nodes);
 			const processSeqs = [];
-			const toolNames = [];
 			for (const node of nodes) {
 				if ((node.kind === "assistant" || node.kind === "tool-result" ? node.turn : void 0) !== matched.turn) continue;
-				if (node.kind === "tool-result") {
-					processSeqs.push(node.seq);
-					if (node.call !== null) toolNames.push(node.call.name);
-				} else if (node.kind === "assistant" && !answerSeqs.has(node.seq) && node.blocks.some((b) => (b.kind === "text" || b.kind === "reasoning") && b.text.trim() !== "")) processSeqs.push(node.seq);
+				if (node.kind === "tool-result") processSeqs.push(node.seq);
+				else if (node.kind === "assistant" && !answerSeqs.has(node.seq) && node.blocks.some((b) => (b.kind === "text" || b.kind === "reasoning") && b.text.trim() !== "")) processSeqs.push(node.seq);
 			}
 			if (processSeqs.length === 0) return null;
+			(0, react.useSyncExternalStore)(subscribeExpanded, () => expanded);
+			if (expanded.has(matched.turn)) return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(react_jsx_runtime.Fragment, { children: fallback });
 			if ((item.kind === "tool-group" ? item.results[0].seq : item.node.seq) !== Math.min(...processSeqs)) return null;
-			const [open, setOpen] = (0, react.useState)(false);
-			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 				style: {
 					margin: "2px 0",
 					fontSize: 13,
@@ -64,9 +82,9 @@ window.__ModuleLoader__.load({
 					borderRadius: 6,
 					color: "var(--dsw-alias-text-muted, #999)"
 				},
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
 					type: "button",
-					onClick: () => setOpen((v) => !v),
+					onClick: () => toggleExpanded(matched.turn),
 					style: {
 						width: "100%",
 						padding: "6px 10px",
@@ -83,15 +101,9 @@ window.__ModuleLoader__.load({
 							tools: processSeqs.length
 						}),
 						" ",
-						open ? t("fold.collapse") : t("fold.expand")
+						t("fold.expand")
 					]
-				}), open && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-					style: {
-						padding: "0 10px 6px",
-						fontSize: 12
-					},
-					children: toolNames.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: ["Tools: ", toolNames.join(", ")] })
-				})]
+				})
 			});
 		}
 		/** 判别式：折叠"已结束 turn 的执行过程"（工具组 + 中间文本），Answer 与未结束 turn 走官方。 */

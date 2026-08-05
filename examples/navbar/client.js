@@ -83,6 +83,8 @@ window.__ModuleLoader__.load({
         };
         var WINDOW = 11;
         var HALF_WINDOW = 5;
+        // 当前窗口起点（render 设置；updateActiveClass 用同一 lo 映射窗口内 dot）。
+        var lo = 0;
 
         // 预览：消息开头（CSS line-clamp 6 行截断）。
         var showPreview = function (row, anchor) {
@@ -108,7 +110,7 @@ window.__ModuleLoader__.load({
           var active = computeActive();
           activeIndex = active;
           var windowed = rows.length > WINDOW;
-          var lo = windowed ? Math.max(0, active - HALF_WINDOW) : 0;
+          lo = windowed ? Math.max(0, active - HALF_WINDOW) : 0;
           var hi = windowed ? Math.min(rows.length - 1, active + HALF_WINDOW) : rows.length - 1;
           var dotCount = hi - lo + 1 + (windowed ? 2 : 0);
           if (bar.childElementCount === dotCount) {
@@ -133,13 +135,7 @@ window.__ModuleLoader__.load({
               d.addEventListener('focus', function () { showPreview(row, d); });
               d.addEventListener('blur', hidePreview);
               d.addEventListener('click', function () {
-                // 平滑滚动：先派发 wheel 事件建立官方 wheel 起源标记，
-                // 使本次程序化滚动不被 follow 逻辑拉回（合成 wheel 无默认滚动）。
-                var scroller = scrollerOf();
-                if (scroller !== null) {
-                  scroller.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }));
-                }
-                row.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                jumpToRow(row);
               });
             })(rows[i], dot);
             if (i === active) dot.classList.add('active');
@@ -150,6 +146,28 @@ window.__ModuleLoader__.load({
             moreR.setAttribute('data-vlln-more', '');
             bar.appendChild(moreR);
           }
+        };
+
+        // 点击跳转：wheel 起源 + 第一步立即 + 手动 rAF 缓动（防 follow 拉回）。
+        var jumpToRow = function (row) {
+          var scroller = scrollerOf();
+          if (scroller === null) return;
+          scroller.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }));
+          var target = scroller.scrollTop + row.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+          var start = scroller.scrollTop;
+          scroller.scrollTop = start + (target > start ? 1 : -1); // 第一步立即
+          var dist = target - start;
+          var dur = Math.min(480, 160 + Math.abs(dist) * 0.25);
+          var t0 = performance.now();
+          var step = function (now) {
+            // 每帧续 wheel 起源（官方 2 rAF 后清空 wheelStart，过期即拉回）。
+            scroller.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }));
+            var p = Math.min(1, (now - t0) / dur);
+            var eased = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+            scroller.scrollTop = start + dist * eased;
+            if (p < 1) requestAnimationFrame(step);
+          };
+          requestAnimationFrame(step);
         };
 
         // 窗口内激活态：第 i 个 dot 对应行 lo+i，只切换 class 不重建。

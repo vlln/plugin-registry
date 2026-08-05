@@ -17,7 +17,7 @@ dsh plugin install ./examples/turn-fold
 dsh plugin enable vlln/turn-fold
 ```
 
-启用后刷新 Web 页面：每次**完成的 turn** 的执行过程（工具调用 + 中间文本）聚合折叠成一行（点击可展开查看），该 turn 的最后一条回答（Answer）与用户消息仍官方渲染。
+启用后刷新 Web 页面：每次**完成的 turn** 的执行过程（工具调用、上下文注入、thinking）默认折叠成一行；**点击展开后渲染官方原生内容**（每个 tool 调用、上下文注入、thinking 原样显示，非自制组件），该 turn 的最后一条回答（Answer）与用户消息不折叠。
 
 ## 已验证（真实 web 组合，bundle 与源码同步）
 
@@ -36,4 +36,5 @@ dsh plugin enable vlln/turn-fold
 ## 已知限制
 
 - **判别是 owner 纯函数**：select 只读 owner 携带的 turn 上下文（`turnEnds`/`answerSeqs`）；正在运行的 turn 不折叠（保持实时过程可见）。
-- **聚合只含流内执行过程**：组件用 `useSession` 聚合该 turn 的执行过程时跳过 tool-call head（空 assistant，不在 flow items 里）——否则首项判定失败；展开内容当前只列工具名，完整过程详情留待后续。
+- **展开 = 官方原生渲染**：chain 的 elected 组件注入 `fallback`（官方原生 item，官方 scoped-slots 支持），展开时渲染 `props.fallback`；折叠状态是插件级展开集（默认全折叠，点击加入），select 保持纯。
+- **聚合只含流内执行过程**：组件用 `useSession` 聚合该 turn 的执行过程时跳过 tool-call head（空 assistant，不在 flow items 里）——否则首项判定失败。

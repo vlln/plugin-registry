@@ -123,6 +123,8 @@ export default {
 
     const WINDOW = 11 // 超过则滑动窗口
     const HALF_WINDOW = 5
+    // 当前窗口起点（render 设置；updateActiveClass 用同一 lo 映射窗口内 dot）。
+    let lo = 0
 
     // 预览：显示消息开头（最多 6 行，CSS line-clamp 截断）。
     const showPreview = (row: HTMLElement, anchor: HTMLElement): void => {
@@ -152,7 +154,7 @@ export default {
       activeIndex = active
       // 窗口：>11 节点时截断（显示激活附近一段），端点细点暗示还有更多。
       const windowed = rows.length > WINDOW
-      const lo = windowed ? Math.max(0, active - HALF_WINDOW) : 0
+      lo = windowed ? Math.max(0, active - HALF_WINDOW) : 0
       const hi = windowed ? Math.min(rows.length - 1, active + HALF_WINDOW) : rows.length - 1
       // 重建（点数/窗口变化时才重建；滚动只走 updateActive 不重建）。
       const dotCount = hi - lo + 1 + (windowed ? 2 : 0) // +2 端点细点
@@ -178,19 +180,7 @@ export default {
         dot.addEventListener('focus', () => showPreview(row, dot))
         dot.addEventListener('blur', hidePreview)
         dot.addEventListener('click', () => {
-          // 平滑滚动。官方 ChatView 在 pinned-to-bottom 时把非 wheel 的
-          // 程序化滚动拉回底部（follow 逻辑）；先派发一个 wheel 事件触发
-          // 官方 onWheel 记录 wheel 起源，使本次滚动被视为用户滚轮输入、
-          // 不被拉回（合成 wheel 无默认滚动，只建立起源标记）。
-          const scroller = scrollerOf()
-          if (scroller !== null) {
-            scroller.dispatchEvent(new WheelEvent('wheel', {
-              // 向上（-1）：刷新后页面常在底部，向下（+1）在底部时官方
-              // canMove=false 不记录 wheel 起源，smooth 仍被 follow 拉回。
-              deltaY: -1, bubbles: true, cancelable: true,
-            }))
-          }
-          row.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          jumpToRow(row)
         })
         if (i === active) dot.classList.add('active')
         bar.appendChild(dot)
@@ -200,6 +190,38 @@ export default {
         more.setAttribute('data-vlln-more', '')
         bar.appendChild(more)
       }
+    }
+
+    // 点击跳转：官方 follow 在 pinned-to-bottom 时拉回非 wheel 的程序化
+    // 滚动。做法：先派发 wheel 事件建立官方 wheel 起源（合成事件无默认
+    // 滚动），再立即改 1px scrollTop 触发第一个 scroll 事件（wheel 起源
+    // 有效期内 movedByWheel=true → atBottomRef 解除），随后手动 rAF 缓动
+    // 到目标——后续滚动即使 wheel 起源过期也不被拉回。
+    const jumpToRow = (row: HTMLElement): void => {
+      const scroller = scrollerOf()
+      if (scroller === null) return
+      scroller.dispatchEvent(new WheelEvent('wheel', {
+        deltaY: -1, bubbles: true, cancelable: true,
+      }))
+      const target = scroller.scrollTop + row.getBoundingClientRect().top - scroller.getBoundingClientRect().top
+      const start = scroller.scrollTop
+      scroller.scrollTop = start + (target > start ? 1 : -1) // 第一步立即
+      const dist = target - start
+      const dur = Math.min(480, 160 + Math.abs(dist) * 0.25)
+      const t0 = performance.now()
+      const step = (now: number): void => {
+        // 每帧续 wheel 起源：官方 onWheel 在 2 rAF 后清空 wheelStart，
+        // 一旦过期后续滚动又被 follow 拉回；每帧重新 dispatch 让每次
+        // scroll 事件都视为用户滚轮输入。
+        scroller.dispatchEvent(new WheelEvent('wheel', {
+          deltaY: -1, bubbles: true, cancelable: true,
+        }))
+        const p = Math.min(1, (now - t0) / dur)
+        const eased = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2
+        scroller.scrollTop = start + dist * eased
+        if (p < 1) requestAnimationFrame(step)
+      }
+      requestAnimationFrame(step)
     }
 
     // 窗口内激活态：第 i 个 dot 对应行 lo+i，只切换 class 不重建。
