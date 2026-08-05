@@ -69,17 +69,16 @@ window.__ModuleLoader__.load({
         var computeActive = function () {
           var rows = userRows();
           if (rows.length === 0) return -1;
-          // 当前页面查看到的 user 消息：视口内离视口中央最近的一条。
-          var mid = window.innerHeight * 0.5;
+          // 激活 = 视口内最顶部的那条 user 消息（阅读起点；与 block:start
+          // 跳转对齐——跳转后目标行在视口顶部，激活应指向它）。
           var best = 0;
-          var bestDist = Number.POSITIVE_INFINITY;
+          var found = false;
+          var bestTop = Number.POSITIVE_INFINITY;
           for (var i = 0; i < rows.length; i++) {
             var top = rows[i].getBoundingClientRect().top;
-            if (top >= window.innerHeight) break; // 视口下方不可见
-            var dist = Math.abs(top - mid);
-            if (dist < bestDist) { bestDist = dist; best = i; }
+            if (top >= 0 && top < bestTop) { bestTop = top; best = i; found = true; }
           }
-          return best;
+          return found ? best : rows.length - 1;
         };
         var WINDOW = 11;
         var HALF_WINDOW = 5;

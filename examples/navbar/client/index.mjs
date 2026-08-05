@@ -107,18 +107,17 @@ export default {
     const computeActive = (): number => {
       const rows = userRows()
       if (rows.length === 0) return -1
-      // 当前页面查看到的 user 消息：视口内离视口中央最近的一条
-      // （不是"最后一条经过参考线的"——那可能是已滚过的旧消息）。
-      const mid = window.innerHeight * 0.5
+      // 激活 = 视口内最顶部的那条 user 消息（阅读起点）。与跳转对齐：
+      // 点击节点跳转把目标行放到视口顶部（block:start），激活必须指向
+      // 那条（用"视口中央"会在跳转后指向下一条，造成不对齐）。
       let best = 0
-      let bestDist = Number.POSITIVE_INFINITY
+      let found = false
+      let bestTop = Number.POSITIVE_INFINITY
       for (let i = 0; i < rows.length; i++) {
         const top = rows[i]!.getBoundingClientRect().top
-        if (top >= window.innerHeight) break // 视口下方不可见
-        const dist = Math.abs(top - mid)
-        if (dist < bestDist) { bestDist = dist; best = i }
+        if (top >= 0 && top < bestTop) { bestTop = top; best = i; found = true }
       }
-      return best
+      return found ? best : rows.length - 1
     }
 
     const WINDOW = 11 // 超过则滑动窗口
