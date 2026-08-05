@@ -86,6 +86,8 @@ registry 插件是**消费者**：`inject: ['tasks']` 登记自己的后台任�
 
 完整机制与设计决策见 [registry client half 设计稿](registry-client-half-design.md)（已实现）。示例：`examples/greeter` 带可安装的 client half。
 
+**UI 挂载扩展方向**：client half 的 UI 目前只能填官方 slot hole 或自渲染（裸 DOM）。更通用的「官方维护渲染容器 + 插件填内容」（Obsidian 式）见 [client 通用渲染容器设计稿](generic-client-render-container-design.md)（未实现）。
+
 ## 与 pi-mono 插件的对比
 
 参考 [pi-mono](https://github.com/pi-mono) 的扩展机制做横向对比。pi 的插件是：**Harness Extensions**（`harness-v2.md`：events 观察 + hooks 拦截）与 `.pi/extensions/*.ts` 本地脚本（放文件即加载，无管理）。

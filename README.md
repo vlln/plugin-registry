@@ -12,6 +12,7 @@ DeepSeek Harness 的本地插件系统：清单协议、安装/启停、Web 管�
 | [集成到 dsh](docs/cookbook/integrating-into-dsh.md) | 复制包 + 补丁 + 组合启用，接入 DSH 源码环境 |
 | [分发插件](docs/cookbook/distributing-plugins.md) | tarball 分发与社区目录模式 |
 | [client half 设计稿](docs/registry-client-half-design.md) | client half 机制的设计与评审记录（已实现） |
+| [通用渲染容器设计稿](docs/generic-client-render-container-design.md) | client UI 的 Obsidian 式通用挂载容器（未实现） |
 | [文档标准](docs/AGENTS.md) | 文档分层、写作规则、字数预算 |
 
 ## 内容
