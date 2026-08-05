@@ -21,6 +21,8 @@ cp -r examples/greeter ./my-tool
 dsh plugin install ./my-tool && dsh plugin enable <publisher>/<name>
 ```
 
+进阶示例：`examples/loop` 演示命令 + 工具双形态（`/loop` 命令 + `loop` 工具 + `ctx.interval` 定时 + `agent.followup` 每轮驱动），需要定时循环能力时直接安装它：`dsh plugin install ./examples/loop && dsh plugin enable acme/loop`。
+
 ## 一个插件 = 清单 + Cordis 入口
 
 | 文件 | 必须 | 说明 |

@@ -1,0 +1,8 @@
+{
+  "id": "acme/loop",
+  "version": "0.1.0",
+  "main": "./index.mjs",
+  "description": "定时循环：/loop 命令 + loop 工具，按间隔向当前 agent 重复投递 prompt",
+  "engines": { "dsh": ">=0.0.1" },
+  "contributes": { "tools": ["loop"], "skills": [] }
+}
