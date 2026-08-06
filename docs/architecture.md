@@ -36,9 +36,9 @@
 
 插件在 `<dshHome>/plugins`（checkout 树外），标准 Node 裸名解析（从 import 文件向上找 node_modules）够不到 checkout——built 形态下 `import '@deepseek-ai/dsh-tools'` 会 `ERR_MODULE_NOT_FOUND`（源码形态靠 tsx paths 兜底，是开发期隐式红利，非契约）。
 
-机制：`<dshHome>/plugins/node_modules` 建**共享目录链接**指向 checkout 的 `node_modules`（`ensureDepsLink`：安装/挂载/启动扫描时确保，checkout 轮转后失效自动重建，Windows 用 junction）。链接是物理事实，任何运行形态（tsx 源码 / built 纯 Node）下 `@deepseek-ai/*`、`cordis` 及 checkout 依赖闭包内任意包都按标准解析命中。
+机制：`<dshHome>/plugins/node_modules` 建**共享目录链接**指向 checkout 的依赖闭包（`ensureDepsLink`：安装/挂载/启动扫描时确保，checkout 轮转后失效自动重建，Windows 用 junction）。目标**优先 pnpm 虚拟 store 公共层**（`checkout/node_modules/.pnpm/node_modules`——pnpm 默认隔离下非提升包如 node-pty/ws 与 workspace/vendor 包唯一全可见处），不存在时（扁平布局/自定义 hoist/非 pnpm）回退顶层 `node_modules`。链接是物理事实，任何运行形态（tsx 源码 / built 纯 Node）下 `@deepseek-ai/*`、`cordis` 及 checkout 依赖闭包内任意包都按标准解析命中。
 
-边界：链接**尽力而为**——不 import 官方包的插件无需它；解析不到 checkout 的部署（如单文件 bundle）跳过，不影响安装与挂载。插件**不能声明自己的 npm 依赖**（`dsh.plugin.json` 无 dependencies 字段）；可用依赖 = checkout 的依赖闭包。
+边界：链接**尽力而为**——不 import 官方包的插件无需它；解析不到 checkout 的部署（如单文件 bundle）跳过，不影响安装与挂载。插件**不能声明自己的 npm 依赖**（`dsh.plugin.json` 无 dependencies 字段）；可用依赖 = checkout 的依赖闭包（公共层暴露面即官方树自身闭包）。
 
 ## 能力面 vs 声明面（contributes）
 
@@ -80,6 +80,8 @@ registry 插件是**消费者**：`inject: ['tasks']` 登记自己的后台任�
 
 两条通道并存：**官方 client 插件**（`dsh-client-*` 包，随产品发布，进 Loader 树）与 **registry client half**（用户安装，运行时登记）。前者是产品结构，后者是用户扩展；同一能力建议先做官方包。
 
+**官方插件增量兼容**：官方格式插件（npm/cordis 包，bundle id = 包名）加一个 `dsh.plugin.json` 增量清单即可进 registry——id 用包名（`@scope/name`），bundle 零重构建，官方通道不受影响（非破坏）；同一插件两种安装方式**强制二选一**（`registerExternal` 拒绝与 Loader entry 同名，碰撞守卫），不会双挂载（互斥）。规范见 [官方插件增量兼容](official-plugin-incremental-compat.md)。
+
 ### registry client half 机制
 
 - **声明**：`dsh.plugin.json` 可选 `client` 对象（`main` 指向构建好的 bundle、`inject` 图元数据、`immediately` 预取标记）；`client.main` 在**安装时**校验存在（与 `manifest.main` 平行）。
@@ -90,7 +92,7 @@ registry 插件是**消费者**：`inject: ['tasks']` 登记自己的后台任�
 
 完整机制与设计决策见 [registry client half 设计稿](registry-client-half-design.md)（已实现）。示例：`examples/greeter` 带可安装的 client half。
 
-**UI 挂载扩展方向**：client half 的 UI 目前只能填官方 slot hole 或自渲染（裸 DOM）。统一扩展心智模型（一个 slot 体系 + 四种匹配 + 数据投影，场景驱动）见 [client UI 扩展统一模型](client-ui-extension-model.md)（未实现）；通用渲染容器（附加式 UI 标准化）见 [client 通用渲染容器设计稿](generic-client-render-container-design.md)（未实现）。
+**UI 挂载扩展方向**：client half 的 UI 挂载走两条官方通道——**官方 slot hole**（如 `conversation.input.dock` 等官方既有槽）或**插件自渲染**（裸 DOM / 自建通道）。统一扩展心智模型见 [client UI 扩展统一模型](client-ui-extension-model.md)（设计稿）；早期为示例打进官方树的缝（`useTasks`/`task/snapshot`、`ctx.ui.mount`、`sidebar.panel`、`conversation.chat.item`）已回退，示例插件（navbar/task-status/greeter）演示插件侧自造缝。
 
 ## 与 pi-mono 插件的对比
 

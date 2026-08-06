@@ -19,14 +19,14 @@
 
 ## 双仓库格局（防止混淆）
 
-- **机制件的家 = worktree 官方分支**：`dsh2026/test-vlln` 的 `feat/plugin-registry-mvp`。机制改动（缝、mount、数据投影）直接改官方源码并提交到该分支。
+- **机制件的家 = worktree 官方分支**：`dsh2026/test-vlln` 的 `feat/plugin-registry-mvp`。平台机制改动直接改官方源码并提交到该分支（当前纪律：示例的数据/渲染需求由插件自造缝承担，不打进官方树）。
 - **本仓库 = 验证与分发层**：示例验证机制、文档记录契约、patch/package 把机制交给外部构建者。
 - **机制迭代顺序**：worktree 官方分支落地 → 本仓库示例/文档同步 → **重新生成 patch**（见下）。
 
 ## patch 维护（关键约束）
 
 - patch 基于**官方快照**生成，基线推进后锚点漂移，需重新生成；生成命令见 [分发插件](docs/cookbook/distributing-plugins.md)。
-- **基线状态**：机制分支已对齐官方 0805 快照；`patches/` 当前仍基于 0804 快照，**待重新生成**（见 [CHANGELOG](CHANGELOG.md)「基线」段）。
+- **基线状态**：机制分支已对齐官方 0805 快照；`patches/` 已基于官方 0805 快照重建（30 文件，纯平台接线，见 [CHANGELOG](CHANGELOG.md)「基线」段）。
 - patch 只含 plugin-registry **核心机制**需要的官方改动；**具体插件的宿主依赖**（如某插件的 ui-workspace hole）由该插件仓库自带补丁提供，不入本补丁。
 
 ## 仓库结构

@@ -8,7 +8,7 @@ plugin-registry 的推进路线。状态标注：`待决策`（需先拍板形�
 |---|---|---|
 | **S4 动态卡片** | 待决策 | marker 识别（新 AssistantBlock kind vs fence 约定）+ keyed 渲染缝（有 slots 的层）。渲染缝有 ToolRow toolview 先例；marker 方案需拍板 |
 | 跨 session 全局看板 | 待决策 | 需 root 级视图环（现 `conversation.view` 是 session 作用域）；S5 委派台（工作区级）暂缓后，此作为同类工作区级机制件评估 |
-| task-status 输出投影 | 下轮 | `useTasks` 当前投影状态不含输出流（`task_output` 读取结果）——详情展示可增强 |
+| task-status 输出投影 | 下轮 | 轮询通道当前投影状态不含输出流（`task_output` 读取结果）——详情展示可增强 |
 
 ## 文档项（零代码）
 
@@ -19,9 +19,9 @@ plugin-registry 的推进路线。状态标注：`待决策`（需先拍板形�
 
 ## 官方基线持续对齐
 
-- worktree 分支随官方快照推进（已对齐 08-05）；后续官方快照发布时评估对齐（冲突面集中于我们改过的官方包：runtime/ui-conversation/ui-sidebar/tasks/apiproxy）
+- worktree 分支随官方快照推进（已对齐 08-05）；后续官方快照发布时评估对齐（冲突面集中于我们改过的官方包：apiproxy/client-modules/cli）
 
 ## 已决定不做（记录）
 
-- **S3 turn 折叠**：区间折叠（N item → 1 折叠头）需官方折叠容器（纯折叠策略 + 原生常驻 + CSS 收起），per-item 缝表达不了——M2 方案已决定不做，`examples/turn-fold` 移除
-- **S5 task board 委派台**：工作区级委派台（与 workspace 平级）暂不做；taskboard 示例移除（缝机制件保留）
+- **S3 turn 折叠**：区间折叠（N item → 1 折叠头）需官方折叠容器（纯折叠策略 + 原生常驻 + CSS 收起）——M2 方案已决定不做，`examples/turn-fold` 移除；早期 per-item 回退缝（`conversation.chat.item`）已随缝降级移除
+- **S5 task board 委派台**：工作区级委派台（与 workspace 平级）暂不做；taskboard 示例移除

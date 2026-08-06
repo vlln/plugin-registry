@@ -2,7 +2,7 @@
   "id": "vlln/task-status",
   "version": "0.2.0",
   "main": "./index.mjs",
-  "description": "示例插件：对话页对话框上方的后台任务状态条——验证 S2 场景（conversation.input.dock + useTasks 实时渲染）",
+  "description": "示例插件：对话页对话框上方的后台任务状态条——S2 场景的自造缝版（conversation.input.dock 官方槽 + Node 轮询路由，零官方改动）",
   "engines": {
     "dsh": ">=0.0.1"
   },

@@ -40,6 +40,13 @@ async function makeCheckout(name: string, withNodeModules: boolean): Promise<str
   return checkout
 }
 
+/** Add pnpm's virtual-store public layer (`.pnpm/node_modules`) to a checkout. */
+async function makePublicLayer(checkout: string): Promise<string> {
+  const publicLayer = join(checkout, 'node_modules', '.pnpm', 'node_modules')
+  await mkdir(publicLayer, { recursive: true })
+  return publicLayer
+}
+
 describe('resolveCheckout', () => {
   it('resolves the checkout from a module inside its tree', async () => {
     const checkout = await makeCheckout('checkout', true)
@@ -89,6 +96,35 @@ describe('ensureDepsLink', () => {
     await expect(ensureDepsLink(dshHome, checkout)).resolves.toBe(false)
     expect(existsSync(join(linkDir, 'keep.txt'))).toBe(true)
   })
+
+  it('prefers pnpm\u2019s virtual-store public layer when present', async () => {
+    const checkout = await makeCheckout('checkout', true)
+    const publicLayer = await makePublicLayer(checkout)
+    await expect(ensureDepsLink(dshHome, checkout)).resolves.toBe(true)
+    const link = join(pluginsRoot(dshHome), 'node_modules')
+    // Non-hoisted packages (node-pty/ws) and workspace packages are only
+    // visible through the public layer under pnpm's isolated layout.
+    expect(realpathSync(link)).toBe(realpathSync(publicLayer))
+  })
+
+  it('falls back to the top-level node_modules without a public layer', async () => {
+    const checkout = await makeCheckout('checkout', true)
+    await expect(ensureDepsLink(dshHome, checkout)).resolves.toBe(true)
+    expect(realpathSync(join(pluginsRoot(dshHome), 'node_modules')))
+      .toBe(realpathSync(join(checkout, 'node_modules')))
+  })
+
+  it('rebuilds to the new public layer after the checkout rotates', async () => {
+    const oldCheckout = await makeCheckout('old-checkout', true)
+    await makePublicLayer(oldCheckout)
+    await ensureDepsLink(dshHome, oldCheckout)
+    await rm(oldCheckout, { recursive: true, force: true })
+    const newCheckout = await makeCheckout('new-checkout', true)
+    const newPublicLayer = await makePublicLayer(newCheckout)
+    await expect(ensureDepsLink(dshHome, newCheckout)).resolves.toBe(true)
+    expect(realpathSync(join(pluginsRoot(dshHome), 'node_modules')))
+      .toBe(realpathSync(newPublicLayer))
+  })
 })
 
 describe('built-form dependency resolution', () => {
@@ -130,6 +166,35 @@ describe('built-form dependency resolution', () => {
     expect(probePlugin(entry)).toBe('FAILED')
     await expect(ensureDepsLink(dshHome, checkout)).resolves.toBe(true)
     // With the link, standard Node resolution reaches the checkout package.
+    expect(probePlugin(entry)).toBe('RESOLVED')
+  })
+
+  it('resolves a package visible only through the virtual-store public layer', async () => {
+    // The node-pty case: an ordinary dependency of an official package that
+    // pnpm never hoists to the top level — only the public layer has it.
+    const checkout = await makeCheckout('checkout', true)
+    const publicLayer = await makePublicLayer(checkout)
+    const ptyDir = join(publicLayer, 'node-pty')
+    await mkdir(ptyDir, { recursive: true })
+    await writeFile(join(ptyDir, 'package.json'), JSON.stringify({
+      name: 'node-pty',
+      version: '1.1.0',
+      type: 'module',
+      main: 'index.js',
+    }))
+    await writeFile(join(ptyDir, 'index.js'), 'export const spawn = () => ({})\n')
+
+    const pluginDir = join(dshHome, 'plugins', 'acme', 'terminal')
+    await mkdir(pluginDir, { recursive: true })
+    const entry = join(pluginDir, 'index.mjs')
+    await writeFile(entry, [
+      "import { spawn } from 'node-pty'",
+      'export default { name: "terminal", apply() {} }',
+      '',
+    ].join('\n'))
+
+    expect(probePlugin(entry)).toBe('FAILED')
+    await expect(ensureDepsLink(dshHome, checkout)).resolves.toBe(true)
     expect(probePlugin(entry)).toBe('RESOLVED')
   })
 })

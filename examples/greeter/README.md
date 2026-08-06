@@ -8,8 +8,8 @@
 |---|---|
 | `dsh.plugin.json` | 清单：身份、入口、兼容范围、`contributes.tools` 声明、`client.main` 声明 |
 | `index.mjs` | Node 侧 Cordis 插件入口：`inject: ['tools']` + `ctx.tools.register(...)` |
-| `client.js` | 浏览器端 bundle 产物（`window.__ModuleLoader__.load` 契约） |
-| `client/index.tsx` | client bundle 源码（`ctx.ui.mount` 渲染，tsdown 构建见下） |
+| `client.js` | 浏览器端 bundle（`window.__ModuleLoader__.load` 契约，手写等价物） |
+| `client/index.tsx` | client bundle 源码（纯 DOM 自渲染，tsdown 构建见下） |
 
 ## 安装与启用
 
@@ -19,7 +19,7 @@ dsh plugin enable acme/greeter          # 启用：挂载 greet 工具 + 登记 
 dsh plugin list                         # 看到 enabled acme/greeter@0.2.0
 ```
 
-启用后：模型可调用 `greet` 工具；Web 端刷新页面后，右下角出现「👋 greeter client half active」（经 `ctx.ui.mount({container:'overlay'})` 渲染进官方通用渲染容器——见 [通用渲染容器设计](../../docs/generic-client-render-container-design.md)）。
+启用后：模型可调用 `greet` 工具；Web 端刷新页面后，右下角出现「👋 greeter client half active」——插件**自渲染**（`createRoot` + `document.body.appendChild`），不依赖官方渲染容器。早期的官方 `ctx.ui` 通用渲染容器已从 plugin-registry 移除，本示例即"插件侧自造缝"的演示。
 
 ## 构建 client bundle
 

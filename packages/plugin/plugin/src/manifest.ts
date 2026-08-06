@@ -49,7 +49,16 @@ export const ManifestSchema: Schema<PluginManifest> = z.object({
   // The negative lookahead keeps the first segment off `node_modules`, which
   // would resolve through the shared dependency link into the checkout (see
   // pluginDir's guard — the schema is the earlier, louder failure).
-  id: z.string().pattern(/^(?!node_modules\/)[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*$/),
+  // Two id conventions coexist: the native `publisher/name` and the scoped
+  // npm package name `@scope/name` (the incremental-compat bridge for
+  // official-format plugins, whose client bundle id is their package name).
+  // Both stay exactly two slash-separated segments; segments are lowercase
+  // alphanumerics plus `-`/`.`, never `.`/`..`, `?`/`#`/`%`, or control
+  // chars (url contract and plugin-dir safety — see
+  // docs/official-plugin-incremental-compat.md).
+  id: z.string().pattern(
+    /^(?!node_modules\/)(?:@[a-z0-9][a-z0-9-.]*\/[a-z0-9][a-z0-9-.]*|[a-z0-9][a-z0-9-.]*\/[a-z0-9][a-z0-9-.]*)$/,
+  ),
   version: z.string(),
   main: z.string(),
   description: z.string().default(''),

@@ -34,7 +34,7 @@ cp -r packages/ui-plugin-manager DSH_MONOREPO/packages/client/
 git apply patches/dsh-plugin-registry.patch   # 在 DSH monorepo 根目录执行
 ```
 
-补丁基于官方 0805 快照生成，改动 84 个文件（CLI 子命令、apiproxy `plugins`/`task` 域、client-modules `registerExternal`、runtime `ctx.ui.mount` 容器 + `useTasks` 投影、ui-conversation `chat.item` 缝、tsconfig、组合挂载、测试与 README），验证可干净应用。基线更新导致锚点漂移时，`git apply --3way` 或手动对齐。本补丁只含 plugin-registry 核心机制需要的官方改动；具体插件各自的宿主依赖由各插件仓库自带补丁提供（如 dsh-subagent-tree 的 ui-workspace 会话行 hole 补丁在其仓库 `patches/` 下）。
+补丁基于官方 0805 快照生成，改动 30 个文件（CLI `dsh plugin` 子命令、apiproxy `plugins` 域、client-modules `registerExternal`、tsconfig、组合挂载、测试与 README——**纯平台接线**，不含示例级数据/渲染缝），验证可干净应用。基线更新导致锚点漂移时，`git apply --3way` 或手动对齐。本补丁只含 plugin-registry 核心机制需要的官方改动；具体插件各自的宿主依赖由各插件仓库自带补丁提供（如 dsh-subagent-tree 的 ui-workspace 会话行 hole 补丁在其仓库 `patches/` 下）。
 
 **验证点**：`git apply --check` 无输出（干净应用）；`git status` 显示改动文件数符合预期。
 

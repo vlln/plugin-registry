@@ -56,6 +56,31 @@ describe('parseManifest', () => {
       .toThrow(/id/)
   })
 
+  it('accepts a scoped npm package id (official-plugin incremental compat)', () => {
+    expect(parseManifest(JSON.stringify({ ...FULL_MANIFEST, id: '@dsh-external/dsh-web-terminal' }), 'dsh.plugin.json').id)
+      .toBe('@dsh-external/dsh-web-terminal')
+    expect(parseManifest(JSON.stringify({ ...FULL_MANIFEST, id: '@scope/foo.bar' }), 'dsh.plugin.json').id)
+      .toBe('@scope/foo.bar')
+  })
+
+  it('rejects malformed scoped ids', () => {
+    // More than two slash-separated segments is never a valid id.
+    expect(() => parseManifest(JSON.stringify({ ...FULL_MANIFEST, id: '@a/b/c' }), 'dsh.plugin.json'))
+      .toThrow(/id/)
+    // Empty scope or empty name segments.
+    expect(() => parseManifest(JSON.stringify({ ...FULL_MANIFEST, id: '@/name' }), 'dsh.plugin.json'))
+      .toThrow(/id/)
+    expect(() => parseManifest(JSON.stringify({ ...FULL_MANIFEST, id: '@scope/' }), 'dsh.plugin.json'))
+      .toThrow(/id/)
+    // Uppercase, dot segments, and url-breaker chars stay rejected.
+    expect(() => parseManifest(JSON.stringify({ ...FULL_MANIFEST, id: '@Scope/name' }), 'dsh.plugin.json'))
+      .toThrow(/id/)
+    expect(() => parseManifest(JSON.stringify({ ...FULL_MANIFEST, id: '@scope/..' }), 'dsh.plugin.json'))
+      .toThrow(/id/)
+    expect(() => parseManifest(JSON.stringify({ ...FULL_MANIFEST, id: '@scope/na?me' }), 'dsh.plugin.json'))
+      .toThrow(/id/)
+  })
+
   it('rejects a node_modules-first-segment id (would escape through the dependency link)', () => {
     expect(() => parseManifest(JSON.stringify({ ...FULL_MANIFEST, id: 'node_modules/tsx' }), 'dsh.plugin.json'))
       .toThrow(/id/)

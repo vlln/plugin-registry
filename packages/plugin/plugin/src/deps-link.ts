@@ -8,6 +8,12 @@
  * resolve with standard Node semantics in any runtime form (source under
  * tsx's paths map, or built under plain Node).
  *
+ * The link targets pnpm's virtual-store public layer (`.pnpm/node_modules`)
+ * when present — it is the only place where non-hoisted packages (ordinary
+ * dependencies like node-pty/ws) and workspace packages are all visible under
+ * pnpm's default isolated layout — and falls back to the top-level
+ * `node_modules` otherwise (flat layouts, custom hoist configs, non-pnpm).
+ *
  * The link is best-effort, not a contract: a plugin that never imports a
  * checkout package needs no link, and a deployment that cannot resolve a
  * checkout (e.g. a single-file bundle) skips it. A stale link (the checkout
@@ -67,16 +73,17 @@ export function resolveCheckout(entryUrl?: string): string | undefined {
 
 /**
  * Ensure the shared dependency link `<dshHome>/plugins/node_modules` exists
- * and points at the current checkout's `node_modules`. Idempotent: an
- * existing link that still resolves to the current target is kept; a stale
- * or missing link is rebuilt. Windows uses a directory junction (ordinary
- * symlinks need privilege).
+ * and points at the current checkout's dependency closure (pnpm's
+ * virtual-store public layer when present, else the top-level
+ * `node_modules`). Idempotent: an existing link that still resolves to the
+ * current target is kept; a stale or missing link is rebuilt. Windows uses a
+ * directory junction (ordinary symlinks need privilege).
  * @param dshHome - harness home whose registry gains the link.
  * @param checkout - the checkout to link against; defaults to the checkout
  *   that owns this module.
  * @returns whether the link is in place (false when no checkout is
- *   reachable, the checkout has no node_modules, or the link could not be
- *   created — the registry still works for plugins that never import
+ *   reachable, the checkout has no dependency closure, or the link could not
+ *   be created — the registry still works for plugins that never import
  *   checkout packages).
  */
 export async function ensureDepsLink(
@@ -84,7 +91,15 @@ export async function ensureDepsLink(
   checkout: string | undefined = resolveCheckout(import.meta.url),
 ): Promise<boolean> {
   if (checkout === undefined) return false
-  const target = join(checkout, 'node_modules')
+  // pnpm's virtual-store public layer (`.pnpm/node_modules`) holds the full
+  // transitive closure plus workspace/vendor symlinks — the only place where
+  // non-hoisted packages (e.g. node-pty, ws) and workspace packages are all
+  // visible under pnpm's default isolated layout. Prefer it when present;
+  // fall back to the top-level node_modules for flat layouts (node-linker
+  // hoisted), custom hoist configs, or non-pnpm installs.
+  const topTarget = join(checkout, 'node_modules')
+  const publicLayer = join(topTarget, '.pnpm', 'node_modules')
+  const target = existsSync(publicLayer) ? publicLayer : topTarget
   if (!existsSync(target)) return false
   const link = join(pluginsRoot(dshHome), 'node_modules')
   try {

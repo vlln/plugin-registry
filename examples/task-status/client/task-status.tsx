@@ -1,7 +1,10 @@
 // vlln/task-status 浏览器端 half：验证 S2 后台任务 UI——对话页对话框
 // （composer）上方的任务状态条。经 `conversation.input.dock`（list 槽，
-// 与 queue/todo 同 strip）注册，`useTasks`（task/snapshot 帧投影）实时
-// 渲染该会话的后台任务。
+// 与 queue/todo 同 strip，官方既有）注册。
+//
+// 数据不再依赖 useTasks / task/snapshot 推送帧（官方基线无此 API）：Node
+// half 注册只读任务路由，本组件每 1s 轮询并只渲染当前会话（ownerSession
+// 等于 InputZone.session.sessionId）的活跃任务——这是"插件自造缝"的示例。
 //
 // 仅对话页显示：对话流列 `[data-chat-flow=""]` 只存在于 Chat 视图（与
 // navbar 同一信号）——组件用 MutationObserver 检测其存在性，切到
@@ -24,6 +27,12 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'task-status': TaskStatusKey
   }
 }
+
+/** Node half 只读任务路由（与 examples/task-status/index.mjs 的 TASKS_PATH 一致）。 */
+const TASKS_PATH = '/plugins/vlln/task-status/tasks'
+
+/** 轮询间隔：活跃任务状态条不需要亚秒刷新。 */
+const POLL_MS = 1000
 
 const NS = 'task-status'
 const zh = {
@@ -65,15 +74,49 @@ const STATUS_META: Record<string, { color: string; glyph: string; label: string 
   failed: { color: 'var(--dsw-alias-state-error-primary)', glyph: '!', label: 'task.failed' },
 }
 
+/** Node half 返回的 wire 任务视图（ownerSession 为宿主 session id）。 */
+interface WireTask {
+  id: string
+  kind: string
+  label: string
+  status: 'running' | 'stopping' | 'completed' | 'killed' | 'failed'
+  detail?: string
+  startedAt: number
+  finishedAt?: number
+  ownerSession?: string
+}
+
+/** 会话级轮询 hook：每 POLL_MS 拉取 Node half 路由，返回该会话的活跃任务。 */
+function useSessionTasks(sessionId: string): WireTask[] {
+  const [tasks, setTasks] = useState<WireTask[]>([])
+  useEffect(() => {
+    let alive = true
+    const poll = async (): Promise<void> => {
+      try {
+        const res = await fetch(TASKS_PATH, { headers: { accept: 'application/json' } })
+        if (!res.ok) return
+        const data = (await res.json()) as { tasks?: WireTask[] }
+        if (alive && Array.isArray(data.tasks)) setTasks(data.tasks)
+      } catch {
+        // 瞬态网络错误：保持上一帧，下轮重试。
+      }
+    }
+    void poll()
+    const timer = setInterval(() => { void poll() }, POLL_MS)
+    return () => { alive = false; clearInterval(timer) }
+  }, [sessionId])
+  return tasks.filter(task => task.ownerSession === sessionId)
+}
+
 /**
  * 对话页对话框上方的后台任务状态条：仅 Chat 视图显示（`[data-chat-flow=""]`
- * 探针），`useTasks` 渲染该会话任务（running 高亮 + 展开逐条）。
+ * 探针），轮询该会话任务（running 高亮 + 展开逐条）。
  */
 export function TaskStatusBar(
   props: PropsRuntime<'conversation.input.dock'> & PropsLocale<'task-status'>,
 ): ReactNode {
-  const { t, useTasks } = props
-  const tasks = useTasks(s => s)
+  const { t, session } = props
+  const tasks = useSessionTasks(session.sessionId)
   const [inChat, setInChat] = useState(false)
   const [open, setOpen] = useState(false)
   const [expandedTask, setExpandedTask] = useState<string | null>(null)
@@ -91,7 +134,7 @@ export function TaskStatusBar(
   }, [])
 
   if (!inChat) return null
-  // 只显示活跃任务：settled（completed/killed/failed）随终态帧到达即消失。
+  // 只显示活跃任务：settled（completed/killed/failed）到达即消失。
   const active = tasks.filter(task => task.status === 'running' || task.status === 'stopping')
   const running = active.filter(task => task.status === 'running').length
   if (active.length === 0) return null
@@ -103,7 +146,7 @@ export function TaskStatusBar(
     <div
       style={{
         display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '4px 5px 4px 12px',
-        cursor: tasks.length > 1 ? 'pointer' : 'default',
+        cursor: active.length > 1 ? 'pointer' : 'default',
       }}
       onClick={active.length > 1 ? () => setOpen(v => !v) : undefined}
     >

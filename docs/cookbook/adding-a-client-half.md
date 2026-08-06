@@ -73,7 +73,7 @@ client half 是浏览器端**完整 Cordis 插件**（`apply(ctx)` 在浏览器�
 
 **关键认知**：client half **不局限于填 hole**——`examples/greeter` 零 slot 依赖，`body.appendChild` 画标记。「改官方 UI 结构」（往官方组件树内部插入）才受限于官方预留的 hole——所有 client 插件（官方包同样）的通用边界；「新增自己的 UI/行为」完全自由。选型：嵌入官方树内部 → 填 hole；只要自己的可见表面 → 自渲染。
 
-**hole 缺失时**：`ctx.slots.register` 类型与运行时都要求 hole 存在。官方树未声明期望的 hole（如 0804 原无 `sidebar.workspaces.sessionRow`）时，填 hole 的组件不注册——两个补救：由依赖该 hole 的**插件项目自带补丁**补声明（如 dsh-subagent-tree 仓库 `patches/`；plugin-registry 补丁不含插件特定改动），或改用自渲染。
+**hole 缺失时**：`ctx.slots.register` 类型与运行时都要求 hole 存在。官方树未声明期望的 hole（如 ui-workspace 至今无 `sidebar.workspaces.sessionRow`）时，填 hole 的组件不注册——两个补救：由依赖该 hole 的**插件项目自带补丁**补声明（如 dsh-subagent-tree 仓库 `patches/`；plugin-registry 补丁不含插件特定改动），或改用自渲染。
 
 ## 契约要点
 
@@ -84,44 +84,36 @@ client half 是浏览器端**完整 Cordis 插件**（`apply(ctx)` 在浏览器�
 
 ## 从官方 client 包转 registry 形态
 
-已有官方 client 插件（`@deepseek-ai/dsh-client-*` 双面包，Loader 树通道）想额外提供 registry 发布形态时，用本节流程。已实测实例：`dsh-subagent-tree` 的 `registry/` 目录（[仓库](https://github.com/dsh-external/dsh-subagent-tree)）。
+已有官方 client 插件（`@deepseek-ai/dsh-client-*` 双面包，Loader 树通道）想额外提供 registry 发布形态时，用**增量兼容**：加一个 `dsh.plugin.json` 增量清单即可，**bundle 零重构建**（规范见 [官方插件增量兼容](../official-plugin-incremental-compat.md)）。已实测实例：`dsh-subagent-tree` 的 `registry/` 目录（[仓库](https://github.com/dsh-external/dsh-subagent-tree)）。
 
-### 官方 cordis 标准包形态与核心冲突
+### 增量清单
 
-官方 client 包是**双面 npm 包**：Node half（包 `main`，常为空 `apply`）+ Client half（`exports["./client"]` + `dshClient` 声明）。构建用 `clientBundle(包名, libEntry)`，**banner id = 包名**。
+```json
+{
+  "id": "@deepseek-ai/dsh-subagent-tree",
+  "version": "0.1.0",
+  "main": "./lib/index.js",
+  "client": {
+    "main": "./lib/client.js",
+    "inject": ["@deepseek-ai/dsh-client-locale", "@deepseek-ai/dsh-client-runtime", "@deepseek-ai/dsh-client-ui-primitives", "@deepseek-ai/dsh-client-ui-slots"]
+  }
+}
+```
 
-**核心冲突**：registry 插件 id 必须匹配 `publisher/name`（无 `@`）；官方包名含 `@` 过不了校验。所以 registry 形态必须**单独构建**——`clientBundle` 的 id 换成 registry 插件 id。
+- **id 用 npm 包名**（含 `@`）：registry 现在接受 scoped 包名 id，`bundle 内 ModuleLoader id === 增量清单 id === registry 插件 id` 三者合一，`arrive()` 校验天然成立——**官方构建的 bundle 原样可用，不需要单独构建**。
+- `version` 必填，抄 `package.json`；`main` 指向 Node half 构建产物；`client.inject` 平移原 `dshClient.inject`。
+- **互斥边界**：同一插件两种安装方式强制二选一——若插件已在官方 Loader 树（`config.yaml` 启用），registry `enable` 会被碰撞守卫拒绝（`registerExternal` 拒绝与 Loader entry 同名），请走官方通道；反之亦然。
 
-### 假设 workflow（以 subagent-tree 为实例）
+### 组装发布目录
 
-1. **定 registry id**：`<publisher>/<name>`，如 `vlln/subagent-tree`。
-2. **建 `dsh.plugin.json`**：
-   ```json
-   {
-     "id": "vlln/subagent-tree",
-     "version": "0.1.0",
-     "main": "./index.mjs",
-     "client": {
-       "main": "./client.js",
-       "inject": ["@deepseek-ai/dsh-client-locale", "@deepseek-ai/dsh-client-runtime", "@deepseek-ai/dsh-client-ui-primitives", "@deepseek-ai/dsh-client-ui-slots"]
-     }
-   }
-   ```
-   - `client.inject` 平移原 `dshClient.inject`；`main` 指向 Node half 的 registry 版（纯 UI 插件用空 `apply` 函数插件）。
-3. **在 DSH monorepo 内构建 registry 版 bundle**（`@deepseek-ai/*` 需 workspace 解析）：staging 复制包进 `packages/client/`，保留原 `tsconfig.json`；覆盖 `tsdown.config.ts` 为 `clientBundle('vlln/subagent-tree', ['lib/types/index.js', 'lib/types/invariant.js'])`；`npx tsc -b` 产 `lib/types`（hole 类型错误只影响 dts）→ `pnpm --filter <包名> run bundle`。
-4. **组装发布目录**：`client.js`（+`.map`）+ `index.mjs`（函数插件 Node half）+ `dsh.plugin.json`。
-5. **验证**（真实 web 组合）：`dsh plugin install ./registry && dsh plugin enable vlln/subagent-tree`；检查 `__DSH_BOOT__` 含该行、`/plugins/vlln/subagent-tree/client.js` 200、bundle 导出 `inject`+`apply`、所需模块全在平台模块表；disable 后行移除。
+`client.js`（官方构建产物，原样）+ `lib/index.js`（Node half）+ `dsh.plugin.json`（增量清单）+ `package.json`（原样，官方通道仍需）。
 
-### 与「从零写 client half」的差异
+### 验证（真实 web 组合）
 
-| | 从零写（greeter） | 转官方包（subagent-tree） |
-|---|---|---|
-| bundle 来源 | 手写或新建构建 | **复用官方 tsdown 构建，只换 id** |
-| 依赖面 | 尽量少 | 官方包原有依赖全部继承 |
-| 构建环境 | 可独立 | **必须在 monorepo 内**（`@deepseek-ai/*` workspace 解析） |
+`dsh plugin install ./registry && dsh plugin enable @deepseek-ai/dsh-subagent-tree`（**前提：该插件未在官方 Loader 树启用**）；检查 `__DSH_BOOT__` 含该行、`/plugins/@deepseek-ai/dsh-subagent-tree/client.js` 200、bundle 导出 `inject`+`apply`、所需模块全在平台模块表；disable 后行移除。
 
 ### 注意事项
 
-- **react 被 require 正常**：官方 client 包 bundle 同样 require `react`——react 是平台模块表成员，非 registry 化问题。
-- **官方通道不动**：转换是「新增发布形态」，原 `dsh-client-*` 包与 Loader 树通道保持原样，两种形态并存。
-- **功能依赖不变**：registry 化只改安装/管理形态；组件注册仍需宿主提供官方扩展 hole（如 `sessionRow`）——该 hole 由**插件项目自带补丁**提供（如 dsh-subagent-tree `patches/`），不属于 plugin-registry 补丁。subagent-tree 实测：bundle 加载、apply 执行、组件注册、CSS 注入均成功。
+- **官方通道不动**：转换是「新增发布形态」，原 `dsh-client-*` 包与 Loader 树通道保持原样；两种形态的 bundle 是同一份产物（增量清单不改 bundle）。
+- **功能依赖不变**：registry 化只改安装/管理形态；组件注册仍需宿主提供官方扩展 hole（如 `sessionRow`）——该 hole 由**插件项目自带补丁**提供（如 dsh-subagent-tree `patches/`），不属于 plugin-registry 补丁。
+- **依赖闭包**：registry 通道的副本从 checkout node_modules 解析依赖（deps-link），官方包依赖需在官方树闭包内。

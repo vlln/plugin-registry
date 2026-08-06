@@ -49,7 +49,7 @@ unregisterExternal(id: string): void
 - **路由零改动**：`serveBundle` 按 `/plugins/<id>/client.js` 查 `clientPath(id)` 读文件——id 含斜杠（`acme/greeter`）与 scoped 包名同构，`pathname.slice(prefix.length, -suffix.length)` 已支持（现有注释即声明此意）。
 - **注入零改动**：`injectBootManifest` 读 `this.composed`，外部行与扫描行一样进入 `__DSH_BOOT__`。
 - **依赖方向**：`@deepseek-ai/dsh-plugin`（第三方 registry 包）调用 `@deepseek-ai/dsh-client-modules`（官方包）——官方包不被第三方反向依赖，方向正确。
-- **id 碰撞不变式**：manifest id regex 为 `^[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*$`（registry `manifest.ts:31`，每段首字符必须字母数字），不含 `@`/点，与官方 loader entry 名（npm 包名）不可能碰撞——作为 `registerExternal` 的注释不变式，无需防御代码（评审 N4：入口仍按此 regex 校验 id 形状，防 `..`/`?` 破坏 url 契约）。
+- **id 碰撞守卫**：manifest id 接受原生 `publisher/name` 与 scoped npm 包名 `@scope/name`（[增量兼容](official-plugin-incremental-compat.md)）——后者与 loader entry 名可能同名，`registerExternal` 拒绝 `ctx.loader.entries()` 中的名字（防扫描 delete/重建互踩与 Node half 双挂载），官方插件走 Loader 树，登记失败走 mount 回滚（N4：regex 仍防 `..`/`?` 破坏 url 契约）。
 - **时序**：页面加载时 `__DSH_BOOT__` 已固定；运行时 register 的变更对**已加载页面**不生效，下次页面刷新后可见（评审 N6：dev 下 HMR 只对**已在图中**的行生效，运行中新增的行仍需刷新）——MVP 接受「启用后刷新生效」。
 
 ### 补登记：host 缺席时怎么办（评审 R1）
