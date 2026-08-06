@@ -6,14 +6,14 @@ description: >
   @deepseek-ai/dsh-plugin): scaffold a plugin root, write the Cordis entry,
   keep contributes in sync, add an optional browser client half, then
   install/enable/verify it with the dsh CLI. Also covers converting an
-  existing official @deepseek-ai/dsh-client-* package into a registry
-  release form. This is the community plugin-registry skill — not the
-  official harness cordis toolset — for creating registry plugins that
-  live under <dshHome>/plugins.
+  existing official npm/cordis plugin into a registry release form via the
+  incremental-compat manifest (one dsh.plugin.json, no rebuild). This is the
+  community plugin-registry skill — not the official harness cordis toolset —
+  for creating registry plugins that live under <dshHome>/plugins.
 license: BSD-3-Clause
 metadata:
   author: dsh-external/plugin-registry
-  version: "0.2.0"
+  version: "0.3.0"
 requires:
   bins:
     - dsh
@@ -33,8 +33,8 @@ additionally ship a browser client half (see Stage 6).
 - The user wants to build a new plugin for dsh (tool, event listener, service,
   command, prompt, TUI overlay).
 - The user wants a plugin with browser UI / client-side behavior (client half).
-- The user wants to convert an existing official `@deepseek-ai/dsh-client-*`
-  package into a registry-managed release form.
+- The user wants to convert an existing official npm/cordis plugin into a
+  registry-managed release form (incremental compat, no rebuild).
 - The user asks for a scaffold / example / template of a registry plugin.
 - The user has a plugin that fails to enable and the cause is a contributes
   mismatch.
@@ -43,8 +43,11 @@ additionally ship a browser client half (see Stage 6).
 
 ### Stage 1: Pick the id
 
-Plugin id is `publisher/name` (must contain a slash; the segment after it is
-the directory name). `publisher` is the author's namespace, `name` the plugin.
+Plugin id is either `publisher/name` (native form) or a scoped npm package
+name `@scope/name` (incremental-compat form for official plugins whose bundle
+id is their package name). Both are exactly two slash-separated segments of
+lowercase alphanumerics plus `-`/`.`, never `.`/`..` or `?`/`#`/`%`. The
+segment after the slash is the directory name under `<dshHome>/plugins`.
 
 ### Stage 2: Scaffold the root
 
@@ -136,28 +139,33 @@ at enable. Three pieces:
 **Checkpoint:** after enable, `curl /plugins/<id>/client.js` returns 200 and
 the boot graph contains the id.
 
-### Stage 7: Convert an official client package (optional)
+### Stage 7: Convert an official plugin (incremental compat, optional)
 
-To add a registry release form to an existing `@deepseek-ai/dsh-client-*`
-package (dual-face npm package, Loader-tree channel), the registry form needs
-a **separate build**: the official bundle's banner id is the package name,
-which usually contains `@` and fails the registry `publisher/name` id check.
-Workflow (proven on `dsh-subagent-tree`):
+An existing official plugin (npm/cordis package with `dshClient` +
+`exports["./client"]`, Loader-tree channel) gains a registry release form by
+adding **one `dsh.plugin.json` — no rebuild**: the manifest id is the package
+name (`@scope/name`), which equals the bundle's ModuleLoader id, so the
+browser `arrive()` check holds and the same artifacts serve both channels
+(spec: `docs/official-plugin-incremental-compat.md`; proven on
+`dsh-web-terminal`).
 
-1. Pick a registry id (`publisher/name`, no `@`).
-2. Write `dsh.plugin.json` with `client.inject` mirroring the package's
-   `dshClient.inject` and `main` pointing at a function-plugin Node half
-   (empty apply for pure-UI plugins).
-3. Build inside a DSH monorepo: staging-copy the package under
-   `packages/client/`, override `tsdown.config.ts` with
-   `clientBundle('<registry-id>', ['lib/types/index.js', 'lib/types/invariant.js'])`,
-   run `tsc -b` (type errors from missing official holes only affect dts),
-   then bundle.
-4. Assemble the release dir (`client.js` + Node entry + manifest), install,
-   enable, and verify against the real web composition.
+1. Write `dsh.plugin.json`: `id` = package name, `version` copied from
+   `package.json`, `main` pointing at the existing Node half build,
+   `client.main` at the existing client bundle, `client.inject` mirroring
+   `dshClient.inject`.
+2. If the plugin's install relies on an npm `postinstall` side effect (e.g.
+   fixing a native binary's executable bit, like node-pty's macOS
+   `spawn-helper`), registry installs do not run postinstall — add a small
+   entry module that performs the fix then re-exports the plugin body, and
+   point `main` at it (see `dsh-web-terminal`'s `registry.mjs`).
+3. Install, enable, verify against the real web composition.
 
-**Checkpoint:** the registry bundle loads from `/plugins/<id>/client.js`,
-exports inject + apply, and requires only platform-table modules.
+**Checkpoint:** the boot graph contains the package-name id and
+`/plugins/<id>/client.js` serves the **original** bundle (no rebuild).
+
+**Boundary:** the two channels are mutually exclusive — if the plugin is
+already enabled via the Loader tree, the registry enable is rejected by the
+`registerExternal` collision guard; pick one channel per deployment.
 
 ## Gotchas
 
@@ -175,7 +183,12 @@ exports inject + apply, and requires only platform-table modules.
   field.
 - **bundle id must equal the plugin id.** `window.__ModuleLoader__.load` id
   and the manifest `id` must match, or the browser-side `arrive()` check
-  fails. An official package name with `@` is never a valid registry id.
+  fails. Under incremental compat the plugin id **is** the package name
+  (`@scope/name`), so an official bundle works as-is.
+- **Official plugins and registry are mutually exclusive per deployment.**
+  `registerExternal` rejects an id that collides with a Loader entry — a
+  plugin already enabled via the Loader tree cannot also be registry-enabled
+  (the Node half would mount twice). Pick one channel.
 - **`client.inject` vs bundle `inject`.** The manifest `client.inject` is
   graph metadata; the fiber's actual service waits come from the bundle's own
   exported `inject`. Change deps in the bundle, not the manifest.
@@ -191,7 +204,8 @@ A complete, installable example lives in this repo at `examples/greeter/`
 (manifest + Node entry + hand-written client half); `examples/README.md` is
 the human-facing from-scratch guide; `examples/greeter/README.md` documents
 the client bundle contract. The full client-half mechanics and design live in
-`docs/registry-client-half-design.md`; the official-package conversion
-workflow is detailed in `docs/cookbook/adding-a-client-half.md`. For registry
+`docs/registry-client-half-design.md`; the official-package conversion is
+covered by `docs/official-plugin-incremental-compat.md` (spec) and
+`docs/cookbook/adding-a-client-half.md` (workflow). For registry
 mechanics (index, lock, rollback) read `packages/plugin/plugin/src/registry.ts`
 and its consistency tests.
