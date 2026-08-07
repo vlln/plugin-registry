@@ -4,12 +4,16 @@
 // 可用工具调整或停止）/ 内置维护 prompt。
 //
 // 边界：会话作用域——循环活在当前 harness 进程，随进程退出消失，不跨重启
-// 持久化（与 Claude Code /loop 一致）。registry 插件不在 Loader 树，无
-// client bundle，本插件纯 Node 侧行为。
+// 持久化（与 Claude Code /loop 一致）。client half 经 conversation.input.dock
+// 槽显示活动 loop 状态条（与官方 goal / task-status 同一 dock 家族），数据
+// 由本文件注册的只读路由提供。
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 
 const PLUGIN_ID = 'acme/loop'
+
+/** client half 轮询的活动 loop 列表路由（与 client/index.tsx 的 LOOPS_PATH 一致）。 */
+export const LOOPS_PATH = '/plugins/acme/loop/loops'
 
 // 内置维护 prompt（bare `/loop` 用），对齐 Claude Code 文档描述的三件事。
 const MAINTENANCE_PROMPT = [
@@ -42,11 +46,45 @@ function formatInterval(ms) {
 export default {
   name: 'loop',
   // agents 定位/校验当前 agent；commands 注册 /loop；tools 注册 loop 工具；
-  // timer 提供 ctx.interval（生命周期管理的定时器）。
-  inject: ['agents', 'commands', 'tools', 'timer'],
+  // timer 提供 ctx.interval（生命周期管理的定时器）；httpServer 提供只读
+  // 状态路由（client half 轮询）。
+  inject: ['agents', 'commands', 'tools', 'timer', 'httpServer'],
   apply(ctx) {
-    // agentId -> { agent, prompt, intervalMs, dispose }
+    // agentId -> { agent, prompt, intervalMs, lastDeliveredAt, dispose }
     const loops = new Map()
+
+    // client half 轮询的活动 loop 列表：按 sessionId 过滤（agent.id === sessionId）。
+    ctx.effect(() => ctx.httpServer.register({
+      kind: 'exact',
+      path: LOOPS_PATH,
+      handler: async (req, res) => {
+        try {
+          const url = new URL(req.url ?? '/', 'http://dsh.internal')
+          const sessionId = url.searchParams.get('sessionId') ?? ''
+          const now = Date.now()
+          const rows = []
+          for (const [id, state] of loops) {
+            if (sessionId !== '' && id !== sessionId) continue
+            const nextTick = state.lastDeliveredAt === undefined
+              ? now
+              : state.lastDeliveredAt + state.intervalMs
+            rows.push({
+              agentId: id,
+              prompt: state.prompt,
+              intervalMs: state.intervalMs,
+              intervalText: formatInterval(state.intervalMs),
+              nextTickAt: nextTick,
+            })
+          }
+          res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
+          res.end(JSON.stringify({ loops: rows }))
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          res.writeHead(500, { 'content-type': 'application/json; charset=utf-8' })
+          res.end(JSON.stringify({ error: message }))
+        }
+      },
+    }), 'loop: status route')
 
     function stopLoop(agent) {
       const state = loops.get(agent.id)
@@ -62,6 +100,7 @@ export default {
         agent,
         prompt,
         intervalMs,
+        lastDeliveredAt: undefined,
         dispose: undefined,
       }
       // 每 tick：agent 已销毁则停止；忙则跳过本轮（不堆积 inbox）；
@@ -74,6 +113,7 @@ export default {
           return
         }
         if (agent.status !== 'idle') return
+        state.lastDeliveredAt = Date.now()
         agent.followup(createUserMessage({
           content: [{ type: 'text', text: state.prompt }],
           source: { kind: 'plugin', plugin: PLUGIN_ID },

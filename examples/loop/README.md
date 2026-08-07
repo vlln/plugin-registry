@@ -39,6 +39,11 @@ dsh registry enable acme/loop
 - 定时 = `ctx.interval()`（vendored timer，生命周期管理的定时器，返回 disposer）；`setInterval` 首个 tick 要等一个完整间隔，故启动时**立即投递第一轮**（对齐 Claude Code `/loop`「立即开始 + 周期重复」），之后按间隔周期投递
 - 调度纪律：agent 忙则跳过本轮（不堆积 inbox）；agent 销毁则自动停止循环
 - 命令定位会话 = `CommandInvocation.agent`；工具定位会话 = `ctx.agents.currentInitiator()`
+- **状态条（client half）**：注入官方 `conversation.input.dock` 槽（与 goal / task-status 同一 dock 家族），Node half 注册只读路由 `/plugins/acme/loop/loops?sessionId=` 暴露活动循环（间隔 + prompt + 下次 tick），client 每 1s 轮询并只渲染当前会话——有循环则显示「🔁 loop: 每 5m — prompt · 下次 23s」，无则隐藏。轮询避免推帧依赖，零官方改动。
+
+## 构建 client bundle
+
+`client.js` 是 `client/index.tsx` 的手写等价物（`window.__ModuleLoader__.load({ id, factory })` 格式，同 examples/navbar / task-status 模式）；改 TSX 后需同步手写 JS 产物（生产用 bundler 生成）。
 
 ## 与官方 /goal 的关系
 
@@ -47,5 +52,5 @@ dsh registry enable acme/loop
 ## 边界
 
 - **会话作用域**：循环活在当前 harness 进程，随进程退出消失，不跨重启持久化（与 Claude Code `/loop` 一致）
-- **Node 侧行为**：registry 插件不在 Loader 树、无 client bundle，本插件不涉及浏览器
+- **状态条仅进程内可见**：client half 轮询 Node half 内存状态，重启后状态条与循环一起消失（不跨重启持久化）
 - **间隔是下限**：忙碌 agent 跳过 tick，实际轮次间隔 ≥ 配置间隔
