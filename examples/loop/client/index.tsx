@@ -45,7 +45,8 @@ const en = {
   'next': 'next {countdown}',
 } satisfies Record<string, string>
 
-/** 布局变量对齐官方 dock 家族（ConversationRoot.module.css / GoalBar）。 */
+/** 布局变量对齐官方 dock 家族（ConversationRoot.module.css / GoalBar / QueueDock）。 */
+const SIDE_CLEARANCE = 'var(--dsh-composer-side-clearance, 16px)'
 const DOCK_INSET = 'var(--dsh-composer-dock-inset, 8px)'
 const CARD_MAX = 'var(--dsh-composer-card-max-width, 780px)'
 
@@ -117,23 +118,31 @@ export function LoopBar(
   const countdownText = countdown > 0 ? `${countdown}s` : 'now'
 
   return (
-    <div
-      data-loop-bar=""
-      style={{
-        boxSizing: 'border-box',
-        display: 'flex', alignItems: 'center', gap: 10,
-        width: '100%',
-        maxWidth: `calc(${CARD_MAX} - 4 * ${DOCK_INSET})`,
-        height: 36,
-        margin: '0 auto',
-        padding: '4px 12px',
-        border: '1px solid var(--dsw-alias-border-l1)',
-        borderRadius: 12,
-        background: 'var(--dsw-specific-tip)',
-        fontSize: 13,
-        fontFamily: 'system-ui',
-      }}
-    >
+    // 双层 dock 结构（对齐官方 GoalBar / QueueDock）：外层 dock 列负责与
+    // 同槽卡片同宽同基准（card cap 减 4 inset，居中），内层 bar 满宽限 max。
+    // 直接用 width:100% 会与 queue/todo 卡片的宽度基准错位干涉。
+    <div data-loop-dock="" style={{
+      boxSizing: 'border-box',
+      width: `calc(100% - 2 * ${SIDE_CLEARANCE} - 4 * ${DOCK_INSET})`,
+      margin: '0 auto',
+    }}>
+      <div
+        data-loop-bar=""
+        style={{
+          boxSizing: 'border-box',
+          display: 'flex', alignItems: 'center', gap: 10,
+          width: '100%',
+          maxWidth: `calc(${CARD_MAX} - 4 * ${DOCK_INSET})`,
+          height: 36,
+          margin: '0 auto',
+          padding: '4px 12px',
+          border: '1px solid var(--dsw-alias-border-l1)',
+          borderRadius: 12,
+          background: 'var(--dsw-specific-tip)',
+          fontSize: 13,
+          fontFamily: 'system-ui',
+        }}
+      >
       {/* 活动指示：ongoing 像素点 + 循环 icon */}
       <span style={{ display: 'inline-flex', flex: 'none', alignItems: 'center', gap: 8 }}>
         <StateDot state="ongoing" size={10} />
@@ -159,6 +168,7 @@ export function LoopBar(
       <span style={{ flex: 'none', fontSize: 12, lineHeight: '20px', color: 'var(--dsw-alias-label-caption)', whiteSpace: 'nowrap' }}>
         {loop.intervalText} · {t('next', { countdown: countdownText })}
       </span>
+      </div>
     </div>
   )
 }

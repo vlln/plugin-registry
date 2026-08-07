@@ -22,6 +22,7 @@ window.__ModuleLoader__.load({
 			"active": "Looping",
 			"next": "next {countdown}"
 		};
+		const SIDE_CLEARANCE = "var(--dsh-composer-side-clearance, 16px)";
 		const DOCK_INSET = "var(--dsh-composer-dock-inset, 8px)";
 		const CARD_MAX = "var(--dsh-composer-card-max-width, 780px)";
 		function useSessionLoops(sessionId) {
@@ -64,7 +65,17 @@ window.__ModuleLoader__.load({
 			if (loop === undefined) return null;
 			const countdown = countdownTo(loop.nextTickAt);
 			const countdownText = countdown > 0 ? countdown + "s" : "now";
+			// 双层 dock 结构（对齐官方 GoalBar / QueueDock）：外层 dock 列负责与
+			// 同槽卡片同宽同基准（card cap 减 4 inset，居中），内层 bar 满宽限 max。
+			// 直接用 width:100% 会与 queue/todo 卡片的宽度基准错位干涉。
 			return react.createElement("div", {
+				"data-loop-dock": "",
+				style: {
+					boxSizing: "border-box",
+					width: "calc(100% - 2 * " + SIDE_CLEARANCE + " - 4 * " + DOCK_INSET + ")",
+					margin: "0 auto"
+				}
+			}, react.createElement("div", {
 				"data-loop-bar": "",
 				style: {
 					boxSizing: "border-box", display: "flex", alignItems: "center", gap: 10,
@@ -87,7 +98,7 @@ window.__ModuleLoader__.load({
 					loop.prompt),
 				// 间隔 + 倒计时
 				react.createElement("span", { style: { flex: "none", fontSize: 12, lineHeight: "20px", color: "var(--dsw-alias-label-caption)", whiteSpace: "nowrap" } },
-					loop.intervalText + " · " + t("next", { countdown: countdownText })));
+					loop.intervalText + " · " + t("next", { countdown: countdownText }))));
 		}
 		const inject = ["slots", "locale"];
 		function apply(ctx) {
