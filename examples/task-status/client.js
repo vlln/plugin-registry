@@ -144,7 +144,8 @@ window.__ModuleLoader__.load({
 				return react.createElement("div", { key: task.id }, line, details);
 			};
 			const header = react.createElement("div", {
-				style: { display: "flex", alignItems: "center", gap: 6, height: 36, padding: "4px 5px 4px 12px", cursor: active.length > 1 ? "pointer" : "default" },
+				// 高度由内容撑开（对齐官方 TodoPanel：上下 6px + 24px 行高 + border ≈ 38px）。
+				style: { display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", cursor: active.length > 1 ? "pointer" : "default" },
 				onClick: active.length > 1 ? () => setOpen(v => !v) : undefined
 			}, react.createElement("span", { style: { width: 16, fontSize: 14, lineHeight: "16px", textAlign: "center", color: "var(--dsw-alias-label-tertiary)" } }, "⚙"),
 				react.createElement("span", { style: { flex: 1, fontSize: 13, lineHeight: "24px", fontWeight: 500, color: "var(--dsw-alias-label-primary)" } }, t("status.running", { count: running })),

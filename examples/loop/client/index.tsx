@@ -133,9 +133,11 @@ export function LoopBar(
           display: 'flex', alignItems: 'center', gap: 10,
           width: '100%',
           maxWidth: `calc(${CARD_MAX} - 4 * ${DOCK_INSET})`,
-          height: 36,
           margin: '0 auto',
-          padding: '4px 12px',
+          // 高度由内容撑开（对齐官方 TodoPanel：body padding 上下 6px +
+          // 24px 行高 + border ≈ 38px），不设固定 height——固定 height 会
+          // 与 To-dos 卡片的实际高度产生 2px 级偏差。
+          padding: '6px 12px',
           border: '1px solid var(--dsw-alias-border-l1)',
           borderRadius: 12,
           background: 'var(--dsw-specific-tip)',

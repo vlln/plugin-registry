@@ -187,7 +187,11 @@ export function TaskStatusBar(
   const header = (
     <div
       style={{
-        display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '4px 5px 4px 12px',
+        display: 'flex', alignItems: 'center', gap: 6,
+        // 高度由内容撑开（对齐官方 TodoPanel body：上下 6px + 24px 行高 +
+        // border ≈ 38px）；固定 height:36 + 上下 padding 会叠成 46px，与
+        // To-dos 卡片高度不一致。
+        padding: '6px 12px',
         cursor: active.length > 1 ? 'pointer' : 'default',
       }}
       onClick={active.length > 1 ? () => setOpen(v => !v) : undefined}
