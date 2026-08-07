@@ -9,7 +9,7 @@
 - `data-time-hover-root` + `[class*="bubble"]` —— user 消息行（0806 起 UserStyleBubble：data-time-hover-root 是消息容器共有属性，气泡结构是 user 专属；`data-chat-flow-kind` 已移除）
 - `data-chat-anchor-key="node:<seq>"` —— 消息锚点
 
-本插件**纯 DOM 自渲染**：扫描 `[data-time-hover-root]` 行中非 pending-steering 且含气泡（`[class*="bubble"]`）的 user 行渲染导航点，点击 `scrollIntoView` 跳转。**零数据通道依赖**，只依赖官方锚点契约（这是设计文档要验证的关键点）。
+本插件**纯 DOM 自渲染**：扫描 `[data-time-hover-root]` 行中非 pending-steering 且含气泡（`[class*="bubble"]`）的 user 行渲染导航点，点击**手动 rAF 缓动滚动**（每帧续 wheel 起源，防官方 follow 拉回）。**零数据通道依赖**，只依赖官方锚点契约（这是设计文档要验证的关键点）。
 
 ## 安装与启用
 
@@ -27,11 +27,12 @@ dsh registry enable vlln/navbar
 - **锚点是内部实现细节**：属性未版本化，官方改动可能破坏——`data-chat-*` 契约文档化是待补机制件。行内 CallRow/SubCallRow 另有 `data-chat-anchor-key="call:<callId>"`（行级 wrapper 无锚点，子行有）。
 - **页面内 disable 不清除**：disposer 只在 fiber 卸载时执行（页面生命周期终点/HMR 重建）——页面内 disable 插件不触发，刷新后生效（与 client half 一致）。
 - **单会话作用域假设**：扫描是 document 级；多会话流并挂（未来 split view）时会把不可见会话的 user 行混入。
-- **跳转可能被官方 follow 拉回**：官方 ChatView 在 pinned-to-bottom 时把非 wheel 的程序化滚动拉回底部（保持跟随）——导航点用 `behavior:'auto'` 一次性滚动（至多被拉回一次；smooth 动画会被每帧拉回形成循环，故禁用）。跨窗口导航的官方 seam 是设计文档 F6 的待补项。
+- **行节点被替换后旧 dot 闭包失效（已修）**：对话流重建（会话切换/视图重挂载/React 节点替换）后，dot 闭包可能持有已脱离文档的旧行——`getBoundingClientRect` 全 0，点击只会略微上移（滚动容器顶偏移量）而非跳转。修复：点击/悬停时按 `data-chat-anchor-key` 重新解析当前行（找不到才回退闭包内的行），且行集合/流容器变化时重建 dot（纯滚动仍只移动激活态）。回归测试见下。
+- **跳转可能被官方 follow 拉回**：官方 ChatView 在 pinned-to-bottom 时把非 wheel 的程序化滚动拉回底部（保持跟随）——导航点在点击时及每帧续发 `wheel` 事件刷新官方 wheel 起源（`wheelStartRef` 2 rAF 过期），使程序化滚动被判定为用户滚动而不拉回；`behavior:'auto'` 一次性滚动已弃用（smooth 会被每帧拉回形成循环）。跨窗口导航的官方 seam 是设计文档 F6 的待补项。
 
 ## 测试
 
-DOM 级单测见 worktree `packages/plugin/plugin/tests/navbar.client.spec.ts`（3 例）：点渲染/点击跳转/dispose 清理/无关变更不重建。**MutationObserver 观察 body，但只响应流容器替换或流容器内变更 + rAF 去抖**——覆盖对话流挂载/重建（hero → active、会话切换、翻页），且不因其他 UI 变更触发（全量响应 + 每帧 reflow 会拖死页面，手测踩中后收窄）；导航条自身变更被过滤避免循环。位置跟随对话流列（列重建重绑 + ResizeObserver + window resize，position 不进渲染每帧路径）。
+DOM 级单测见 worktree `packages/plugin/plugin/tests/navbar.client.spec.ts`（4 例）：点渲染/点击跳转/行替换后重解析/dispose 清理/无关变更不重建。**MutationObserver 观察 body，但只响应流容器替换或流容器内变更 + rAF 去抖**——覆盖对话流挂载/重建（hero → active、会话切换、翻页），且不因其他 UI 变更触发（全量响应 + 每帧 reflow 会拖死页面，手测踩中后收窄）；导航条自身变更被过滤避免循环。位置跟随对话流列（列重建重绑 + ResizeObserver + window resize，position 不进渲染每帧路径）。
 
 ## 构建
 

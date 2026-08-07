@@ -51,7 +51,11 @@ window.__ModuleLoader__.load({
           return null;
         };
         var userRows = function () {
-          return Array.prototype.slice.call(document.querySelectorAll('[data-chat-flow-kind="user"]'));
+          return Array.prototype.slice.call(document.querySelectorAll('[data-time-hover-root]')).filter(function (row) {
+					// user 行 = UserStyleBubble（data-time-hover-root + 气泡结构）；排除
+					// assistant/Think 行（body 无 bubble）与 pending steering。
+					return !row.hasAttribute('data-pending-steering') && row.querySelector('[class*="bubble"]') !== null;
+				});
         };
 
         // 位置：贴近对话流列右缘 + 12px，钳制视口内（列移动时触发）。
@@ -104,11 +108,46 @@ window.__ModuleLoader__.load({
         };
         var hidePreview = function () { preview.style.display = 'none'; };
 
+        // 行身份：稳定锚点 = 祖先 flowItem 的 data-chat-anchor-key（node:<seq>，
+        // 重挂载/重建后不变）；元素身份用弱引用 UUID 兜底（同锚点但 DOM 节点被
+        // 替换时也能识别变化）。
+        var rowIds = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
+        var rowIdCounter = 0;
+        var rowIdOf = function (r) {
+          if (rowIds === null) return 'r' + (rowIdCounter++);
+          var id = rowIds.get(r);
+          if (id === undefined) { id = 'r' + (rowIdCounter++); rowIds.set(r, id); }
+          return id;
+        };
+        var anchorKeyOf = function (row, flowEl) {
+          var n = row.parentElement;
+          while (n !== null && n !== flowEl) {
+            if (n.hasAttribute('data-chat-anchor-key')) return n.getAttribute('data-chat-anchor-key');
+            n = n.parentElement;
+          }
+          return null;
+        };
+        // 点击/悬停时按锚点重新解析当前行：dot 闭包捕获的旧行可能已被 React
+        // 替换/脱离 DOM（getBoundingClientRect 全 0 → 跳转只动一点），锚点解析
+        // 保证跳到最新的对应节点；找不到才回退到闭包内的行（且需仍在文档中）。
+        var resolveRow = function (key, fallback) {
+          if (key !== null) {
+            var item = document.querySelector('[data-chat-anchor-key="' + key + '"]');
+            if (item !== null) {
+              var r = item.querySelector('[data-time-hover-root]');
+              if (r !== null && !r.hasAttribute('data-pending-steering') && r.querySelector('[class*="bubble"]') !== null) return r;
+            }
+          }
+          return (fallback !== undefined && fallback !== null && fallback.isConnected) ? fallback : null;
+        };
+
         // 渲染节点串：等距节点 + 滑动窗口（>11 显示激活 ± 5，端点细点）。
+        var lastLo = -1, lastHi = -1, lastSig = null;
         var render = function () {
           position();
           // 仅在对话页面显示：无对话流列（设置页/其他视图）时隐藏。
-          if (flowOf() === null) { bar.style.display = 'none'; return; }
+          var f = flowOf();
+          if (f === null) { bar.style.display = 'none'; return; }
           var rows = userRows();
           if (rows.length < 2) { bar.style.display = 'none'; return; }
           bar.style.display = 'flex';
@@ -118,11 +157,15 @@ window.__ModuleLoader__.load({
           lo = windowed ? Math.max(0, active - HALF_WINDOW) : 0;
           var hi = windowed ? Math.min(rows.length - 1, active + HALF_WINDOW) : rows.length - 1;
           var dotCount = hi - lo + 1 + (windowed ? 2 : 0);
-          if (bar.childElementCount === dotCount) {
-            // 窗口未变：只移动激活态（滚动时不应重建节点）。
+          // 窗口、行集合、流容器任一变化都重建 dot：行 DOM 节点被替换/重挂载
+          // 后旧 dot 闭包会持有已脱离文档的行（点击跳转只动一点点），重建即失效。
+          // 纯滚动（行集合不变、窗口不变）仍只移动激活态，不重建。
+          var sig = rows.map(rowIdOf).join('|');
+          if (bar.childElementCount === dotCount && lo === lastLo && hi === lastHi && sig === lastSig) {
             updateActiveClass(active);
             return;
           }
+          lastLo = lo; lastHi = hi; lastSig = sig;
           bar.textContent = '';
           if (windowed && lo > 0) {
             var moreL = document.createElement('span');
@@ -135,15 +178,16 @@ window.__ModuleLoader__.load({
             dot.setAttribute('data-vlln-dot', '');
             // aria-label 而非 title：title 会叠加浏览器原生 tooltip（与预览卡重复）。
             dot.setAttribute('aria-label', 'user #' + (i + 1) + '（点击跳转）');
-            (function (row, d) {
-              d.addEventListener('mouseenter', function () { showPreview(row, d); });
+            (function (row, key, d) {
+              d.addEventListener('mouseenter', function () { var t = resolveRow(key, row); if (t !== null) showPreview(t, d); });
               d.addEventListener('mouseleave', hidePreview);
-              d.addEventListener('focus', function () { showPreview(row, d); });
+              d.addEventListener('focus', function () { var t = resolveRow(key, row); if (t !== null) showPreview(t, d); });
               d.addEventListener('blur', hidePreview);
               d.addEventListener('click', function () {
-                jumpToRow(row);
+                var t = resolveRow(key, row);
+                if (t !== null) jumpToRow(t);
               });
-            })(rows[i], dot);
+            })(rows[i], anchorKeyOf(rows[i], f), dot);
             if (i === active) dot.classList.add('active');
             bar.appendChild(dot);
           }

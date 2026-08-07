@@ -2,9 +2,11 @@
 /**
  * DOM-level test for the vlln/navbar example plugin's client bundle
  * (registry release in the standalone repo, mirrored here for CI).
- * Verifies: dots render from user rows, click scrolls to the anchor,
- * dispose cleans up, and an unrelated DOM change does NOT trigger a
- * rebuild storm (the MutationObserver self-trigger regression).
+ * Verifies: dots render from user rows (0806 锚点契约：data-time-hover-root +
+ * 气泡结构，排除 assistant/Think 行), click scrolls to the anchor, stale dot
+ * closures re-resolve rows after DOM replacement, dispose cleans up, and an
+ * unrelated DOM change does NOT trigger a rebuild storm (the MutationObserver
+ * self-trigger regression).
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -61,16 +63,29 @@ function flow(): HTMLElement {
   return el
 }
 
-function userRow(flow: HTMLElement, seq: number): HTMLElement {
+/** 0806 DOM 结构：flowItem（data-chat-flow-kind + data-chat-anchor-key）内嵌
+ * userRow（data-time-hover-root + 气泡）。返回 userRow（navbar 的行锚点）。 */
+function userRow(flow: HTMLElement, seq: number, text = ''): HTMLElement {
+  const item = document.createElement('div')
+  item.setAttribute('data-chat-flow-kind', 'user')
+  item.setAttribute('data-chat-anchor-key', `node:${seq}`)
   const row = document.createElement('div')
-  row.setAttribute('data-chat-flow-kind', 'user')
-  row.setAttribute('data-chat-anchor-key', `node:${seq}`)
-  flow.appendChild(row)
+  row.setAttribute('data-time-hover-root', '')
+  const bubble = document.createElement('div')
+  bubble.className = 'bubble'
+  bubble.textContent = text
+  row.appendChild(bubble)
+  item.appendChild(row)
+  flow.appendChild(item)
   return row
 }
 
 function bar(): HTMLElement | null {
   return document.querySelector('nav[aria-label="用户消息导航"]')
+}
+
+function preview(): HTMLElement | null {
+  return document.querySelector('[data-vlln-preview]')
 }
 
 function scrollerOf(): HTMLElement {
@@ -87,15 +102,21 @@ function scrollerOf(): HTMLElement {
 describe('vlln/navbar client bundle', () => {
   it('renders one nav dot per user row and scrolls to the anchor on click', () => {
     const flowEl = flow()
-    userRow(flowEl, 100)
-    userRow(flowEl, 101)
-    const scroll = vi.fn()
-    document.querySelectorAll<HTMLElement>('[data-chat-anchor-key="node:100"]').forEach((el) => { el.scrollIntoView = scroll })
+    userRow(flowEl, 100, 'first')
+    userRow(flowEl, 101, 'second')
+    // assistant/Think 行（data-time-hover-root 但无气泡）不得被当成 user 行。
+    const think = document.createElement('div')
+    think.setAttribute('data-time-hover-root', '')
+    const thinkBody = document.createElement('div')
+    thinkBody.className = 'markdown-body'
+    think.textContent = 'Think ...'
+    think.appendChild(thinkBody)
+    flowEl.appendChild(think)
 
     const disposer = loadPlugin().apply({}) as () => void
 
     expect(bar()).not.toBeNull()
-    // One compact dot per user row (no text label — pure dots, title tooltip).
+    // 每个 user 行一个 dot；assistant/Think 行不产生 dot。
     const dots = bar()!.querySelectorAll('[data-vlln-dot]')
     expect(dots).toHaveLength(2)
     expect(dots[0]!.getAttribute('aria-label')).toContain('user #1')
@@ -107,6 +128,47 @@ describe('vlln/navbar client bundle', () => {
 
     disposer()
     expect(bar()).toBeNull()
+  })
+
+  it('re-resolves stale rows after DOM replacement (click/preview use the latest row)', () => {
+    const flowEl = flow()
+    userRow(flowEl, 100, 'A')
+    userRow(flowEl, 101, 'B')
+    const disposer = loadPlugin().apply({}) as () => void
+    const dots = bar()!.querySelectorAll('[data-vlln-dot]')
+    expect(dots).toHaveLength(2)
+
+    // 用同锚点的新节点原位替换第 1 个 user 行（React 重建场景：旧节点脱离文档）。
+    const oldItem = document.querySelector<HTMLElement>('[data-chat-anchor-key="node:100"]')!
+    const newItem = document.createElement('div')
+    newItem.setAttribute('data-chat-flow-kind', 'user')
+    newItem.setAttribute('data-chat-anchor-key', 'node:100')
+    const newRow = document.createElement('div')
+    newRow.setAttribute('data-time-hover-root', '')
+    const newBubble = document.createElement('div')
+    newBubble.className = 'bubble'
+    newBubble.textContent = 'A2'
+    newRow.appendChild(newBubble)
+    newItem.appendChild(newRow)
+    oldItem.replaceWith(newItem)
+
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        // 重建后 dot 仍为 2 个；悬停/聚焦预览显示的是最新行文本（防旧闭包）。
+        const after = bar()!.querySelectorAll('[data-vlln-dot]')
+        expect(after).toHaveLength(2)
+        after[0]!.dispatchEvent(new FocusEvent('focus'))
+        expect(preview()!.textContent).toBe('A2')
+        expect(newRow.isConnected).toBe(true)
+
+        // 点击仍触发第一步跳转（resolveRow 命中当前节点）。
+        after[0]!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        expect(Math.abs(scrollerOf().scrollTop)).toBe(1)
+
+        disposer()
+        resolve()
+      }, 50)
+    })
   })
 
   it('re-renders dots when the flow region changes; fewer than 2 user rows hides the rail', () => {
@@ -132,7 +194,7 @@ describe('vlln/navbar client bundle', () => {
     const disposer = loadPlugin().apply({}) as () => void
 
     // A change outside the flow region fires the body-scoped observer, but
-    // the dot count is unchanged (no user row added) so the rebuild is
+    // the row set is unchanged (no user row added) so the rebuild is
     // skipped — and the bar's own mutations never re-trigger it.
     const other = document.createElement('div')
     other.id = 'unrelated'
