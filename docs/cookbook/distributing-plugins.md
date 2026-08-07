@@ -25,7 +25,7 @@ tarball 安装走严格解压（防路径穿越），定位到含 `dsh.plugin.js
 适配新基线：在官方新快照上重新生成补丁（文件范围 = 官方侧接线改动 + 机制件，排除复制分发包 `packages/plugin`、`packages/ui-plugin-manager` 与构建产物）：
 
 ```sh
-git diff <snapshot-ref>..HEAD -- apps/cli/package.json apps/cli/src/args.ts apps/cli/src/bin.ts apps/cli/src/registry.ts apps/cli/tests/args.spec.ts packages/client/connection packages/client/modules packages/client/ui-plugin-manager packages/host/apiproxy packages/README.md packages/README.zh.md packages/README.i18n.yaml scripts/verify-package-readme-model-experience.ts tsconfig.base.json tsconfig.client.json > patches/dsh-plugin-registry-0806.patch
+git diff <snapshot-ref>..HEAD -- apps/cli/package.json apps/cli/src/args.ts apps/cli/src/bin.ts apps/cli/src/registry.ts apps/cli/tests/args.spec.ts packages/client/connection packages/client/modules packages/client/ui-plugin-manager packages/host/apiproxy packages/tasks/tasks packages/tasks/tasks-local packages/bash/bash packages/bash/bash-local packages/bash/pwsh-local packages/bash/tool-bash packages/README.md packages/README.zh.md packages/README.i18n.yaml scripts/verify-package-readme-model-experience.ts tsconfig.base.json tsconfig.client.json > patches/dsh-plugin-registry-0806.patch
 ```
 
 **验证点**：在干净的新快照 checkout 上 `git apply --check` 通过。

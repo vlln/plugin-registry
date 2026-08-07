@@ -113,12 +113,14 @@ function useSessionTasks(sessionId: string): WireTask[] {
 
 /**
  * 任务输出 tail：展开任务时**自动轮询** Node half 输出路由。路由走宿主
- * `tasks.peek`（非消耗式）——每次返回当前保留输出全文，客户端**整段替换**
- * 渲染（tail -f 效果，无需按钮）。peek 不推进 per-task 游标、不标记
- * reported：自动轮询与官方 `task_output` 工具的读取零竞争（官方工具读到的
- * 增量不受影响），终态通知仍由首次消耗式 read/wait 交付。
+ * `tasks.peek`（非消耗式）并带 `full: true`——每次返回当前保留输出全文，
+ * 客户端**整段替换**渲染（tail -f 效果，无需按钮）。peek 不推进 per-task
+ * 游标、不标记 reported：自动轮询与官方 `task_output` 工具的读取零竞争
+ * （官方工具读到的增量不受影响），终态通知仍由首次消耗式 read/wait 交付。
+ * 兼容旧路由（无 `full` 标志 = 消耗式增量契约）：此时**追加**增量而非替换，
+ * 展开期间输出可累积显示。
  * @param taskId - 当前展开的任务 id；null 时不轮询。
- * @returns 当前保留输出文本。
+ * @returns 当前输出文本（整段替换或增量追加后）。
  */
 function useTaskOutput(taskId: string | null): string {
   const [output, setOutput] = useState('')
@@ -132,11 +134,10 @@ function useTaskOutput(taskId: string | null): string {
       try {
         const res = await fetch(`${OUTPUT_PATH}?id=${encodeURIComponent(taskId)}`, { headers: { accept: 'application/json' } })
         if (!res.ok) return
-        const data = (await res.json()) as { text?: string }
-        // 整段替换：peek 返回保留输出全文（重复轮询同一文本），追加会重复。
-        if (alive && typeof data.text === 'string') {
-          setOutput(data.text)
-        }
+        const data = (await res.json()) as { text?: string; full?: boolean }
+        if (!alive || typeof data.text !== 'string') return
+        // peek 全文（full:true）整段替换；旧增量契约（无 full）追加累积。
+        setOutput(prev => data.full === true ? data.text : prev + data.text)
       } catch {
         // 瞬态网络错误：保持当前输出。
       }

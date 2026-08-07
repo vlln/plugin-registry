@@ -114,7 +114,8 @@ export function apply(ctx) {
             return
           }
           res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
-          res.end(JSON.stringify({ text: read.text, snapshot: read.snapshot }))
+          // full: true = peek 全文契约（客户端整段替换）；缺省视为旧增量契约。
+          res.end(JSON.stringify({ text: read.text, full: true, snapshot: read.snapshot }))
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
           res.writeHead(500, { 'content-type': 'application/json; charset=utf-8' })

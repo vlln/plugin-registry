@@ -1348,3 +1348,400 @@ index e1d40880..e60a0f76 100644
      { "path": "./packages/client/ui-trajectory" },
      { "path": "./packages/client/ui-theme" },
      { "path": "./packages/client/ui-settings" },
+diff --git a/packages/bash/bash-local/src/index.ts b/packages/bash/bash-local/src/index.ts
+index ccb5a32a..d667faa8 100644
+--- a/packages/bash/bash-local/src/index.ts
++++ b/packages/bash/bash-local/src/index.ts
+@@ -278,6 +278,26 @@ export class LocalBashExecutor extends BashExecutor {
+           ...err.spillPath !== undefined ? { stderrSpillPath: err.spillPath } : {},
+         }
+       },
++      peekOutput: (): BashProcessRead => {
++        // The full retained stream from byte 0 (bounded): a UI tail shows the
++        // current output regardless of where the consuming cursor sits, so
++        // repeated peeks re-deliver until the stream grows or retention slides.
++        const out = collected.stdout.readFrom(0)
++        const err = collected.stderr.readFrom(0)
++
++        // The spawn note is not consumed by a peek: it stays owed to the read
++        // path (delivered exactly once there) while still appearing in peeks.
++        const errText = err.text.length > 0 ? err.text : (spawnFailureNote ?? '')
++        const separator = out.text.length > 0 && !out.text.endsWith('\n') ? '\n' : ''
++        const delta = out.text
++          + (errText.length > 0 ? `${separator}[stderr]\n${errText}` : '')
++        return {
++          delta,
++          lossy: out.lossy || err.lossy,
++          ...out.spillPath !== undefined ? { stdoutSpillPath: out.spillPath } : {},
++          ...err.spillPath !== undefined ? { stderrSpillPath: err.spillPath } : {},
++        }
++      },
+       kill: (): boolean => {
+         if (proc.status !== 'running') return false
+         proc.status = 'killed'
+diff --git a/packages/bash/bash-local/tests/executor.spec.ts b/packages/bash/bash-local/tests/executor.spec.ts
+index af556608..1bb2d186 100644
+--- a/packages/bash/bash-local/tests/executor.spec.ts
++++ b/packages/bash/bash-local/tests/executor.spec.ts
+@@ -197,6 +197,25 @@ describe('LocalBashExecutor.start (background process handles)', () => {
+     expect(proc.readOutput().delta).toBe('')
+   })
+ 
++  it('peekOutput is non-consuming: repeated peeks re-deliver, reads stay unaffected', async () => {
++    const { bash } = await setup()
++    const proc = bash.start(bash.resolve({ command: 'echo first; sleep 1; echo second' }))
++    await readUntil(proc, 'first\n')
++
++    // A peek shows the retained stream since the cursor without advancing it.
++    const peeked = proc.peekOutput()
++    expect(peeked.delta).toContain('first\n')
++    expect(proc.peekOutput().delta).toBe(peeked.delta)
++
++    await proc.done
++    // The same retained tail stays visible to peeks after exit…
++    const tail = proc.peekOutput()
++    expect(tail.delta).toContain('second\n')
++    expect(proc.peekOutput().delta).toBe(tail.delta)
++    // …while a consuming read still delivers the full remaining delta once.
++    expect(proc.readOutput().delta).toBe('second\n')
++  })
++
+   it('readOutput marks stderr sections', async () => {
+     const { bash } = await setup()
+     const proc = bash.start(bash.resolve({ command: 'echo out; echo err >&2' }))
+diff --git a/packages/bash/bash/src/types.ts b/packages/bash/bash/src/types.ts
+index 6fdd8b36..a471beb2 100644
+--- a/packages/bash/bash/src/types.ts
++++ b/packages/bash/bash/src/types.ts
+@@ -175,6 +175,14 @@ export interface BashProcess {
+    * full-stream spill files when available.
+    */
+   readOutput(): BashProcessRead
++  /**
++   * Non-consuming view of the currently retained output (bounded): the same
++   * text {@link readOutput} would return, but the read cursor stays put, so
++   * repeated peeks re-deliver the same text until the stream grows or a
++   * consuming read advances the cursor. Lossy peeks flag and point at spill
++   * files exactly like {@link readOutput}.
++   */
++  peekOutput(): BashProcessRead
+   /**
+    * Kill the process group. Returns false when it had already finished
+    * (no-op); idempotent.
+diff --git a/packages/bash/bash/tests/service.spec.ts b/packages/bash/bash/tests/service.spec.ts
+index 77527d97..407e4cf3 100644
+--- a/packages/bash/bash/tests/service.spec.ts
++++ b/packages/bash/bash/tests/service.spec.ts
+@@ -40,6 +40,7 @@ class StubExecutor extends BashExecutor {
+       signal: null,
+       done: Promise.resolve(),
+       readOutput: (): BashProcessRead => ({ delta: '', lossy: false }),
++      peekOutput: (): BashProcessRead => ({ delta: '', lossy: false }),
+       kill: (): boolean => {
+         if (proc.status !== 'running') return false
+         proc.status = 'killed'
+diff --git a/packages/bash/pwsh-local/src/index.ts b/packages/bash/pwsh-local/src/index.ts
+index b026795c..04c1a50d 100644
+--- a/packages/bash/pwsh-local/src/index.ts
++++ b/packages/bash/pwsh-local/src/index.ts
+@@ -265,6 +265,26 @@ export class PwshLocalExecutor extends BashExecutor {
+           ...err.spillPath !== undefined ? { stderrSpillPath: err.spillPath } : {},
+         }
+       },
++      peekOutput: (): BashProcessRead => {
++        // The full retained stream from byte 0 (bounded): a UI tail shows the
++        // current output regardless of where the consuming cursor sits, so
++        // repeated peeks re-deliver until the stream grows or retention slides.
++        const out = collected.stdout.readFrom(0)
++        const err = collected.stderr.readFrom(0)
++
++        // The spawn note is not consumed by a peek: it stays owed to the read
++        // path (delivered exactly once there) while still appearing in peeks.
++        const errText = err.text.length > 0 ? err.text : (spawnFailureNote ?? '')
++        const separator = out.text.length > 0 && !out.text.endsWith('\n') ? '\n' : ''
++        const delta = out.text
++          + (errText.length > 0 ? `${separator}[stderr]\n${errText}` : '')
++        return {
++          delta,
++          lossy: out.lossy || err.lossy,
++          ...out.spillPath !== undefined ? { stdoutSpillPath: out.spillPath } : {},
++          ...err.spillPath !== undefined ? { stderrSpillPath: err.spillPath } : {},
++        }
++      },
+       kill: (): boolean => {
+         if (proc.status !== 'running') { return false }
+         proc.status = 'killed'
+diff --git a/packages/bash/tool-bash/src/index.ts b/packages/bash/tool-bash/src/index.ts
+index d9410482..45ce37d5 100644
+--- a/packages/bash/tool-bash/src/index.ts
++++ b/packages/bash/tool-bash/src/index.ts
+@@ -370,6 +370,7 @@ export function apply(ctx: Context, config: Config = {}): void {
+               cancel: () => void proc.kill(),
+               done: proc.done.then(() => processOutcome(proc)),
+               readOutput: () => renderProcessRead(proc.readOutput(), proc.sandbox, escalationModes),
++              peekOutput: () => renderProcessRead(proc.peekOutput(), proc.sandbox, escalationModes),
+             }
+           },
+         })
+diff --git a/packages/bash/tool-bash/tests/tools.spec.ts b/packages/bash/tool-bash/tests/tools.spec.ts
+index 2e76b16d..bcad385d 100644
+--- a/packages/bash/tool-bash/tests/tools.spec.ts
++++ b/packages/bash/tool-bash/tests/tools.spec.ts
+@@ -147,6 +147,7 @@ class RecordingSandboxExecutor extends BashExecutor {
+       done: Promise.resolve(),
+       sandbox: { mode: spec.sandboxPolicy?.mode ?? 'read-only', denied: false },
+       readOutput: () => ({ delta: '', lossy: false }),
++      peekOutput: () => ({ delta: '', lossy: false }),
+       kill: () => false,
+     }
+   }
+@@ -176,6 +177,7 @@ class CountingStartExecutor extends BashExecutor {
+       signal: null,
+       done: Promise.resolve(),
+       readOutput: () => ({ delta: '', lossy: false }),
++      peekOutput: () => ({ delta: '', lossy: false }),
+       kill: () => false,
+     }
+   }
+@@ -772,6 +774,7 @@ describe('processOutcome', () => {
+       signal: null,
+       done: Promise.resolve(),
+       readOutput: () => ({ delta: '', lossy: false }),
++      peekOutput: () => ({ delta: '', lossy: false }),
+       kill: () => false,
+       ...over,
+     }
+@@ -1095,6 +1098,7 @@ describe('the model-facing bash tool builds its request from named args only (no
+         signal: null,
+         done: Promise.resolve(),
+         readOutput: () => ({ delta: '', lossy: false }),
++        peekOutput: () => ({ delta: '', lossy: false }),
+         kill: () => false,
+       }
+     }
+diff --git a/packages/bash/tool-pwsh/tests/tools.spec.ts b/packages/bash/tool-pwsh/tests/tools.spec.ts
+index 71e3124e..c03e0646 100644
+--- a/packages/bash/tool-pwsh/tests/tools.spec.ts
++++ b/packages/bash/tool-pwsh/tests/tools.spec.ts
+@@ -98,6 +98,7 @@ function fakeProcess(delta = 'bg-ok\n'): BashProcess {
+       consumed = true
+       return { delta, lossy: false }
+     },
++    peekOutput: () => ({ delta, lossy: false }),
+     kill: () => false,
+   }
+ }
+@@ -112,6 +113,7 @@ function killableProcess(): BashProcess {
+     signal: null,
+     done,
+     readOutput: () => ({ delta: '', lossy: false }),
++    peekOutput: () => ({ delta: '', lossy: false }),
+     kill: () => {
+       if (proc.status !== 'running') return false
+       proc.status = 'killed'
+@@ -687,6 +689,7 @@ describe('processOutcome', () => {
+       signal: null,
+       done: Promise.resolve(),
+       readOutput: () => ({ delta: '', lossy: false }),
++      peekOutput: () => ({ delta: '', lossy: false }),
+       kill: () => false,
+       ...over,
+     }
+diff --git a/packages/tasks/tasks-local/src/index.ts b/packages/tasks/tasks-local/src/index.ts
+index f108022b..5ae86f6a 100644
+--- a/packages/tasks/tasks-local/src/index.ts
++++ b/packages/tasks/tasks-local/src/index.ts
+@@ -13,7 +13,7 @@ import { Context } from 'cordis'
+ import type { Agent } from '@deepseek-ai/dsh-agent'
+ import { deadline, timeoutOf } from '@deepseek-ai/dsh-timeout'
+ import { TaskService, TaskId } from '@deepseek-ai/dsh-tasks'
+-import type { TaskDoneListener, TaskKind, TaskOutcome, TaskRead, TaskSnapshot, TaskStart, TaskStatus } from '@deepseek-ai/dsh-tasks'
++import type { TaskDoneListener, TaskKind, TaskOutcome, TaskPeek, TaskRead, TaskSnapshot, TaskStart, TaskStatus } from '@deepseek-ai/dsh-tasks'
+ 
+ /** Timeout code that distinguishes a bounded wait from caller cancellation. */
+ export const TASK_WAIT_TIMEOUT = 'TASK_WAIT_TIMEOUT'
+@@ -28,6 +28,8 @@ interface TrackedTask {
+   owner: Agent | undefined
+   cancel: (reason?: string) => void
+   readOutput: (() => string) | undefined
++  /** Non-consuming sibling of {@link readOutput}; absent for final-output tasks. */
++  peekOutput: (() => string) | undefined
+   status: TaskStatus
+   detail: string | undefined
+   output: string | undefined
+@@ -98,6 +100,7 @@ export class LocalTaskService extends TaskService {
+       owner: spec.owner,
+       cancel: hooks.cancel.bind(hooks),
+       readOutput: hooks.readOutput?.bind(hooks),
++      peekOutput: hooks.peekOutput?.bind(hooks),
+       status: 'running',
+       detail: undefined,
+       output: undefined,
+@@ -145,6 +148,17 @@ export class LocalTaskService extends TaskService {
+     return { text, snapshot: this.snapshot(task) }
+   }
+ 
++  peek(id: TaskId, caller?: Agent): TaskPeek {
++    const task = this.expect(id)
++    this.assertAccess(task, caller)
++    const text = task.peekOutput !== undefined
++      ? task.peekOutput()
++      : isTerminal(task.status) ? task.output ?? '' : ''
++    // A peek never marks the task reported: the terminal notice stays owed to
++    // the first consuming read or wait.
++    return { text, snapshot: this.snapshot(task) }
++  }
++
+   kill(id: TaskId, caller?: Agent, reason?: string): 'requested' | 'already-finished' {
+     const task = this.expect(id)
+     this.assertAccess(task, caller)
+diff --git a/packages/tasks/tasks-local/tests/tasks.spec.ts b/packages/tasks/tasks-local/tests/tasks.spec.ts
+index 8e0a17af..ffdd539c 100644
+--- a/packages/tasks/tasks-local/tests/tasks.spec.ts
++++ b/packages/tasks/tasks-local/tests/tasks.spec.ts
+@@ -130,6 +130,41 @@ describe('LocalTaskService reads and settlement', () => {
+     expect(read.snapshot.finishedAt).toBeTypeOf('number')
+   })
+ 
++  it('peek returns the retained output without consuming or marking reported', async () => {
++    const ctx = await harness()
++    const chunks = ['first', '', 'rest']
++    const p = producer({ readOutput: () => chunks.shift() ?? '', peekOutput: () => chunks.join('') })
++    const id = ctx.tasks.start(p.spec)
++
++    // A peek never consumes the read cursor: the producer's retained view is
++    // re-delivered until a consuming read advances it.
++    const peeked = ctx.tasks.peek(id)
++    expect(peeked.text).toBe('firstrest')
++    expect(peeked.snapshot).toMatchObject({ status: 'running', reported: false })
++    expect(ctx.tasks.peek(id).text).toBe('firstrest')
++
++    // A terminal peek keeps the notice owed: reported stays false until a
++    // consuming read or wait commits to report.
++    p.settle({ status: 'completed', detail: 'exit code: 0' })
++    await tick()
++    expect(ctx.tasks.peek(id).snapshot).toMatchObject({ status: 'completed', reported: false })
++    expect(ctx.tasks.read(id).snapshot).toMatchObject({ status: 'completed', reported: true })
++  })
++
++  it('peek on a final-output kind falls back to the idempotent terminal output', async () => {
++    const ctx = await harness()
++    const p = producer({ kind: 'subagent', label: 'research task' })
++    const id = ctx.tasks.start(p.spec)
++
++    expect(ctx.tasks.peek(id)).toMatchObject({ text: '', snapshot: { status: 'running' } })
++
++    p.settle({ status: 'completed', output: 'final answer' })
++    await tick()
++    expect(ctx.tasks.peek(id).text).toBe('final answer')
++    expect(ctx.tasks.peek(id).text).toBe('final answer') // idempotent, not consumed
++    expect(ctx.tasks.peek(id).snapshot.reported).toBe(false)
++  })
++
+   it('projects a producer-owned model output limit into reads and snapshots', async () => {
+     const ctx = await harness()
+     const p = producer({ outputLimitBytes: 64, readOutput: () => 'delta' })
+diff --git a/packages/tasks/tasks/src/index.ts b/packages/tasks/tasks/src/index.ts
+index e237aa06..682d02fb 100644
+--- a/packages/tasks/tasks/src/index.ts
++++ b/packages/tasks/tasks/src/index.ts
+@@ -8,7 +8,7 @@
+ 
+ import { Context, Service } from 'cordis'
+ import type { Agent } from '@deepseek-ai/dsh-agent'
+-import type { TaskDoneListener, TaskId, TaskRead, TaskSnapshot, TaskStart } from './types.ts'
++import type { TaskDoneListener, TaskId, TaskPeek, TaskRead, TaskSnapshot, TaskStart } from './types.ts'
+ 
+ export { TaskId } from './types.ts'
+ export type {
+@@ -17,6 +17,7 @@ export type {
+   TaskKind,
+   TaskKindMap,
+   TaskOutcome,
++  TaskPeek,
+   TaskRead,
+   TaskSnapshot,
+   TaskStart,
+@@ -96,6 +97,17 @@ export abstract class TaskService extends Service {
+    */
+   abstract read(id: TaskId, caller?: Agent): TaskRead
+ 
++  /**
++   * Non-consuming read: the task's retained output (bounded), without advancing
++   * the read cursor or marking the task reported. Stream kinds re-deliver the
++   * same text until the stream grows; final-output kinds fall back to the
++   * idempotent terminal output. Throws for an unknown or foreign task.
++   * @param id - task to peek at.
++   * @param caller - peeking agent checked against the owner.
++   * @returns output text and the post-peek snapshot.
++   */
++  abstract peek(id: TaskId, caller?: Agent): TaskPeek
++
+   /**
+    * Request cancellation, then mark the task stopping and reported. A producer
+    * throw propagates without changing task state. Throws for an unknown or
+diff --git a/packages/tasks/tasks/src/types.ts b/packages/tasks/tasks/src/types.ts
+index d722f3fc..b80a4bc8 100644
+--- a/packages/tasks/tasks/src/types.ts
++++ b/packages/tasks/tasks/src/types.ts
+@@ -101,6 +101,16 @@ export interface TaskHooks {
+    * task has one consuming cursor.
+    */
+   readOutput?(): string
++  /**
++   * Non-consuming view of the task's retained output (bounded). Repeated peeks
++   * re-deliver the same text until the stream grows; the producer's read cursor
++   * is never advanced, so a later consuming {@link readOutput} still delivers
++   * its full delta. Absence marks a final-output-only task —
++   * {@link TaskService.peek} then falls back to the terminal
++   * {@link TaskOutcome.output} exactly like {@link TaskService.read}. A peek
++   * never marks the task reported and never suppresses a completion notice.
++   */
++  peekOutput?(): string
+ }
+ 
+ /**
+@@ -149,6 +159,19 @@ export interface TaskRead {
+   snapshot: TaskSnapshot
+ }
+ 
++/** Output and post-peek state returned by {@link TaskService.peek}. */
++export interface TaskPeek {
++  /**
++   * Stream kinds: the retained output (bounded), without consuming the cursor —
++   * repeated peeks re-deliver the same text until the stream grows. Final-output
++   * kinds: empty while live, the terminal {@link TaskOutcome.output} (or empty)
++   * once settled — idempotent, never consumed.
++   */
++  text: string
++  /** The task's state at peek time. */
++  snapshot: TaskSnapshot
++}
++
+ /**
+  * Completion callback with the exact owner supplied at start, or `undefined`
+  * for an unowned task. Returned promises are observed but not awaited.
+diff --git a/packages/tasks/tasks/tests/service.spec.ts b/packages/tasks/tasks/tests/service.spec.ts
+index 6ab9b142..79d5dbf4 100644
+--- a/packages/tasks/tasks/tests/service.spec.ts
++++ b/packages/tasks/tasks/tests/service.spec.ts
+@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
+ import { Context } from 'cordis'
+ import type { Agent } from '@deepseek-ai/dsh-agent'
+ import { TaskId, TaskService } from '@deepseek-ai/dsh-tasks'
+-import type { TaskDoneListener, TaskRead, TaskSnapshot, TaskStart } from '@deepseek-ai/dsh-tasks'
++import type { TaskDoneListener, TaskPeek, TaskRead, TaskSnapshot, TaskStart } from '@deepseek-ai/dsh-tasks'
+ 
+ /**
+  * Minimal concrete registry: one canned record. The seam owns the contract
+@@ -38,6 +38,10 @@ class StubTaskService extends TaskService {
+     return { text: '', snapshot: this.snapshotOf(id) }
+   }
+ 
++  peek(id: TaskId): TaskPeek {
++    return { text: '', snapshot: this.snapshotOf(id) }
++  }
++
+   kill(): 'requested' | 'already-finished' {
+     return 'requested'
+   }

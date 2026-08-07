@@ -7,7 +7,16 @@
 本仓库是「官方基线 + patch + package」构建式仓库（见 [AGENTS.md](AGENTS.md)），交付时需标明基线：
 
 - **机制分支基线**：官方 0806 快照（`20260806T160212Z`，提交 `28f4c886`）——worktree 分支已对齐
-- **patch 基线**：`patches/dsh-plugin-registry-0806.patch` 基于官方 0806 快照（28 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、host 帧 `client-graph-changed` 自动刷新、依赖闭包）
+- **patch 基线**：`patches/dsh-plugin-registry-0806.patch` 基于官方 0806 快照（41 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、host 帧 `client-graph-changed` 自动刷新、tasks/bash 非消耗式 `peek` seam、依赖闭包）
+
+## 2026-08（任务输出 tail 零竞争：tasks.peek）
+
+task-status 实时 tail 与官方 `task_output` 工具的读取竞争问题（`tasks.read` 游标全局 per-task，自动轮询会抢走工具增量）的根治：官方 seam 新增**非消耗式读取**，插件 tail 与工具读取互不干扰：
+
+- **seam（机制分支）**：`TaskService` 抽象 `peek(id, caller?)`（返回保留输出，不推进游标、不标记 reported——终态通知仍由首次消耗式 read/wait 交付）；`TaskHooks` 可选 `peekOutput?()`（缺省回退到与 `read` 一致的终态幂等输出）；`BashProcess.peekOutput()`（bounded 保留窗口非消耗视图，lossy/spill 语义与 `readOutput` 一致），bash-local / pwsh-local 实现，tool-bash 接线
+- **示例**：task-status Node half 输出路由改 `ctx.tasks.peek`，client 由「增量追加」改「整段替换」渲染（peek 重复轮询返回同一全文）
+- **验证**：`/tmp/dsh-0806` 集成验证——peek 非消耗（重复轮询同文本）、官方 read 在多次 peek 后仍读完整增量、peek 始终显示保留全文
+
 
 ## 2026-08（插件启停自动刷新）
 

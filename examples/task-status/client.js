@@ -68,9 +68,10 @@ window.__ModuleLoader__.load({
 			return tasks.filter(task => task.ownerSession === sessionId);
 		}
 		// 自动 tail：展开任务即轮询 Node half 输出路由（宿主 tasks.peek，
-		// 非消耗式）——返回保留输出全文，整段替换渲染（无需按钮）。
-		// peek 不推进 per-task 游标、不标记 reported：与官方 task_output 工具
-		// 的读取零竞争，终态通知仍由首次消耗式 read/wait 交付。
+		// 非消耗式，响应带 full:true）——返回保留输出全文，整段替换渲染
+		// （无需按钮）。peek 不推进 per-task 游标、不标记 reported：与官方
+		// task_output 工具的读取零竞争，终态通知仍由首次消耗式 read/wait 交付。
+		// 兼容旧路由（无 full 标志 = 消耗式增量契约）：此时追加增量累积。
 		function useTaskOutput(taskId) {
 			const [output, setOutput] = react.useState("");
 			react.useEffect(() => {
@@ -81,8 +82,9 @@ window.__ModuleLoader__.load({
 						const res = await fetch(OUTPUT_PATH + "?id=" + encodeURIComponent(taskId), { headers: { accept: "application/json" } });
 						if (!res.ok) return;
 						const data = await res.json();
-						// 整段替换：peek 返回保留输出全文（重复轮询同一文本），追加会重复。
-						if (alive && typeof data.text === "string") setOutput(data.text);
+						if (!alive || typeof data.text !== "string") return;
+						// peek 全文（full:true）整段替换；旧增量契约（无 full）追加累积。
+						setOutput(prev => data.full === true ? data.text : prev + data.text);
 					} catch {}
 				};
 				poll();
@@ -136,8 +138,8 @@ window.__ModuleLoader__.load({
 					? react.createElement("div", {
 						key: "det",
 						style: { padding: "0 12px 8px 34px", fontSize: 12, lineHeight: "18px", color: "var(--dsw-alias-label-tertiary)", display: "flex", flexDirection: "column", gap: 2 }
-					}, react.createElement("span", null, "类型：" + task.kind + " · " + timeText(task)), task.detail !== undefined ? react.createElement("span", null, "详情：" + task.detail) : null,
-						taskOutput !== "" ? react.createElement("pre", { style: { margin: "4px 0 0", padding: "8px 10px", maxHeight: 160, overflowY: "auto", borderRadius: 8, fontSize: 11, lineHeight: "16px", fontFamily: "var(--dsh-code-font-family, ui-monospace, monospace)", background: "var(--dsw-specific-tip)", border: "1px solid var(--dsw-alias-border-l1)", whiteSpace: "pre-wrap", wordBreak: "break-word" } }, taskOutput) : null)
+					}, task.detail !== undefined ? react.createElement("span", null, "详情：" + task.detail) : null,
+						taskOutput !== "" ? react.createElement("div", { style: { margin: "2px 0 0", fontSize: 11, lineHeight: "16px", fontFamily: "var(--dsh-code-font-family, ui-monospace, monospace)", whiteSpace: "pre-wrap", wordBreak: "break-word" } }, taskOutput) : null)
 					: null;
 				return react.createElement("div", { key: task.id }, line, details);
 			};
