@@ -219,6 +219,25 @@ index 8df252c2..edfd008c 100644
      }
    }
  
+diff --git a/packages/client/connection/tests/fake-api.ts b/packages/client/connection/tests/fake-api.ts
+index 7d759cda..9cb1528a 100644
+--- a/packages/client/connection/tests/fake-api.ts
++++ b/packages/client/connection/tests/fake-api.ts
+@@ -94,6 +94,14 @@ export class FakeApiClient implements IApiClient {
+   // Parameter annotations below are local structural types on purpose: the CI
+   // lint lane runs without built artifacts, where IApiClient's wire types
+   // (apiproxy subpath) resolve to any and inferred params trip no-unsafe-argument.
++  readonly plugins = {
++    list: () => Promise.resolve(ok({ plugins: [] as never })),
++    install: () => Promise.resolve(ok({ id: 'x' as never })),
++    enable: () => Promise.resolve(ok({ id: 'x' as never })),
++    disable: () => Promise.resolve(ok({ id: 'x' as never })),
++    uninstall: () => Promise.resolve(ok({ id: 'x' as never })),
++  } as never
++
+   readonly sessions: IApiClient['sessions'] = {
+     list: (payload: unknown) => this.record('session.list', payload, this.onList(payload)),
+     search: (payload: unknown, signal?: AbortSignal) => {
 diff --git a/packages/client/modules/src/index.ts b/packages/client/modules/src/index.ts
 index ec3822e5..2644f910 100644
 --- a/packages/client/modules/src/index.ts
@@ -432,7 +451,7 @@ index 186cfe10..b37448e7 100644
 +  })
 +})
 diff --git a/packages/client/runtime/tests/fake-api.ts b/packages/client/runtime/tests/fake-api.ts
-index e50574d1..5ed17490 100644
+index e50574d1..26d38a11 100644
 --- a/packages/client/runtime/tests/fake-api.ts
 +++ b/packages/client/runtime/tests/fake-api.ts
 @@ -254,6 +254,14 @@ export class FakeApiClient implements IApiClient {
@@ -440,11 +459,11 @@ index e50574d1..5ed17490 100644
    }
  
 +  readonly plugins: IApiClient['plugins'] = {
-+    list: _p => Promise.resolve({ rpcId: '', result: { ok: true, value: { plugins: [] } } }),
-+    install: p => Promise.resolve({ rpcId: '', result: { ok: true, value: { id: String((p as { payload: { id: string } }).payload.id) } } }),
-+    enable: p => Promise.resolve({ rpcId: '', result: { ok: true, value: { id: String((p as { payload: { id: string } }).payload.id) } } }),
-+    disable: p => Promise.resolve({ rpcId: '', result: { ok: true, value: { id: String((p as { payload: { id: string } }).payload.id) } } }),
-+    uninstall: p => Promise.resolve({ rpcId: '', result: { ok: true, value: { id: String((p as { payload: { id: string } }).payload.id) } } }),
++    list: _p => Promise.resolve({ rpcId: '', result: { ok: true, value: { plugins: [] } } } as never),
++    install: _p => Promise.resolve({ rpcId: '', result: { ok: true, value: { id: 'x' } } } as never),
++    enable: _p => Promise.resolve({ rpcId: '', result: { ok: true, value: { id: 'x' } } } as never),
++    disable: _p => Promise.resolve({ rpcId: '', result: { ok: true, value: { id: 'x' } } } as never),
++    uninstall: _p => Promise.resolve({ rpcId: '', result: { ok: true, value: { id: 'x' } } } as never),
 +  }
 +
    onRespond: (message: ClientResponse) => Promise<RpcReceipt> = () => Promise.resolve({ accepted: true })
@@ -1656,6 +1675,44 @@ index 00000000..8ad8836b
 +    expect(message).toContain('not in the catalog')
 +  })
 +})
+diff --git a/packages/host/apiproxy/tests/client-handler.spec.ts b/packages/host/apiproxy/tests/client-handler.spec.ts
+index 173730ae..39425ed9 100644
+--- a/packages/host/apiproxy/tests/client-handler.spec.ts
++++ b/packages/host/apiproxy/tests/client-handler.spec.ts
+@@ -34,6 +34,14 @@ function scriptedApi(overrides: {
+   const err = <T>(r: RpcRequest<unknown>): Promise<RpcResponse<T>> =>
+     Promise.resolve({ rpcId: r.rpcId, result: { ok: false, error: { code: 'internal' as const, message: 'stub', details: {} } } })
+   return {
++    plugins: {
++      list: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { plugins: [] as never } } }),
++      install: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { id: 'x' as never } } }),
++      enable: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { id: 'x' as never } } }),
++      disable: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { id: 'x' as never } } }),
++      uninstall: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { id: 'x' as never } } }),
++    } as unknown as ApiProxy['plugins'],
++
+     sessions: {
+       list: r => ok(r, { items: [] }),
+       search: r => ok(r, { items: [], hasMore: false }),
+diff --git a/packages/host/apiproxy/tests/fetch-carrier.spec.ts b/packages/host/apiproxy/tests/fetch-carrier.spec.ts
+index acbedbaa..aefea014 100644
+--- a/packages/host/apiproxy/tests/fetch-carrier.spec.ts
++++ b/packages/host/apiproxy/tests/fetch-carrier.spec.ts
+@@ -17,6 +17,14 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
+     }
+   }
+   return {
++    plugins: {
++      list: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { plugins: [] as never } } }),
++      install: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { id: 'x' as never } } }),
++      enable: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { id: 'x' as never } } }),
++      disable: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { id: 'x' as never } } }),
++      uninstall: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { id: 'x' as never } } }),
++    } as unknown as ApiProxy['plugins'],
++
+     sessions: {
+       async list(request) {
+         if (overrides.crashOn === 'session.list') throw new Error('impl crashed')
 diff --git a/packages/host/apiproxy/tsconfig.json b/packages/host/apiproxy/tsconfig.json
 index c648d7a3..b04f74b6 100644
 --- a/packages/host/apiproxy/tsconfig.json
