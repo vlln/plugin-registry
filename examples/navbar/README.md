@@ -32,7 +32,7 @@ dsh registry enable vlln/navbar
 
 ## 测试
 
-DOM 级单测见 worktree `packages/plugin/plugin/tests/navbar.client.spec.ts`（4 例）：点渲染/点击跳转/行替换后重解析/dispose 清理/无关变更不重建。**MutationObserver 观察 body，但只响应流容器替换或流容器内变更 + rAF 去抖**——覆盖对话流挂载/重建（hero → active、会话切换、翻页），且不因其他 UI 变更触发（全量响应 + 每帧 reflow 会拖死页面，手测踩中后收窄）；导航条自身变更被过滤避免循环。位置跟随对话流列（列重建重绑 + ResizeObserver + window resize，position 不进渲染每帧路径）。
+DOM 级单测见 worktree `packages/plugin/plugin/tests/navbar.client.spec.ts`（4 例）：点渲染/点击跳转/行替换后重解析/dispose 清理/无关变更不重建。**MutationObserver 观察 body，但只响应流容器替换或流容器内变更 + rAF 去抖**——覆盖对话流挂载/重建（hero → active、会话切换、翻页），且不因其他 UI 变更触发（全量响应 + 每帧 reflow 会拖死页面，手测踩中后收窄）；导航条自身变更被过滤避免循环。位置跟随对话流列（列重建重绑 + ResizeObserver 观察**flow 及其祖先链** + window resize，position 不进渲染每帧路径）——祖先链覆盖侧边栏折叠/展开（AppFrame grid 轨道动画改变布局，flow 自身 contentRect 可能不变，但任一祖先尺寸变化即触发重定位）。
 
 ## 构建
 

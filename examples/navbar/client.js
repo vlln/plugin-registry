@@ -245,8 +245,20 @@ window.__ModuleLoader__.load({
           if (next === flow) return false;
           flow = next;
           if (sizeObserver !== null) sizeObserver.disconnect();
-          sizeObserver = flow === null ? null : new ResizeObserver(function () { position(); });
-          if (sizeObserver !== null && flow !== null) sizeObserver.observe(flow);
+          sizeObserver = null;
+          if (flow !== null) {
+            sizeObserver = new ResizeObserver(function () { position(); });
+            // 观察 flow 及其祖先链（到 body 为止）：侧边栏折叠/展开通过
+            // AppFrame 的 grid 轨道动画改变布局——flow 自身 contentRect 在
+            // 部分变化下不变（ResizeObserver 只报元素自身尺寸），但任一祖先
+            // 尺寸变化都会移动 flow 位置。观察整条祖先链，布局变化必然触发
+            // 重定位，不依赖官方 hash class。
+            var el = flow;
+            while (el !== null && el !== document.body) {
+              sizeObserver.observe(el);
+              el = el.parentElement;
+            }
+          }
           position();
           return true;
         };
