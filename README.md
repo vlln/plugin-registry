@@ -80,6 +80,7 @@ Web 设置页「插件」面板：
 - [清单格式参考](docs/manifest-format.md) — `dsh.plugin.json` 完整字段定义（原生 + 增量两种形态）
 - [加 client half](docs/cookbook/adding-a-client-half.md) — 给插件带浏览器端 UI：client 声明 → bundle 契约 → 构建 → 验证
 - [官方插件增量兼容](docs/official-plugin-incremental-compat.md) — 官方格式插件加增量清单进 registry（设计规范）
+- [0805→0806 迁移](docs/migrating-to-0806.md) — 命令/slots/挂载三处契约变化的插件迁移指南
 - [集成到 dsh](docs/cookbook/integrating-into-dsh.md) — 复制包 + 补丁 + 组合启用，接入 DSH 源码环境
 - [卸载](docs/cookbook/uninstalling-plugins.md) — 卸载插件，或把 registry 从 DSH 移除（集成反操作）
 - [分发插件](docs/cookbook/distributing-plugins.md) — tarball 分发与社区目录模式
