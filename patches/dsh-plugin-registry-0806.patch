@@ -72,41 +72,12 @@ index 17a288c0..0c329e9b 100644
    case 'dump-config': {
      const { runDumpConfig } = await import('./dump-config.ts')
      runDumpConfig(invocation.profile, invocation.defaultOnly, invocation.patches)
-diff --git a/apps/cli/tsconfig.json b/apps/cli/tsconfig.json
-index 36c4bad6..c6600a26 100644
---- a/apps/cli/tsconfig.json
-+++ b/apps/cli/tsconfig.json
-@@ -109,6 +109,12 @@
-     },
-     {
-       "path": "../../packages/client/ui-question"
-+    },
-+    {
-+      "path": "../../packages/plugin/plugin"
-+    },
-+    {
-+      "path": "../../packages/client/ui-plugin-manager"
-     }
-   ]
- }
-diff --git a/tsconfig.base.json b/tsconfig.base.json
-index cba3a997..53164f6e 100644
---- a/tsconfig.base.json
-+++ b/tsconfig.base.json
-@@ -213,6 +213,7 @@
-         "./packages/mcp/*/src",
-         "./packages/support/*/src",
-         "./packages/host/*/src",
-+        "./packages/plugin/*/src",
-         "./packages/client/*/src"
-       ]
-     }
 diff --git a/apps/cli/src/registry.ts b/apps/cli/src/registry.ts
 new file mode 100644
-index 00000000..90245ab3
+index 00000000..fb4c49f6
 --- /dev/null
 +++ b/apps/cli/src/registry.ts
-@@ -0,0 +1,95 @@
+@@ -0,0 +1,94 @@
 +/**
 + * `dsh registry` — manage the local plugin registry: install from a
 + * directory or tarball, list, enable/disable, uninstall, and scaffold.
@@ -194,11 +165,685 @@ index 00000000..90245ab3
 +        break
 +      }
 +      default:
-+        invocation satisfies never
-+        throw new Error(`dsh registry: unhandled action ${JSON.stringify(invocation)}`)
++        throw new Error(`dsh registry: unhandled action ${JSON.stringify(invocation.action)}`)
 +    }
 +  } catch (error) {
 +    console.error(String(error))
 +    process.exitCode = 1
 +  }
 +}
+diff --git a/apps/cli/tsconfig.json b/apps/cli/tsconfig.json
+index 36c4bad6..c6600a26 100644
+--- a/apps/cli/tsconfig.json
++++ b/apps/cli/tsconfig.json
+@@ -109,6 +109,12 @@
+     },
+     {
+       "path": "../../packages/client/ui-question"
++    },
++    {
++      "path": "../../packages/plugin/plugin"
++    },
++    {
++      "path": "../../packages/client/ui-plugin-manager"
+     }
+   ]
+ }
+diff --git a/packages/client/connection/src/client/fixture.ts b/packages/client/connection/src/client/fixture.ts
+index 8df252c2..edfd008c 100644
+--- a/packages/client/connection/src/client/fixture.ts
++++ b/packages/client/connection/src/client/fixture.ts
+@@ -2509,6 +2509,13 @@ export function createFixtureApi(options: FixtureOptions = {}): ApiProxy {
+         models: fixtureModelGroups().flatMap(group => group.models.map(model => ({ id: model.id, name: model.name }))),
+       }),
+     },
++    plugins: {
++      list: request => ok(request, { plugins: [] }),
++      install: request => ok(request, { id: request.payload.id }),
++      enable: request => ok(request, { id: request.payload.id }),
++      disable: request => ok(request, { id: request.payload.id }),
++      uninstall: request => ok(request, { id: request.payload.id }),
++    },
+     respond(message: ClientResponse): Promise<RpcReceipt> {
+       // Same routing discipline as the host: rpcId first, then the payload's
+       // audit correlation; a settled or unknown id is not-pending.
+@@ -2626,6 +2633,11 @@ export class FixtureApiClient extends AbstractApiClient {
+       case 'llm.providers': return this.api.llm.providers(request)
+       case 'llm.models': return this.api.llm.models(request)
+       case 'llm.discoverModels': return this.api.llm.discoverModels(request, signal)
++      case 'plugin.list': return this.api.plugins.list(request)
++      case 'plugin.install': return this.api.plugins.install(request)
++      case 'plugin.enable': return this.api.plugins.enable(request)
++      case 'plugin.disable': return this.api.plugins.disable(request)
++      case 'plugin.uninstall': return this.api.plugins.uninstall(request)
+     }
+   }
+ 
+diff --git a/packages/client/runtime/tests/fake-api.ts b/packages/client/runtime/tests/fake-api.ts
+index e50574d1..5ed17490 100644
+--- a/packages/client/runtime/tests/fake-api.ts
++++ b/packages/client/runtime/tests/fake-api.ts
+@@ -254,6 +254,14 @@ export class FakeApiClient implements IApiClient {
+     host: (_payload: unknown, signal: AbortSignal, onOpen?: () => void) => this.openStream(this.hostConns, signal, onOpen),
+   }
+ 
++  readonly plugins: IApiClient['plugins'] = {
++    list: _p => Promise.resolve({ rpcId: '', result: { ok: true, value: { plugins: [] } } }),
++    install: p => Promise.resolve({ rpcId: '', result: { ok: true, value: { id: String((p as { payload: { id: string } }).payload.id) } } }),
++    enable: p => Promise.resolve({ rpcId: '', result: { ok: true, value: { id: String((p as { payload: { id: string } }).payload.id) } } }),
++    disable: p => Promise.resolve({ rpcId: '', result: { ok: true, value: { id: String((p as { payload: { id: string } }).payload.id) } } }),
++    uninstall: p => Promise.resolve({ rpcId: '', result: { ok: true, value: { id: String((p as { payload: { id: string } }).payload.id) } } }),
++  }
++
+   onRespond: (message: ClientResponse) => Promise<RpcReceipt> = () => Promise.resolve({ accepted: true })
+ 
+   respond(message: ClientResponse): Promise<RpcReceipt> {
+diff --git a/packages/host/apiproxy/src/api-proxy.ts b/packages/host/apiproxy/src/api-proxy.ts
+index 1564abaf..fe47b643 100644
+--- a/packages/host/apiproxy/src/api-proxy.ts
++++ b/packages/host/apiproxy/src/api-proxy.ts
+@@ -25,6 +25,7 @@ import {
+ } from '@deepseek-ai/dsh-workspace'
+ // Type-only: brings the `ctx.tools` Context merge into this program (viewFor reads presenters).
+ import type {} from '@deepseek-ai/dsh-tools'
++import type { PluginLocalService } from '@deepseek-ai/dsh-plugin'
+ import type {
+   ApiProxy, CredentialView, GoalRef, HistoryEntry, HostFrame, ModelCatalogFailure, ModelProviderGroup,
+   ModelReasoning, MuxFrame, QuestionResponsePayload, SessionProjectionsBlock, SessionSearchItem,
+@@ -1340,6 +1341,21 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
+     return { code: 'internal', message: 'credentials service is absent: this deployment does not mount a credential provider (e.g. @deepseek-ai/dsh-credentials-local) in its composition', details: {} }
+   }
+ 
++  /** Missing-service report shared by the plugins domain. */
++  function pluginsAbsent(): RpcError {
++    return { code: 'internal', message: 'plugin registry is absent: this deployment does not mount @deepseek-ai/dsh-plugin in its composition (cordis.yml or explicit assembly)', details: {} }
++  }
++
++  /**
++   * Resolve the plugin registry service. The plugins domain keeps the same
++   * stance as settings/skills: a deployment without `ctx.plugins` is a
++   * composition gap, not an empty catalog.
++   * @returns the registry service, or undefined when absent.
++   */
++  function pluginRegistry(): PluginLocalService | undefined {
++    return ctx.get('plugins')
++  }
++
+   /** Map one redacted seam descriptor to its wire view. */
+   function namespaceView(descriptor: SettingsDescriptor): SettingsNamespaceView {
+     return {
+@@ -2739,5 +2755,61 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
+       pending.resolve(payload.answer)
+       return Promise.resolve({ accepted: true })
+     },
++
++    plugins: {
++      async list(request) {
++        const registry = pluginRegistry()
++        if (registry === undefined) return err(request, pluginsAbsent())
++        try {
++          return ok(request, { plugins: await registry.list() })
++        } catch (error: unknown) {
++          return err(request, { code: 'internal', message: `plugin listing failed: ${String(error)}`, details: {} })
++        }
++      },
++
++      async install(request) {
++        const registry = pluginRegistry()
++        if (registry === undefined) return err(request, pluginsAbsent())
++        try {
++          const installed = await registry.install(request.payload.id)
++          return ok(request, { id: installed.id })
++        } catch (error: unknown) {
++          return err(request, { code: 'internal', message: `plugin install failed: ${String(error)}`, details: {} })
++        }
++      },
++
++      async enable(request) {
++        const registry = pluginRegistry()
++        if (registry === undefined) return err(request, pluginsAbsent())
++        try {
++          await registry.enable(request.payload.id)
++          return ok(request, { id: request.payload.id })
++        } catch (error: unknown) {
++          return err(request, { code: 'internal', message: `plugin enable failed: ${String(error)}`, details: {} })
++        }
++      },
++
++      async disable(request) {
++        const registry = pluginRegistry()
++        if (registry === undefined) return err(request, pluginsAbsent())
++        try {
++          await registry.disable(request.payload.id)
++          return ok(request, { id: request.payload.id })
++        } catch (error: unknown) {
++          return err(request, { code: 'internal', message: `plugin disable failed: ${String(error)}`, details: {} })
++        }
++      },
++
++      async uninstall(request) {
++        const registry = pluginRegistry()
++        if (registry === undefined) return err(request, pluginsAbsent())
++        try {
++          await registry.uninstall(request.payload.id)
++          return ok(request, { id: request.payload.id })
++        } catch (error: unknown) {
++          return err(request, { code: 'internal', message: `plugin uninstall failed: ${String(error)}`, details: {} })
++        }
++      },
++    },
+   }
+ }
+diff --git a/packages/host/apiproxy/src/api/index.ts b/packages/host/apiproxy/src/api/index.ts
+index 4f10d928..5138e94b 100644
+--- a/packages/host/apiproxy/src/api/index.ts
++++ b/packages/host/apiproxy/src/api/index.ts
+@@ -15,6 +15,7 @@ import type { GoalsApi } from './goals.ts'
+ import type { SettingsApi } from './settings.ts'
+ import type { CredentialsApi } from './credentials.ts'
+ import type { LlmApi } from './llm.ts'
++import type { PluginsApi } from './plugins.ts'
+ import type { ClientResponse, RpcReceipt } from './rpc.ts'
+ 
+ /** Root interface of the unified API surface. New client-request domain = one new file pair + one field here + one map row. */
+@@ -30,6 +31,7 @@ export interface ApiProxy {
+   settings: SettingsApi
+   credentials: CredentialsApi
+   llm: LlmApi
++  plugins: PluginsApi
+   /** Response entry for server-requests (client-response, echoing their rpcId); not a domain method (four-quadrant model). */
+   respond(message: ClientResponse): Promise<RpcReceipt>
+ }
+@@ -52,6 +54,7 @@ export type { GoalsApi, GoalId, GoalRef } from './goals.ts'
+ export type { SettingsApi, SettingsNamespaceView, SettingsPathOpView, SettingsSecretView } from './settings.ts'
+ export type { CredentialsApi, CredentialView } from './credentials.ts'
+ export type { ConfigurableProviderView, DiscoveredModelView, LlmApi } from './llm.ts'
++export type { PluginEntryView, PluginsApi } from './plugins.ts'
+ export type { ApprovalResponsePayload } from './approvals.ts'
+ export type { QuestionResponsePayload } from './questions.ts'
+ 
+diff --git a/packages/host/apiproxy/src/api/plugins.schema.ts b/packages/host/apiproxy/src/api/plugins.schema.ts
+new file mode 100644
+index 00000000..6ca14a7f
+--- /dev/null
++++ b/packages/host/apiproxy/src/api/plugins.schema.ts
+@@ -0,0 +1,36 @@
++/**
++ * plugins domain zod schemas (names derived from map keys: pluginListRequestSchema /
++ * pluginListValueSchema / pluginInstall* / pluginEnable* / pluginDisable* / pluginUninstall*).
++ */
++
++import { z } from 'zod'
++import type { RequestPayload, ResponseValue } from './rpc-map.ts'
++import type { Wire } from './rpc.schema.ts'
++import type { PluginEntryView } from './plugins.ts'
++
++/** One plugin browse row. */
++export const pluginEntryViewSchema = z.object({
++  id: z.string().min(1),
++  version: z.string().min(1),
++  description: z.string(),
++  installed: z.boolean(),
++  enabled: z.boolean(),
++}) satisfies z.ZodType<Wire<PluginEntryView>>
++
++/** plugin.list request payload. */
++export const pluginListRequestSchema = z.object({}) satisfies z.ZodType<Wire<RequestPayload<'plugin.list'>>>
++
++/** plugin.list response value. */
++export const pluginListValueSchema = z.object({
++  plugins: z.array(pluginEntryViewSchema),
++}) satisfies z.ZodType<Wire<ResponseValue<'plugin.list'>>>
++
++/** The id-addressed request payload shared by install/enable/disable/uninstall. */
++export const pluginIdRequestSchema = z.object({
++  id: z.string().min(1),
++}) satisfies z.ZodType<Wire<RequestPayload<'plugin.install'>>>
++
++/** The id echo shared by install/enable/disable/uninstall response values. */
++export const pluginIdValueSchema = z.object({
++  id: z.string().min(1),
++}) satisfies z.ZodType<Wire<ResponseValue<'plugin.install'>>>
+diff --git a/packages/host/apiproxy/src/api/plugins.ts b/packages/host/apiproxy/src/api/plugins.ts
+new file mode 100644
+index 00000000..32f4e406
+--- /dev/null
++++ b/packages/host/apiproxy/src/api/plugins.ts
+@@ -0,0 +1,43 @@
++/**
++ * plugins domain contract: the web face of the local plugin registry
++ * (`ctx.plugins`, provided by `@deepseek-ai/dsh-plugin`). Rows merge the local
++ * catalog (the browse list) with installed state; install/enable/disable/
++ * uninstall operate on the registry, and enable/disable keep the live mount
++ * set in sync — a toggled plugin mounts or unmounts immediately.
++ */
++
++import type { RpcRequest, RpcResponse } from './rpc.ts'
++
++/** One plugin browse row (wire projection of the registry's PluginEntryView). */
++export interface PluginEntryView {
++  /** Publisher-scoped plugin id. */
++  readonly id: string
++  /** Installed version when installed, else the catalog-advertised version. */
++  readonly version: string
++  /** One-line summary. */
++  readonly description: string
++  /** Whether the plugin is installed in the registry. */
++  readonly installed: boolean
++  /** Whether the installed plugin is mounted (and will mount on the next load). */
++  readonly enabled: boolean
++}
++
++/** One plugin id addressed by every mutating method. */
++export interface PluginIdPayload {
++  /** The plugin id. */
++  readonly id: string
++}
++
++/** Plugin-domain unary methods (the map keys plugin.* of RpcMethodMap). */
++export interface PluginsApi {
++  /** List every browse row: catalog entries merged with installed state, sorted by id. */
++  list(request: RpcRequest<{}>): Promise<RpcResponse<{ plugins: readonly PluginEntryView[] }>>
++  /** Install a catalog entry (disabled by default; not mounted). */
++  install(request: RpcRequest<PluginIdPayload>): Promise<RpcResponse<{ id: string }>>
++  /** Enable an installed plugin and mount it immediately. */
++  enable(request: RpcRequest<PluginIdPayload>): Promise<RpcResponse<{ id: string }>>
++  /** Unmount and disable an installed plugin. */
++  disable(request: RpcRequest<PluginIdPayload>): Promise<RpcResponse<{ id: string }>>
++  /** Unmount and remove an installed plugin from the registry. */
++  uninstall(request: RpcRequest<PluginIdPayload>): Promise<RpcResponse<{ id: string }>>
++}
+diff --git a/packages/host/apiproxy/src/api/rpc-map.ts b/packages/host/apiproxy/src/api/rpc-map.ts
+index 9a8750c7..9a2120cb 100644
+--- a/packages/host/apiproxy/src/api/rpc-map.ts
++++ b/packages/host/apiproxy/src/api/rpc-map.ts
+@@ -13,6 +13,7 @@ import type { GoalsApi } from './goals.ts'
+ import type { SettingsApi } from './settings.ts'
+ import type { CredentialsApi } from './credentials.ts'
+ import type { LlmApi } from './llm.ts'
++import type { PluginsApi } from './plugins.ts'
+ import type { SubagentsApi } from './subagents.ts'
+ import type { RpcResponse } from './rpc.ts'
+ 
+@@ -67,6 +68,11 @@ export interface RpcMethodMap {
+   'llm.providers': LlmApi['providers']
+   'llm.models': LlmApi['models']
+   'llm.discoverModels': LlmApi['discoverModels']
++  'plugin.list': PluginsApi['list']
++  'plugin.install': PluginsApi['install']
++  'plugin.enable': PluginsApi['enable']
++  'plugin.disable': PluginsApi['disable']
++  'plugin.uninstall': PluginsApi['uninstall']
+ }
+ 
+ /** Business request payload of method K (reaches through the RpcRequest narrow form to payload). */
+diff --git a/packages/host/apiproxy/src/fetch/client.ts b/packages/host/apiproxy/src/fetch/client.ts
+index 0f54d76d..d80718e8 100644
+--- a/packages/host/apiproxy/src/fetch/client.ts
++++ b/packages/host/apiproxy/src/fetch/client.ts
+@@ -56,6 +56,7 @@ import {
+   credentialsDescribeValueSchema, credentialsSetValueSchema, credentialsUnsetValueSchema,
+ } from '../api/credentials.schema.ts'
+ import { llmDiscoverModelsValueSchema, llmModelsValueSchema, llmProvidersValueSchema } from '../api/llm.schema.ts'
++import { pluginIdValueSchema, pluginListValueSchema } from '../api/plugins.schema.ts'
+ import {
+   subagentHistoryValueSchema,
+   subagentListValueSchema,
+@@ -148,6 +149,13 @@ export interface IApiClient {
+     models(payload: RequestPayload<'llm.models'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'llm.models'>>>
+     discoverModels(payload: RequestPayload<'llm.discoverModels'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'llm.discoverModels'>>>
+   }
++  plugins: {
++    list(payload: RequestPayload<'plugin.list'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'plugin.list'>>>
++    install(payload: RequestPayload<'plugin.install'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'plugin.install'>>>
++    enable(payload: RequestPayload<'plugin.enable'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'plugin.enable'>>>
++    disable(payload: RequestPayload<'plugin.disable'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'plugin.disable'>>>
++    uninstall(payload: RequestPayload<'plugin.uninstall'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'plugin.uninstall'>>>
++  }
+   /** client-response passthrough (rpcId is a backfill of the server-request's id — never minted here). */
+   respond(message: ClientResponse, signal?: AbortSignal): Promise<RpcReceipt>
+ }
+@@ -202,6 +210,11 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
+   'llm.providers': llmProvidersValueSchema,
+   'llm.models': llmModelsValueSchema,
+   'llm.discoverModels': llmDiscoverModelsValueSchema,
++  'plugin.list': pluginListValueSchema,
++  'plugin.install': pluginIdValueSchema,
++  'plugin.enable': pluginIdValueSchema,
++  'plugin.disable': pluginIdValueSchema,
++  'plugin.uninstall': pluginIdValueSchema,
+ }
+ 
+ /** Default timeout for bounded unary calls (rpc-compare 2026-07-19: a hung host must not leave callers pending forever). */
+@@ -472,6 +485,14 @@ export abstract class AbstractApiClient implements IApiClient {
+     discoverModels: (payload, signal) => this.callUnary('llm.discoverModels', payload, signal),
+   }
+ 
++  readonly plugins: IApiClient['plugins'] = {
++    list: (payload, signal) => this.callUnary('plugin.list', payload, signal),
++    install: (payload, signal) => this.callUnary('plugin.install', payload, signal),
++    enable: (payload, signal) => this.callUnary('plugin.enable', payload, signal),
++    disable: (payload, signal) => this.callUnary('plugin.disable', payload, signal),
++    uninstall: (payload, signal) => this.callUnary('plugin.uninstall', payload, signal),
++  }
++
+   readonly events: IApiClient['events'] = {
+     mux: (payload, signal, onOpen) => this.openMux(payload, signal, onOpen),
+     host: (payload, signal, onOpen) => this.openHost(payload, signal, onOpen),
+diff --git a/packages/host/apiproxy/src/fetch/handler.ts b/packages/host/apiproxy/src/fetch/handler.ts
+index 2b30e3fe..41736387 100644
+--- a/packages/host/apiproxy/src/fetch/handler.ts
++++ b/packages/host/apiproxy/src/fetch/handler.ts
+@@ -58,6 +58,7 @@ import {
+   credentialsDescribeRequestSchema, credentialsSetRequestSchema, credentialsUnsetRequestSchema,
+ } from '../api/credentials.schema.ts'
+ import { llmDiscoverModelsRequestSchema, llmModelsRequestSchema, llmProvidersRequestSchema } from '../api/llm.schema.ts'
++import { pluginIdRequestSchema, pluginListRequestSchema } from '../api/plugins.schema.ts'
+ import {
+   subagentHistoryRequestSchema,
+   subagentListRequestSchema,
+@@ -126,6 +127,11 @@ const UNARY_ROUTES: UnaryRoutes = {
+   'llm.providers': { schema: llmProvidersRequestSchema, invoke: (api, r) => api.llm.providers(r) },
+   'llm.models': { schema: llmModelsRequestSchema, invoke: (api, r) => api.llm.models(r) },
+   'llm.discoverModels': { schema: llmDiscoverModelsRequestSchema, invoke: (api, r, signal) => api.llm.discoverModels(r, signal) },
++  'plugin.list': { schema: pluginListRequestSchema, invoke: (api, r) => api.plugins.list(r) },
++  'plugin.install': { schema: pluginIdRequestSchema, invoke: (api, r) => api.plugins.install(r) },
++  'plugin.enable': { schema: pluginIdRequestSchema, invoke: (api, r) => api.plugins.enable(r) },
++  'plugin.disable': { schema: pluginIdRequestSchema, invoke: (api, r) => api.plugins.disable(r) },
++  'plugin.uninstall': { schema: pluginIdRequestSchema, invoke: (api, r) => api.plugins.uninstall(r) },
+ }
+ 
+ /** Route lookup that narrows an arbitrary path segment to a map key (single cast point for the string→key refinement). */
+diff --git a/packages/host/apiproxy/src/index.ts b/packages/host/apiproxy/src/index.ts
+index e279575f..e9dcf38b 100644
+--- a/packages/host/apiproxy/src/index.ts
++++ b/packages/host/apiproxy/src/index.ts
+@@ -66,6 +66,7 @@ export class ApiProxyService extends Service implements ApiProxy {
+   readonly settings: ApiProxy['settings']
+   readonly credentials: ApiProxy['credentials']
+   readonly llm: ApiProxy['llm']
++  readonly plugins: ApiProxy['plugins']
+   readonly events: ApiProxy['events']
+   readonly respond: ApiProxy['respond']
+ 
+@@ -88,6 +89,7 @@ export class ApiProxyService extends Service implements ApiProxy {
+     this.settings = api.settings
+     this.credentials = api.credentials
+     this.llm = api.llm
++    this.plugins = api.plugins
+     this.events = api.events
+     // createApiProxy returns closures (no `this` capture); bind only satisfies
+     // the unbound-method lint without changing behavior.
+diff --git a/packages/host/apiproxy/tsconfig.json b/packages/host/apiproxy/tsconfig.json
+index c648d7a3..b04f74b6 100644
+--- a/packages/host/apiproxy/tsconfig.json
++++ b/packages/host/apiproxy/tsconfig.json
+@@ -82,6 +82,9 @@
+     },
+     {
+       "path": "../../util/native-command"
++    },
++    {
++      "path": "../../plugin/plugin"
+     }
+   ]
+-}
++}
+\ No newline at end of file
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 8b6543ac..98df211d 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -155,6 +155,9 @@ importers:
+       '@deepseek-ai/dsh-paths':
+         specifier: workspace:^
+         version: link:../../packages/util/paths
++      '@deepseek-ai/dsh-plugin':
++        specifier: workspace:^
++        version: link:../../packages/plugin/plugin
+       '@deepseek-ai/dsh-pty':
+         specifier: workspace:^
+         version: link:../../packages/pty/pty
+@@ -1773,6 +1776,45 @@ importers:
+         specifier: ^18.2.0
+         version: 18.3.1
+ 
++  packages/client/ui-plugin-manager:
++    devDependencies:
++      '@deepseek-ai/dsh-client-connection':
++        specifier: workspace:^
++        version: link:../connection
++      '@deepseek-ai/dsh-client-runtime':
++        specifier: workspace:^
++        version: link:../runtime
++      '@deepseek-ai/dsh-client-test-runtime':
++        specifier: workspace:^
++        version: link:../test-runtime
++      '@deepseek-ai/dsh-client-ui-primitives':
++        specifier: workspace:^
++        version: link:../ui-primitives
++      '@deepseek-ai/dsh-client-ui-settings':
++        specifier: workspace:^
++        version: link:../ui-settings
++      '@deepseek-ai/dsh-client-ui-slots':
++        specifier: workspace:^
++        version: link:../ui-slots
++      '@deepseek-ai/dsh-client-web-react':
++        specifier: workspace:^
++        version: link:../web-react
++      '@deepseek-ai/dsh-host-apiproxy':
++        specifier: workspace:^
++        version: link:../../host/apiproxy
++      '@deepseek-ai/dsh-invariants':
++        specifier: workspace:^
++        version: link:../../support/invariants
++      '@types/react':
++        specifier: ~18.3.1
++        version: 18.3.31
++      cordis:
++        specifier: ^4.0.0-rc.7
++        version: link:../../../vendor/cordis
++      react:
++        specifier: ^18.2.0
++        version: 18.3.1
++
+   packages/client/ui-primitives:
+     dependencies:
+       '@shikijs/langs':
+@@ -4169,6 +4211,34 @@ importers:
+         specifier: ^4.0.0-rc.7
+         version: link:../../../vendor/cordis
+ 
++  packages/plugin/plugin:
++    dependencies:
++      schemastery:
++        specifier: ^3.18.0
++        version: link:../../../vendor/schemastery
++      semver:
++        specifier: ^7.8.4
++        version: 7.8.4
++      tar:
++        specifier: ^7.5.22
++        version: 7.5.22
++    devDependencies:
++      '@deepseek-ai/dsh-invariants':
++        specifier: workspace:^
++        version: link:../../support/invariants
++      '@deepseek-ai/dsh-paths':
++        specifier: workspace:^
++        version: link:../../util/paths
++      '@deepseek-ai/dsh-tools':
++        specifier: workspace:^
++        version: link:../../core/tools
++      '@types/semver':
++        specifier: ^7.8.0
++        version: 7.8.0
++      cordis:
++        specifier: ^4.0.0-rc.7
++        version: link:../../../vendor/cordis
++
+   packages/pty/pty:
+     devDependencies:
+       '@deepseek-ai/dsh-agent':
+@@ -8109,6 +8179,10 @@ packages:
+     resolution: {integrity: sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA==}
+     engines: {node: '>=12'}
+ 
++  '@isaacs/fs-minipass@4.0.1':
++    resolution: {integrity: sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w==}
++    engines: {node: '>=18.0.0'}
++
+   '@joplin/turndown-plugin-gfm@1.0.67':
+     resolution: {integrity: sha512-FZfW5EZfidhzd1IaY1uxHnIZPTVOxAdleMZ4/1U6Nt5b7+Qj5JThDnaIomuJtetnUBzuRNbe9FWMuqD4B3dlWA==}
+ 
+@@ -9448,6 +9522,9 @@ packages:
+   '@types/retry@0.12.0':
+     resolution: {integrity: sha512-wWKOClTTiizcZhXnPY4wikVAwmdYHp8q6DmC+EJUzAMsycb7HB32Kh9RN4+0gExjmPmZSAQjgURXIGATPegAvA==}
+ 
++  '@types/semver@7.8.0':
++    resolution: {integrity: sha512-1mAINjtQCXXeLkJ9ehXkwOcBpqtLxiVtKhpUf83DdRNdQKV0iXZpaHYqRr7nj+wvxuJzoAmAwXI+sCNMv1CzLQ==}
++
+   '@types/spdx-expression-parse@4.0.0':
+     resolution: {integrity: sha512-odQzy87phelGS4inXOzjmusx4hoCVD0IbxUANxHzVkmTzMRTNnUPoq1urIl7S1qf09KcDWKLFIftPmLtgbsAHA==}
+ 
+@@ -9908,6 +9985,10 @@ packages:
+     resolution: {integrity: sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw==}
+     engines: {node: '>= 20.19.0'}
+ 
++  chownr@3.0.0:
++    resolution: {integrity: sha512-+IxzY9BZOQd/XuYPRmrvEVjF/nqj5kgT4kEq7VofrDoM1MxoRjEWkrCC3EtLi59TVawxTAn+orJwFQcrqEN1+g==}
++    engines: {node: '>=18'}
++
+   clsx@2.1.1:
+     resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
+     engines: {node: '>=6'}
+@@ -11231,6 +11312,10 @@ packages:
+   minisearch@7.2.0:
+     resolution: {integrity: sha512-dqT2XBYUOZOiC5t2HRnwADjhNS2cecp9u+TJRiJ1Qp/f5qjkeT5APcGPjHw+bz89Ms8Jp+cG4AlE+QZ/QnDglg==}
+ 
++  minizlib@3.1.0:
++    resolution: {integrity: sha512-KZxYo1BUkWD2TVFLr0MQoM8vUUigWD3LlD83a/75BqC+4qE0Hb1Vo5v1FgcfaNXvfXzr+5EhQ6ing/CaBijTlw==}
++    engines: {node: '>= 18'}
++
+   mitt@3.0.1:
+     resolution: {integrity: sha512-vKivATfr97l2/QBCYAkXYDbrIWPM2IIKEl7YPhjCvKlG3kE2gm+uBo6nEXK3M5/Ffh/FLpKExzOQ3JJoJGFKBw==}
+ 
+@@ -11874,6 +11959,10 @@ packages:
+   tabbable@6.5.0:
+     resolution: {integrity: sha512-wieBHXygIm7OyQOu5hQlkk62/WyCFYGlWg7L6/ZCUZwx0o398Zkn4pVmMyfYhfMG8kGrj/Krt8eIk6UKC6VzwA==}
+ 
++  tar@7.5.22:
++    resolution: {integrity: sha512-MFO/QzvtAOmJbkhOaCTvbGcFN9L9b+JunIsDwaKljSOdcLMea3NJ1k9Usz/rjdfSXTq4dfzfeS7W4p4YOAAHeA==}
++    engines: {node: '>=18'}
++
+   tinybench@2.9.0:
+     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
+ 
+@@ -12368,6 +12457,10 @@ packages:
+   yallist@3.1.1:
+     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
+ 
++  yallist@5.0.0:
++    resolution: {integrity: sha512-YgvUTfwqyc7UXVMrB+SImsVYSmTS8X/tSrtdNZMImM+n7+QTriRXyXim0mBrTXNeqzVF0KWGgHPeiyViFFrNDw==}
++    engines: {node: '>=18'}
++
+   yaml@2.9.0:
+     resolution: {integrity: sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA==}
+     engines: {node: '>= 14.6'}
+@@ -13401,6 +13494,10 @@ snapshots:
+       wrap-ansi: 8.1.0
+       wrap-ansi-cjs: wrap-ansi@7.0.0
+ 
++  '@isaacs/fs-minipass@4.0.1':
++    dependencies:
++      minipass: 7.1.3
++
+   '@joplin/turndown-plugin-gfm@1.0.67': {}
+ 
+   '@jridgewell/gen-mapping@0.3.13':
+@@ -14469,6 +14566,8 @@ snapshots:
+ 
+   '@types/retry@0.12.0': {}
+ 
++  '@types/semver@7.8.0': {}
++
+   '@types/spdx-expression-parse@4.0.0': {}
+ 
+   '@types/tough-cookie@4.0.5': {}
+@@ -14580,7 +14679,7 @@ snapshots:
+       obug: 2.1.3
+       std-env: 4.1.0
+       tinyrainbow: 3.1.0
+-      vitest: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@22.20.0)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@22.20.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
++      vitest: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.3)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
+ 
+   '@vitest/expect@4.1.8':
+     dependencies:
+@@ -14965,6 +15064,8 @@ snapshots:
+     dependencies:
+       readdirp: 5.0.0
+ 
++  chownr@3.0.0: {}
++
+   clsx@2.1.1: {}
+ 
+   color-convert@2.0.1:
+@@ -16585,6 +16686,10 @@ snapshots:
+ 
+   minisearch@7.2.0: {}
+ 
++  minizlib@3.1.0:
++    dependencies:
++      minipass: 7.1.3
++
+   mitt@3.0.1: {}
+ 
+   mri@1.2.0: {}
+@@ -17313,6 +17418,14 @@ snapshots:
+ 
+   tabbable@6.5.0: {}
+ 
++  tar@7.5.22:
++    dependencies:
++      '@isaacs/fs-minipass': 4.0.1
++      chownr: 3.0.0
++      minipass: 7.1.3
++      minizlib: 3.1.0
++      yallist: 5.0.0
++
+   tinybench@2.9.0: {}
+ 
+   tinyexec@1.2.4: {}
+@@ -17815,6 +17928,8 @@ snapshots:
+ 
+   yallist@3.1.1: {}
+ 
++  yallist@5.0.0: {}
++
+   yaml@2.9.0: {}
+ 
+   yocto-queue@0.1.0: {}
+diff --git a/tsconfig.base.json b/tsconfig.base.json
+index cba3a997..53164f6e 100644
+--- a/tsconfig.base.json
++++ b/tsconfig.base.json
+@@ -213,6 +213,7 @@
+         "./packages/mcp/*/src",
+         "./packages/support/*/src",
+         "./packages/host/*/src",
++        "./packages/plugin/*/src",
+         "./packages/client/*/src"
+       ]
+     }
+diff --git a/tsconfig.client.json b/tsconfig.client.json
+index e1d40880..e60a0f76 100644
+--- a/tsconfig.client.json
++++ b/tsconfig.client.json
+@@ -66,6 +66,7 @@
+     { "path": "./packages/client/ui-permission" },
+     { "path": "./packages/client/ui-plan" },
+     { "path": "./packages/client/ui-question" },
++    { "path": "./packages/client/ui-plugin-manager" },
+     { "path": "./packages/client/ui-trajectory" },
+     { "path": "./packages/client/ui-theme" },
+     { "path": "./packages/client/ui-settings" },
