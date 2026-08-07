@@ -36,7 +36,7 @@ dsh registry enable acme/loop
 ## 工作原理
 
 - 每轮 = `agent.followup(createUserMessage({ content, source: { kind: 'plugin', plugin: 'acme/loop' } }))`——与官方 goal-session 驱动多轮同一机制
-- 定时 = `ctx.interval()`（vendored timer，生命周期管理的定时器，返回 disposer）
+- 定时 = `ctx.interval()`（vendored timer，生命周期管理的定时器，返回 disposer）；`setInterval` 首个 tick 要等一个完整间隔，故启动时**立即投递第一轮**（对齐 Claude Code `/loop`「立即开始 + 周期重复」），之后按间隔周期投递
 - 调度纪律：agent 忙则跳过本轮（不堆积 inbox）；agent 销毁则自动停止循环
 - 命令定位会话 = `CommandInvocation.agent`；工具定位会话 = `ctx.agents.currentInitiator()`
 

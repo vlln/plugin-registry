@@ -65,8 +65,10 @@ export default {
         dispose: undefined,
       }
       // 每 tick：agent 已销毁则停止；忙则跳过本轮（不堆积 inbox）；
-      // 空闲则 followup 投递下一轮 prompt。
-      state.dispose = ctx.interval(() => {
+      // 空闲则 followup 投递 prompt。setInterval 语义是首个 tick 要等
+      // 一个完整间隔，所以启动时立即补投第一轮（对齐 Claude Code /loop
+      // "立即开始 + 周期重复"），之后由 interval 周期投递。
+      const deliver = () => {
         if (ctx.agents.get(agent.id) !== agent) {
           stopLoop(agent)
           return
@@ -76,8 +78,13 @@ export default {
           content: [{ type: 'text', text: state.prompt }],
           source: { kind: 'plugin', plugin: PLUGIN_ID },
         }))
-      }, intervalMs)
+      }
+      state.dispose = ctx.interval(deliver, intervalMs)
       loops.set(agent.id, state)
+      // 命令路径（用户敲 /loop）：agent 此刻空闲，立即投递第一轮；
+      // 工具路径（模型 turn 内 loop start）：agent 忙，deliver 会跳过，
+      // 本轮结束后由 interval 接管——两种场景都正确。
+      deliver()
       return state
     }
 
