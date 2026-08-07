@@ -7,7 +7,16 @@
 本仓库是「官方基线 + patch + package」构建式仓库（见 [AGENTS.md](AGENTS.md)），交付时需标明基线：
 
 - **机制分支基线**：官方 0806 快照（`20260806T160212Z`，提交 `28f4c886`）——worktree 分支已对齐
-- **patch 基线**：`patches/dsh-plugin-registry-0806.patch` 基于官方 0806 快照（25 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、依赖闭包）
+- **patch 基线**：`patches/dsh-plugin-registry-0806.patch` 基于官方 0806 快照（28 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、host 帧 `client-graph-changed` 自动刷新、依赖闭包）
+
+## 2026-08（插件启停自动刷新）
+
+registry enable/disable 通过 `registerExternal`/`unregisterExternal` 改变 client-modules graph；boot manifest 页面加载时固定，故 apiproxy 在 host 流推送纯信号帧 `host/client-graph-changed`，浏览器收到后 `location.reload()` 拾取新 `__DSH_BOOT__`：
+
+- **host 侧**：`events.ts` HostFrame union 加 `{ type: 'host/client-graph-changed' }` + schema；api-proxy 的 events.host disposers 订阅 `clientModuleHost.onGraphChanged`（跨 isolate 走 `ctx.root`，与 plugin service 一致）
+- **client 侧**：`manager.ts` 收到该帧 → `window.location.reload()`
+- **验证**：WebSocket 连 `/api/events.host`，`plugin.disable/enable`（有 client half 的插件，如 greeter）→ 立即收到 `client-graph-changed` 帧（先于 RPC 响应）；无 client half 的插件（如 loop）不触发（`unregisterExternal` 无行可删，正确行为）
+
 
 ## 2026-08（0806 对齐的架构修复）
 

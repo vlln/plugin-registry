@@ -451,6 +451,26 @@ index 186cfe10..b37448e7 100644
 +    expect(service.graph().entries).toHaveLength(0)
 +  })
 +})
+diff --git a/packages/client/runtime/src/client/sessions/manager.ts b/packages/client/runtime/src/client/sessions/manager.ts
+index 64199c48..986ee989 100644
+--- a/packages/client/runtime/src/client/sessions/manager.ts
++++ b/packages/client/runtime/src/client/sessions/manager.ts
+@@ -806,6 +806,15 @@ export class SessionManager {
+         this.sessions.get(frame.sessionId)?.handleAgentError(frame.message)
+         return // not reflected in the list
+       }
++      case 'host/client-graph-changed': {
++        // The plugin-registry client-modules graph changed (registerExternal/
++        // unregisterExternal). The boot manifest is fixed at page load, so a
++        // reload is the only way to pick up the new __DSH_BOOT__ — the
++        // browser-side half of "no manual refresh needed" after enabling or
++        // disabling a plugin's client half.
++        window.location.reload()
++        return
++      }
+       default:
+         return // stream/error ignored; unknown frames ignored (documented default)
+     }
 diff --git a/packages/client/runtime/tests/fake-api.ts b/packages/client/runtime/tests/fake-api.ts
 index e50574d1..26d38a11 100644
 --- a/packages/client/runtime/tests/fake-api.ts
@@ -471,7 +491,7 @@ index e50574d1..26d38a11 100644
  
    respond(message: ClientResponse): Promise<RpcReceipt> {
 diff --git a/packages/host/apiproxy/src/api-proxy.ts b/packages/host/apiproxy/src/api-proxy.ts
-index 1564abaf..fe47b643 100644
+index 1564abaf..c69da07b 100644
 --- a/packages/host/apiproxy/src/api-proxy.ts
 +++ b/packages/host/apiproxy/src/api-proxy.ts
 @@ -25,6 +25,7 @@ import {
@@ -504,7 +524,31 @@ index 1564abaf..fe47b643 100644
    /** Map one redacted seam descriptor to its wire view. */
    function namespaceView(descriptor: SettingsDescriptor): SettingsNamespaceView {
      return {
-@@ -2739,5 +2755,61 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
+@@ -2669,6 +2685,23 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
+           ctx.on('commands/change', () => {
+             queue.push(frame({ type: 'host/commands-changed' }))
+           }),
++          // plugin-registry enable/disable changes the client-modules graph
++          // (registerExternal/unregisterExternal); the boot manifest is fixed
++          // at page load, so signal the browser to reload (host frame is only
++          // wired when the modules host is composed — web shapes).
++          (() => {
++            // Cross-isolate read: `ctx.get` is strict (the providing fiber
++            // must be ACTIVE in this isolate), and the modules host lives in
++            // the client/web fiber — reach it through the root store the same
++            // way @deepseek-ai/dsh-plugin's service does.
++            const clientModuleHost = (ctx.root as {
++              clientModuleHost?: { onGraphChanged?: (l: () => void) => () => void }
++            }).clientModuleHost
++            if (clientModuleHost === undefined || clientModuleHost.onGraphChanged === undefined) return () => {}
++            return clientModuleHost.onGraphChanged(() => {
++              queue.push(frame({ type: 'host/client-graph-changed' }))
++            })
++          })(),
+           ctx.on('settings/document-updated', (ns) => {
+             // The RAW-section event, not the resolved one: a field going from
+             // inherited to overridden leaves the resolved value equal, and a
+@@ -2739,5 +2772,61 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
        pending.resolve(payload.answer)
        return Promise.resolve({ accepted: true })
      },
@@ -566,6 +610,37 @@ index 1564abaf..fe47b643 100644
 +    },
    }
  }
+diff --git a/packages/host/apiproxy/src/api/events.schema.ts b/packages/host/apiproxy/src/api/events.schema.ts
+index 13ead7d0..a750f0c1 100644
+--- a/packages/host/apiproxy/src/api/events.schema.ts
++++ b/packages/host/apiproxy/src/api/events.schema.ts
+@@ -81,6 +81,7 @@ export const hostFrameSchema = z.discriminatedUnion('type', [
+   z.object({ type: z.literal('host/workspace-removed'), workspaceId: workspaceIdSchema }),
+   z.object({ type: z.literal('host/archived-sessions-changed'), archivedSessionIds: z.array(sessionIdSchema) }),
+   z.object({ type: z.literal('host/commands-changed') }),
++  z.object({ type: z.literal('host/client-graph-changed') }),
+   z.object({ type: z.literal('host/settings-changed'), ns: z.string() }),
+   z.object({ type: z.literal('host/credentials-changed'), ref: z.string() }),
+   z.object({ type: z.literal('host/models-changed') }),
+diff --git a/packages/host/apiproxy/src/api/events.ts b/packages/host/apiproxy/src/api/events.ts
+index 7fc54f6f..ad2535c4 100644
+--- a/packages/host/apiproxy/src/api/events.ts
++++ b/packages/host/apiproxy/src/api/events.ts
+@@ -123,6 +123,14 @@ export type HostFrame =
+   | { type: 'host/workspace-changed'; workspace: WorkspaceView }
+   | { type: 'host/workspace-removed'; workspaceId: WorkspaceView['workspaceId'] }
+   | { type: 'host/archived-sessions-changed'; archivedSessionIds: SessionId[] }
++  /**
++   * The web client-modules graph changed (plugin-registry enable/disable
++   * registered or removed a client half via registerExternal). Pure signal,
++   * no payload: the boot manifest is fixed at page load, so the browser
++   * reloads to pick up the new `__DSH_BOOT__` — the alternative to a manual
++   * refresh.
++   */
++  | { type: 'host/client-graph-changed' }
+   /**
+    * The command registry changed (`commands/change` passthrough). Pure
+    * invalidation signal, no payload: clients refetch `command.list` in the
 diff --git a/packages/host/apiproxy/src/api/index.ts b/packages/host/apiproxy/src/api/index.ts
 index 4f10d928..5138e94b 100644
 --- a/packages/host/apiproxy/src/api/index.ts
