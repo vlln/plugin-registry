@@ -3,7 +3,13 @@
 #
 # Applied via the official profile-bundle mechanism (dsh.bundle.patch) — the
 # profile's `dsh.profile.bundles` lists this package, and `dsh plugin --profile
-# <name> add @dsh-external/dsh-plugin-registry-bundle` installs it as a layer.
+# <name> add <dir|git-url>` installs it as a layer.
+#
+# The two inserted rows resolve through the profile's dependency fallback
+# (`<dshHome>/profiles/node_modules`, healed from the app manifest closure):
+# both packages are workspace deps of the app (apps/cli), so this bundle
+# declares NO dependencies of its own — the row names must stay in the app
+# closure or the composition fails to import them.
 # Rows below address the same plugin ids the base bundle inserted; the last
 # write per row wins, matching every other bundle layer.
 

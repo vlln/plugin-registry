@@ -6,8 +6,17 @@
 
 本仓库是「官方基线 + patch + package」构建式仓库（见 [AGENTS.md](AGENTS.md)），交付时需标明基线：
 
-- **机制分支基线**：官方 0805 快照（`20260805T134133Z`，提交 `9e785ce`）——worktree 分支已对齐
-- **patch 基线**：`patches/dsh-plugin-registry.patch` 基于官方 0805 快照（30 文件，纯平台接线：CLI 子命令、apiproxy `plugins` 域、client-modules `registerExternal`、组合挂载；S2/S3/mount 机制件已移除）
+- **机制分支基线**：官方 0806 快照（`20260806T160212Z`，提交 `28f4c886`）——worktree 分支已对齐
+- **patch 基线**：`patches/dsh-plugin-registry-0806.patch` 基于官方 0806 快照（27 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、依赖闭包）
+
+## 2026-08（0806 对齐的架构修复）
+
+架构审查发现的 3 个问题修复：
+
+- **🔴 bundle 安装死路**：registry bundle 不再声明 private 包依赖（@deepseek-ai/dsh-plugin 等未发布，npm 解析必败）；`@deepseek-ai/dsh-client-ui-plugin-manager` 加入 apps/cli 依赖闭包（0806 patch），bundle 的 insert 行经 profile 依赖 fallback（`healProfilesModuleFallback`）解析——`dsh plugin --profile web add <bundle>` 路径跑通
+- **🟠 双装互斥扩展**：plugin-local mount 时检查 `<dshHome>/profiles/*` 的 `dsh.profile.bundles`，同一包已作为 bundle 层安装则拒绝（补 registerExternal 的 Loader-entry 守卫覆盖不到的 bundle 层场景）
+- **🟠 分发侧同步 0806**：repo 的 ui-plugin-manager 客户端 `deferRegistration → ctx.slots.inject`（0806 slots 契约）；install-into-dsh.mjs、integrating-into-dsh、uninstalling-plugins、distributing-plugins、AGENTS、architecture 全部 0805 → 0806 基线 + bundle 化流程
+- **依赖解析分工**（architecture.md 记录）：profile 闭包服务组合内服务，deps-link 只服务动态插件，不重叠
 
 ## 2026-08（deps-link 增强：pnpm 虚拟 store 公共层）
 

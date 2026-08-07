@@ -20,12 +20,12 @@ tarball 安装走严格解压（防路径穿越），定位到含 `dsh.plugin.js
 
 ## 形态二：社区目录模式（registry 功能分发）
 
-本仓库自身用此模式：把 `packages/plugin/`、`packages/ui-plugin-manager/` 复制进目标 DSH monorepo + `git apply patches/dsh-plugin-registry.patch`（基于官方 0805 快照生成）。见 [集成到 dsh](integrating-into-dsh.md)。
+本仓库自身用此模式：把 `packages/plugin/`、`packages/ui-plugin-manager/` 复制进目标 DSH monorepo + `git apply patches/dsh-plugin-registry-0806.patch`（基于官方 0806 快照生成）；registry 服务经 profile bundle 挂载（`packages/bundle/dsh-plugin-registry`）。见 [集成到 dsh](integrating-into-dsh.md)。
 
 适配新基线：在官方新快照上重新生成补丁（文件范围 = 官方侧接线改动 + 机制件，排除复制分发包 `packages/plugin`、`packages/ui-plugin-manager` 与构建产物）：
 
 ```sh
-git diff <snapshot-ref>..HEAD -- apps/cli/config/web.cordis.yml apps/cli/package.json apps/cli/src/args.ts apps/cli/src/bin.ts apps/cli/src/plugin.ts apps/cli/tests/args.spec.ts packages/client/connection packages/client/modules packages/client/runtime packages/client/test-runtime packages/client/ui-conversation packages/client/ui-question packages/client/ui-sidebar packages/client/ui-trajectory packages/client/web-react packages/host/apiproxy packages/tasks packages/README.md packages/README.zh.md packages/README.i18n.yaml scripts/verify-package-readme-model-experience.ts tsconfig.base.json tsconfig.client.json > patches/dsh-plugin-registry.patch
+git diff <snapshot-ref>..HEAD -- apps/cli/package.json apps/cli/src/args.ts apps/cli/src/bin.ts apps/cli/src/registry.ts apps/cli/tests/args.spec.ts packages/client/connection packages/client/modules packages/client/ui-plugin-manager packages/host/apiproxy packages/README.md packages/README.zh.md packages/README.i18n.yaml scripts/verify-package-readme-model-experience.ts tsconfig.base.json tsconfig.client.json > patches/dsh-plugin-registry-0806.patch
 ```
 
 **验证点**：在干净的新快照 checkout 上 `git apply --check` 通过。

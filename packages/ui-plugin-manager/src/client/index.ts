@@ -7,7 +7,6 @@
  */
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
-import { deferRegistration } from '@deepseek-ai/dsh-client-ui-slots'
 import { PluginPanel, type PluginPanelInjected } from './PluginPanel.tsx'
 
 export type { PluginPanelInjected, PluginPanelProps } from './PluginPanel.tsx'
@@ -16,22 +15,20 @@ export type { PluginPanelInjected, PluginPanelProps } from './PluginPanel.tsx'
 export const inject = ['slots', 'connection']
 
 /**
- * Register the Settings plugin section once its slot declaration is on the
- * ledger.
+ * Register the Settings plugin section. 0806 dropped the deferred-registration
+ * helper; the current contract is `slots.inject(name, () => register(...))`,
+ * matching every other settings-section plugin.
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
   const connection = ctx.get('connection') as ConnectionHandle
   const injected = (): PluginPanelInjected => ({ api: connection.api })
-  ctx.effect(() => {
-    const panel = deferRegistration(ctx.slots, 'settings.section', PluginPanel, () =>
-      ctx.slots.register({
-        name: 'settings.section',
-        id: 'plugins',
-        order: 60,
-        label: () => '插件',
-        inject: injected,
-      }, PluginPanel))
-    return () => { panel.dispose() }
-  }, 'ui-plugin-manager: settings section registration')
+  ctx.slots.inject('settings.section', () =>
+    ctx.slots.register({
+      name: 'settings.section',
+      id: 'plugins',
+      order: 60,
+      label: () => '插件',
+      inject: injected,
+    }, PluginPanel))
 }

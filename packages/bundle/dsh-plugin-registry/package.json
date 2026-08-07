@@ -20,10 +20,6 @@
       "patch": "./cordis.patch.yml"
     }
   },
-  "dependencies": {
-    "@deepseek-ai/dsh-plugin": "^0.0.1",
-    "@deepseek-ai/dsh-client-ui-plugin-manager": "^0.0.1"
-  },
   "peerDependencies": {
     "@deepseek-ai/dsh-invariants": "^0.0.1",
     "cordis": "^4.0.0-rc.7"

@@ -40,6 +40,10 @@
 
 边界：链接**尽力而为**——不 import 官方包的插件无需它；解析不到 checkout 的部署（如单文件 bundle）跳过，不影响安装与挂载。插件**不能声明自己的 npm 依赖**（`dsh.plugin.json` 无 dependencies 字段）；可用依赖 = checkout 的依赖闭包（公共层暴露面即官方树自身闭包）。
 
+**与 0806 profile 依赖解析的分工**：官方 profile/bundle 机制为**组合内服务**提供依赖解析（`<dshHome>/profiles/node_modules`，`healProfilesModuleFallback` 从 app 闭包 BFS 建链接）——registry 服务（plugin-local/ui-plugin-manager）作 bundle 层时走官方闭包；deps-link 只服务**动态安装的插件**（`<dshHome>/plugins/`），两者不重叠。
+
+**双装互斥**：同一包可同时有 `dsh.plugin.json` 与 bundle 形态。`registerExternal` 碰撞守卫拦 Loader entry 同名；bundle 层行非 Loader entry，由 **plugin-local 的 profile bundles 守卫**（mount 时检查 `<dshHome>/profiles/*` 的 `dsh.profile.bundles`）补上——两种安装方式强制二选一。
+
 ## 能力面 vs 声明面（contributes）
 
 `contributes` 字段目前只有 `tools` / `skills`（仅 `tools` 做挂载时校验）——这是**校验范围**，不是**能力上限**。

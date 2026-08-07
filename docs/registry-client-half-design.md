@@ -54,7 +54,7 @@ unregisterExternal(id: string): void
 
 ### 补登记：host 缺席时怎么办（评审 R1）
 
-`plugin-local` 激活即跑 `reconcile()`（`plugin/src/index.ts:64-68`，`inject = []`）；`ClientModuleHostService` 要等 `httpServer`+`loader`（`static inject = ['httpServer', 'loader']`）。web.cordis.yml 明示行序无加载语义——两者**无顺序保证**，且倾向 plugin-local 先激活。mount 期间 root 属性读 `clientModuleHost` 得 undefined → 登记静默跳过，且无再触发 → **进程重启后已启用插件的 client half 从 boot graph 永久消失**。
+`plugin-local` 激活即跑 `reconcile()`（`plugin/src/index.ts:64-68`，`inject = []`）；`ClientModuleHostService` 要等 `httpServer`+`loader`（`static inject = ['httpServer', 'loader']`）。组合层（profile bundle patch）行序无加载语义——两者**无顺序保证**，且倾向 plugin-local 先激活。mount 期间 root 属性读 `clientModuleHost` 得 undefined → 登记静默跳过，且无再触发 → **进程重启后已启用插件的 client half 从 boot graph 永久消失**。
 
 **选型：`ctx.inject` 延迟补登记（推荐）**。`ctx.inject(['clientModuleHost'], cb)` 是 cordis 标准「等服务就绪再执行」机制（`this.mixin("registry", ["inject", "plugin"])`，任何 ctx 可用；`vendor/cordis/lib/index.js:743,1583-1596`）：
 

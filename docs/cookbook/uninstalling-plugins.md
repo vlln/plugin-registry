@@ -29,11 +29,11 @@ Web 面板：设置页「插件」区 → 目标插件 → 卸载。
 按集成流程的反向操作（在 DSH monorepo 根目录）：
 
 ```sh
-# 1. 移除组合挂载行（apps/cli/config/web.cordis.yml 的 plugin-local / ui-plugin-manager insert）
-#    手动删除，或还原该文件
+# 1. 移除 profile 挂载：从 profile 的 dsh.profile.bundles 去掉 registry bundle
+#    （或 dsh plugin --profile web remove @dsh-external/dsh-plugin-registry-bundle）
 
 # 2. 回滚接线补丁（与 install-into-dsh.mjs 的 git apply 相反）
-git apply -R patches/dsh-plugin-registry.patch
+git apply -R patches/dsh-plugin-registry-0806.patch
 
 # 3. 删除 copy-in 的插件实现包
 rm -rf packages/plugin packages/client/ui-plugin-manager
@@ -47,14 +47,14 @@ pnpm install
 
 **已安装插件的处理**：registry 卸载**不会**删除 `<dshHome>/plugins/` 下的插件目录与索引——那是插件数据，不是 registry 机制本身。需要一并清理时手动 `rm -rf <dshHome>/plugins/`（含 `index.json` 与 `node_modules` deps-link）。
 
-**验证**：`./bin/dsh web` 启动无 plugin-local 错误；设置页无「插件」面板；`dsh plugin` 子命令不存在（回到官方 CLI 面）。
+**验证**：`./bin/dsh web` 启动无 plugin-local 错误；设置页无「插件」面板；`dsh registry` 子命令不存在（回到官方 CLI 面）。
 
 ## 常见问题
 
 - **卸载失败 / 索引不一致**：`dsh registry uninstall` 重试；仍失败则检查 `<dshHome>/plugins/index.json` 与目录是否匹配，手动修正。
 - **uninstall 后浏览器仍显示插件 UI**：boot graph 变更跨页面生效——刷新页面。
 - **目录被占用（Windows）**：先停掉 `dsh web` 再卸载。
-- **卸载 registry 后 `dsh web` 报错**：确认 web.cordis.yml 的组合行已删除、patch 已回滚（`git apply -R` 失败说明基线漂移，按 `--3way` 提示手动对齐）。
+- **卸载 registry 后 `dsh web` 报错**：确认 profile 的 bundles 列表已移除 registry bundle、patch 已回滚（`git apply -R` 失败说明基线漂移，按 `--3way` 提示手动对齐）。
 
 ## 参考
 
