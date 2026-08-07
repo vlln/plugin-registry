@@ -112,37 +112,40 @@ function useSessionTasks(sessionId: string): WireTask[] {
 }
 
 /**
- * 任务输出读取：**手动**（点击"读取输出"按钮触发一次），不用自动轮询。
- * `tasks.read` 的游标是全局 per-task——自动轮询会持续消耗官方 `task_output`
- * 工具的读取增量（两者竞争同一游标），故改为用户主动点击时读一次并追加。
- * 任务终态后输出幂等（final-output），重读不会重复。
- * @param taskId - 当前展开的任务 id；null 时不读。
- * @returns 累计输出 + 手动读取函数 + 重置函数。
+ * 任务输出 tail：展开任务时**自动轮询** Node half 输出路由。路由走宿主
+ * `tasks.peek`（非消耗式）——每次返回当前保留输出全文，客户端**整段替换**
+ * 渲染（tail -f 效果，无需按钮）。peek 不推进 per-task 游标、不标记
+ * reported：自动轮询与官方 `task_output` 工具的读取零竞争（官方工具读到的
+ * 增量不受影响），终态通知仍由首次消耗式 read/wait 交付。
+ * @param taskId - 当前展开的任务 id；null 时不轮询。
+ * @returns 当前保留输出文本。
  */
-function useTaskOutput(taskId: string | null): {
-  taskOutput: string
-  readOutput: () => Promise<void>
-  resetOutput: () => void
-} {
+function useTaskOutput(taskId: string | null): string {
   const [output, setOutput] = useState('')
-  const taskIdRef = useRef(taskId)
-  taskIdRef.current = taskId
-  useEffect(() => { setOutput('') }, [taskId])
-  const readOutput = async (): Promise<void> => {
-    const current = taskIdRef.current
-    if (current === null) return
-    try {
-      const res = await fetch(`${OUTPUT_PATH}?id=${encodeURIComponent(current)}`, { headers: { accept: 'application/json' } })
-      if (!res.ok) return
-      const data = (await res.json()) as { text?: string }
-      if (typeof data.text === 'string' && data.text !== '') {
-        setOutput(prev => prev + data.text)
-      }
-    } catch {
-      // 瞬态网络错误：保持当前输出。
+  useEffect(() => {
+    if (taskId === null) {
+      setOutput('')
+      return
     }
-  }
-  return { taskOutput: output, readOutput, resetOutput: () => setOutput('') }
+    let alive = true
+    const poll = async (): Promise<void> => {
+      try {
+        const res = await fetch(`${OUTPUT_PATH}?id=${encodeURIComponent(taskId)}`, { headers: { accept: 'application/json' } })
+        if (!res.ok) return
+        const data = (await res.json()) as { text?: string }
+        // 整段替换：peek 返回保留输出全文（重复轮询同一文本），追加会重复。
+        if (alive && typeof data.text === 'string') {
+          setOutput(data.text)
+        }
+      } catch {
+        // 瞬态网络错误：保持当前输出。
+      }
+    }
+    void poll()
+    const timer = setInterval(() => { void poll() }, POLL_MS)
+    return () => { alive = false; clearInterval(timer) }
+  }, [taskId])
+  return output
 }
 
 /**
@@ -157,7 +160,7 @@ export function TaskStatusBar(
   const [inChat, setInChat] = useState(false)
   const [open, setOpen] = useState(false)
   const [expandedTask, setExpandedTask] = useState<string | null>(null)
-  const { taskOutput, readOutput } = useTaskOutput(expandedTask)
+  const taskOutput = useTaskOutput(expandedTask)
 
   // 对话页探针：flow 列存在性（navbar 同信号）。body 级 observer 只跑
   // querySelector，回调轻量；view 切换（flow 移除/重建）都触发。
@@ -239,18 +242,6 @@ export function TaskStatusBar(
           <div style={{ padding: '0 12px 8px 34px', fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary)', display: 'flex', flexDirection: 'column', gap: 2 }}>
             <span>类型：{task.kind} · {timeText(task)}</span>
             {task.detail !== undefined && <span>详情：{task.detail}</span>}
-            <button
-              type="button"
-              onClick={() => { void readOutput() }}
-              style={{
-                alignSelf: 'flex-start', marginTop: 2, padding: '2px 8px', borderRadius: 6,
-                fontSize: 11, lineHeight: '18px', cursor: 'pointer',
-                color: 'var(--dsw-alias-text-accent)', background: 'transparent',
-                border: '1px solid var(--dsw-alias-border-l1)',
-              }}
-            >
-              {taskOutput === '' ? '读取输出' : '继续读取'}
-            </button>
             {taskOutput !== '' && (
               <pre style={{
                 margin: '4px 0 0', padding: '8px 10px', maxHeight: 160, overflowY: 'auto',

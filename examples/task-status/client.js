@@ -67,24 +67,29 @@ window.__ModuleLoader__.load({
 			}, [sessionId]);
 			return tasks.filter(task => task.ownerSession === sessionId);
 		}
-		// 手动读取（不用自动轮询）：tasks.read 的游标全局 per-task，自动轮询会
-		// 持续消耗官方 task_output 工具的读取增量（竞争同一游标）。
+		// 自动 tail：展开任务即轮询 Node half 输出路由（宿主 tasks.peek，
+		// 非消耗式）——返回保留输出全文，整段替换渲染（无需按钮）。
+		// peek 不推进 per-task 游标、不标记 reported：与官方 task_output 工具
+		// 的读取零竞争，终态通知仍由首次消耗式 read/wait 交付。
 		function useTaskOutput(taskId) {
 			const [output, setOutput] = react.useState("");
-			const taskIdRef = react.useRef(taskId);
-			taskIdRef.current = taskId;
-			react.useEffect(() => { setOutput(""); }, [taskId]);
-			const readOutput = async () => {
-				const current = taskIdRef.current;
-				if (current === null) return;
-				try {
-					const res = await fetch(OUTPUT_PATH + "?id=" + encodeURIComponent(current), { headers: { accept: "application/json" } });
-					if (!res.ok) return;
-					const data = await res.json();
-					if (typeof data.text === "string" && data.text !== "") setOutput(prev => prev + data.text);
-				} catch {}
-			};
-			return { taskOutput: output, readOutput };
+			react.useEffect(() => {
+				if (taskId === null) { setOutput(""); return; }
+				let alive = true;
+				const poll = async () => {
+					try {
+						const res = await fetch(OUTPUT_PATH + "?id=" + encodeURIComponent(taskId), { headers: { accept: "application/json" } });
+						if (!res.ok) return;
+						const data = await res.json();
+						// 整段替换：peek 返回保留输出全文（重复轮询同一文本），追加会重复。
+						if (alive && typeof data.text === "string") setOutput(data.text);
+					} catch {}
+				};
+				poll();
+				const timer = setInterval(() => { poll(); }, POLL_MS);
+				return () => { alive = false; clearInterval(timer); };
+			}, [taskId]);
+			return output;
 		}
 		function TaskStatusBar(props) {
 			const t = props.t;
@@ -92,7 +97,7 @@ window.__ModuleLoader__.load({
 			const [inChat, setInChat] = react.useState(false);
 			const [open, setOpen] = react.useState(false);
 			const [expandedTask, setExpandedTask] = react.useState(null);
-			const { taskOutput, readOutput } = useTaskOutput(expandedTask);
+			const taskOutput = useTaskOutput(expandedTask);
 			react.useEffect(() => {
 				const check = () => { setInChat(document.querySelector('[data-chat-flow=""]') !== null); };
 				check();
@@ -132,7 +137,6 @@ window.__ModuleLoader__.load({
 						key: "det",
 						style: { padding: "0 12px 8px 34px", fontSize: 12, lineHeight: "18px", color: "var(--dsw-alias-label-tertiary)", display: "flex", flexDirection: "column", gap: 2 }
 					}, react.createElement("span", null, "类型：" + task.kind + " · " + timeText(task)), task.detail !== undefined ? react.createElement("span", null, "详情：" + task.detail) : null,
-						react.createElement("button", { type: "button", onClick: () => { readOutput(); }, style: { alignSelf: "flex-start", marginTop: 2, padding: "2px 8px", borderRadius: 6, fontSize: 11, lineHeight: "18px", cursor: "pointer", color: "var(--dsw-alias-text-accent)", background: "transparent", border: "1px solid var(--dsw-alias-border-l1)" } }, taskOutput === "" ? "读取输出" : "继续读取"),
 						taskOutput !== "" ? react.createElement("pre", { style: { margin: "4px 0 0", padding: "8px 10px", maxHeight: 160, overflowY: "auto", borderRadius: 8, fontSize: 11, lineHeight: "16px", fontFamily: "var(--dsh-code-font-family, ui-monospace, monospace)", background: "var(--dsw-specific-tip)", border: "1px solid var(--dsw-alias-border-l1)", whiteSpace: "pre-wrap", wordBreak: "break-word" } }, taskOutput) : null)
 					: null;
 				return react.createElement("div", { key: task.id }, line, details);

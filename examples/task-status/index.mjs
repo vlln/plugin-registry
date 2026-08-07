@@ -9,7 +9,7 @@
 /** 只读任务列表路由（与 client bundle 轮询地址一致）。 */
 export const TASKS_PATH = '/plugins/vlln/task-status/tasks'
 
-/** 任务输出读取路由（tail：每次返回自上次读取以来的流增量）。 */
+/** 任务输出读取路由（tail：每次返回保留输出全文，非消耗式）。 */
 export const OUTPUT_PATH = '/plugins/vlln/task-status/output'
 
 /** Cordis 插件名。 */
@@ -53,22 +53,25 @@ function collectTasks(ctx) {
 }
 
 /**
- * 读取一个任务的输出增量（tail）。`tasks.read(id, caller)` 的 owner fence
- * 让无 agent 身份的调用方只读 unowned 任务——所以先按 agent 遍历找到任务
- * 的 owner（其 `list(agent)` 含该 id），用该 agent 身份 read（游标是
- * per-task 的，只调一次，避免重复消耗）；unowned 直接 read。
+ * 读取一个任务的输出 tail（非消耗式）。`tasks.peek(id, caller)` 的 owner
+ * fence 与 `read` 一致——先按 agent 遍历找到任务的 owner（其 `list(agent)`
+ * 含该 id），用该 agent 身份 peek；unowned 直接 peek。
+ *
+ * 与 `tasks.read` 的区别：peek 不推进 per-task 游标，也不标记 reported——
+ * 自动轮询 tail 不再与官方 `task_output` 工具的读取竞争（官方工具读到的
+ * 增量不受影响），终态通知仍由首次消耗式 read/wait 交付。
  * @param ctx - host cordis context。
  * @param id - 任务 id。
- * @returns 该次读取的流增量 text 与快照；任务不存在返回 null。
+ * @returns 当前保留输出 text 与快照；任务不存在返回 null。
  */
 function readTaskOutput(ctx, id) {
   const tasks = ctx.tasks
   for (const agent of ctx.agents.list()) {
     if (tasks.list(agent).some(snapshot => snapshot.id === id)) {
-      return { text: tasks.read(id, agent).text, snapshot: toWire(tasks.list(agent).find(s => s.id === id)) }
+      return { text: tasks.peek(id, agent).text, snapshot: toWire(tasks.list(agent).find(s => s.id === id)) }
     }
   }
-  return { text: tasks.read(id).text, snapshot: toWire(tasks.list().find(s => s.id === id)) }
+  return { text: tasks.peek(id).text, snapshot: toWire(tasks.list().find(s => s.id === id)) }
 }
 
 /**
