@@ -12,6 +12,9 @@ window.__ModuleLoader__.load({
     var slots = require("@deepseek-ai/dsh-client-ui-slots");
     module.exports = {
       name: "turn-fold-client",
+      // Cordis 服务依赖声明：用了 ctx.slots 与 ctx.locale，必须显式 inject，
+      // 否则加载报 "cannot get property \"locale\" without inject"。
+      inject: ["slots", "locale"],
       apply: function (ctx) {
         // locale 字典（zh/en）。
         var NS = "turn-fold";

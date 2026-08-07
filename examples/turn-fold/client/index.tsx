@@ -193,6 +193,8 @@ export function TurnFold({ matched, t }: TurnFoldProps) {
  * 随声明坍缩自动移除、重声明后重跑（0806+ slots 契约）。
  * @param ctx - client root context。
  */
+export const inject = ['slots', 'locale']
+
 export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'turn-fold: dictionaries')
   ctx.slots.inject('conversation.chat.turnTail', () =>
