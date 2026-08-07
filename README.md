@@ -68,6 +68,7 @@ Web 设置页「插件」面板：
 | [`examples/greeter`](examples/greeter/README.md) | Node 侧 greet 工具 + 浏览器端 client half（纯 DOM 自渲染浮层） |
 | [`examples/navbar`](examples/navbar/README.md) | S1 自渲染导航条：对话流 user 消息导航，仅对话页显示（DOM 锚点契约） |
 | [`examples/task-status`](examples/task-status/README.md) | S2 后台任务状态条：对话框上方显示该会话后台任务（官方槽 + Node 轮询路由，仅对话页、完成后消失、点击展开详情） |
+| [`examples/turn-fold`](examples/turn-fold/README.md) | S3 turn 折叠（形态 A）：0807 官方 `conversation.chat.turnTail` 槽——每个完成 turn 末尾的可折叠工具活动摘要头 |
 | [`examples/loop`](examples/loop/README.md) | `/loop` 命令 + `loop` 工具，按间隔向当前 agent 重复投递 prompt（对齐 Claude Code `/loop`） |
 
 ## Agent Skill

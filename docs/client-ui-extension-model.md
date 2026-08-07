@@ -8,7 +8,7 @@
 |---|---|---|
 | S1 | 导航条 | 侧边一条 user message 导航，点击跳转 |
 | S2 | 后台任务 UI | 对话页**对话框上方**的任务状态条（官方槽 + 插件自造轮询通道） |
-| S3 | Turn 折叠 | turn 结束折叠执行过程（**不可行**：区间折叠需官方折叠容器） |
+| S3 | Turn 折叠 | turn 结束折叠执行过程（**形态 A 可行**：0807 `conversation.chat.turnTail` 槽追加式尾部折叠；**形态 C 区间折叠仍不可行**：需官方折叠容器） |
 | S4 | 动态卡片 | Agent 输出结构化标记 → 插件渲染动态卡片 |
 | S5 | Task board | 用户**委派任务给 Agent** 的委派台（**工作区级**）——**暂不做** |
 
@@ -33,9 +33,11 @@
 
 示例 `examples/task-status`：不依赖推送投影，`tasks.list(caller)` 的 owner fence 由 Node half 遍历 `ctx.agents.list()` 绕过（插件侧等价于 `listOwned`）。代价：实时性降为轮询粒度、插件代码更厚；收益：官方树零改动。
 
-### S3 Turn 折叠 ❌ 不可行
+### S3 Turn 折叠 ⚠️ 形态 A 可行（0807+）
 
-折叠是**区间语义**（N item → 1 折叠头）。早期尝试的 per-item 回退缝（`conversation.chat.item` chain 槽）只覆盖逐 item 替换，hack 折叠有硬缺陷（卸载原生行丢展开状态、null 占位破坏间距、上下文无 turn 归属）。正确形态需官方折叠容器，**已决定不做**。
+0805 判定不可行：区间折叠是**区间语义**（N item → 1 折叠头），早期 per-item 回退缝（`conversation.chat.item` chain 槽）只覆盖逐 item 替换，hack 折叠有硬缺陷（卸载原生行丢展开状态、null 占位破坏间距、上下文无 turn 归属），正确形态需官方折叠容器。
+
+**0807 官方补齐 turn 归属基础设施**，形态 A（追加式尾部折叠）可行：`conversation.chat.turnTail` 链槽（每完成 turn 一次，渲染在 closing assistant 正文与 IconActions 之间）+ `TurnTailOwnerProps`（`nodes`/`seq`/`openFile`）+ `ConversationNode.turn` 字段（turn 分组）。插件从 owner.nodes 按 turn 派生活动摘要，`select` 返回 null 谢绝空 turn；官方同槽先例 `ui-deliverables.ProducedFiles`。示例 `examples/turn-fold`。**形态 C（区间折叠，隐藏 turn 内官方行）仍不可行**——需官方在 ChatView 层加 turn 容器。
 
 ### S4 动态卡片 ⚠️ 需数据侧 marker + 渲染点（安全版）
 

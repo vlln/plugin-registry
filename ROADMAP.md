@@ -23,5 +23,5 @@ plugin-registry 的推进路线。状态标注：`待决策`（需先拍板形�
 
 ## 已决定不做（记录）
 
-- **S3 turn 折叠**：区间折叠（N item → 1 折叠头）需官方折叠容器（纯折叠策略 + 原生常驻 + CSS 收起）——M2 方案已决定不做，`examples/turn-fold` 移除；早期 per-item 回退缝（`conversation.chat.item`）已随缝降级移除
+- **S3 turn 折叠（形态 C 原生容器）**：区间折叠（N item → 1 折叠头，隐藏 turn 内官方行）需官方折叠容器——0807 仍无，未实现；**形态 A（turn 尾部摘要折叠）已实现**（`examples/turn-fold`，0807 官方 `conversation.chat.turnTail` 槽）；早期 per-item 回退缝（`conversation.chat.item`）已随缝降级移除
 - **S5 task board 委派台**：工作区级委派台（与 workspace 平级）暂不做；taskboard 示例移除
