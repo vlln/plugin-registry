@@ -15,15 +15,6 @@
 
 0807 官方已吸收部分机制文档（`services.md` 的 `BashProcess.peekOutput` 行等）；官方新增 `ui-skill` 包（含 locale 路径引用 bug，非机制引入）。
 
-## 2026-08（S3 turn 折叠复活：0807 turnTail 槽）
-
-S3「turn 折叠」0805 判定不可行（区间折叠需官方折叠容器），**0807 官方补齐 turn 归属基础设施后形态 A 复活**：
-
-- **0807 新增能力**：`conversation.chat.turnTail` 链槽（每完成 turn 一次，渲染在 closing assistant 正文与 IconActions 之间）+ `TurnTailOwnerProps`（`nodes`/`seq`/`openFile`）+ `ConversationNode.turn` 字段（turn 分组）+ 官方同槽先例 `ui-deliverables.ProducedFiles`
-- **示例**：`examples/turn-fold`——从 owner.nodes 按 turn 派生活动摘要（工具调用数/失败数/步骤数），`select` 返回 null 谢绝空 turn；默认收起的折叠头，展开显示工具调用列表；纯 client half 插件
-- **验证**：0807 站类型检查（tsx 入 ui-conversation 编译）+ 逻辑单测（turn 分组/边界重置/select 挂载）+ web 加载（bundle 200 / boot manifest / 无错误）
-- **形态边界**：形态 A（追加式尾部折叠）✅ 可行；形态 C（区间折叠，隐藏 turn 内官方行）❌ 仍不可行（需官方 ChatView 层 turn 容器）——ROADMAP / client-ui-extension-model 已同步
-
 ## 2026-08（任务输出 tail 零竞争：tasks.peek）
 
 task-status 实时 tail 与官方 `task_output` 工具的读取竞争问题（`tasks.read` 游标全局 per-task，自动轮询会抢走工具增量）的根治：官方 seam 新增**非消耗式读取**，插件 tail 与工具读取互不干扰：
