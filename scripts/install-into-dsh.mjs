@@ -8,7 +8,7 @@
  * What it does (mirrors docs/cookbook/integrating-into-dsh.md):
  *   1. copies packages/plugin  -> <repo>/packages/plugin
  *   2. copies packages/ui-plugin-manager -> <repo>/packages/client/ui-plugin-manager
- *   3. applies patches/dsh-plugin-registry-0806.patch (dry-run first)
+ *   3. applies patches/dsh-plugin-registry-0807.patch (dry-run first)
  *   4. runs `pnpm install` so the copied packages' deps resolve
  *
  * The patch is generated against the official 0806 snapshot
@@ -27,7 +27,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const here = resolve(fileURLToPath(import.meta.url), '..', '..')
-const patch = join(here, 'patches', 'dsh-plugin-registry-0806.patch')
+const patch = join(here, 'patches', 'dsh-plugin-registry-0807.patch')
 const target = resolve(process.argv[2] ?? '')
 const step = (s) => console.log(`\n==> ${s}`)
 
@@ -52,7 +52,7 @@ mkdirSync(join(target, 'packages/client'), { recursive: true })
 cpSync(join(here, 'packages/ui-plugin-manager'), join(target, 'packages/client/ui-plugin-manager'), { recursive: true })
 
 // 2. apply the wiring patch (dry-run first so a bad baseline fails cleanly)
-step('applying patches/dsh-plugin-registry-0806.patch')
+step('applying patches/dsh-plugin-registry-0807.patch')
 const check = spawnSync('git', ['apply', '--check', patch], { cwd: target, encoding: 'utf8' })
 if (check.status !== 0) {
   console.error('patch dry-run failed — baseline drift. Try `git apply --3way ' + patch + '` and align conflicts manually.')

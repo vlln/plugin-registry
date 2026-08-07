@@ -11,11 +11,11 @@
 | 构件 | 内容 | 作用 |
 |---|---|---|
 | 官方基线 | 官方上游发布的 baseline snapshot（快照提交） | 被构建的底座 |
-| [`patches/dsh-plugin-registry-0806.patch`](patches/dsh-plugin-registry-0806.patch) | 机制打进官方源码的补丁（CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal`、host 帧 `client-graph-changed` 自动刷新、tsconfig、依赖闭包） | `git apply` 后官方树具备 registry 机制 |
+| [`patches/dsh-plugin-registry-0807.patch`](patches/dsh-plugin-registry-0807.patch) | 机制打进官方源码的补丁（CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal`、host 帧 `client-graph-changed` 自动刷新、tsconfig、依赖闭包） | `git apply` 后官方树具备 registry 机制 |
 | [`packages/`](packages/) | 插件实现包（`plugin` 核心、`ui-plugin-manager` 管理面板、`bundle/` registry bundle） | 复制进目标 monorepo，随 patch 一起交付；bundle 经官方 profile 机制挂载 |
 | [`examples/`](examples/) | 可运行示例插件（greeter / navbar / task-status / loop） | 验证机制 + 学习模板 |
 
-**集成步骤**（详见 [集成到 dsh](docs/cookbook/integrating-into-dsh.md)）：复制 `packages/` 进 monorepo → `git apply patches/dsh-plugin-registry-0806.patch` → 把 registry bundle 加进 profile（`dsh plugin --profile web add packages/bundle/dsh-plugin-registry`）。
+**集成步骤**（详见 [集成到 dsh](docs/cookbook/integrating-into-dsh.md)）：复制 `packages/` 进 monorepo → `git apply patches/dsh-plugin-registry-0807.patch` → 把 registry bundle 加进 profile（`dsh plugin --profile web add packages/bundle/dsh-plugin-registry`）。
 
 ## 双仓库格局（防止混淆）
 
@@ -26,7 +26,7 @@
 ## patch 维护（关键约束）
 
 - patch 基于**官方快照**生成，基线推进后锚点漂移，需重新生成；生成命令见 [分发插件](docs/cookbook/distributing-plugins.md)。
-- **基线状态**：机制分支已对齐官方 0806 快照；`patches/` 已基于官方 0806 快照重建（41 文件，纯平台接线，见 [CHANGELOG](CHANGELOG.md)「基线」段）。
+- **基线状态**：机制分支已对齐官方 0807 快照；`patches/` 已基于官方 0807 快照重建（54 文件，纯平台接线，见 [CHANGELOG](CHANGELOG.md)「基线」段）。
 - patch 只含 plugin-registry **核心机制**需要的官方改动；**具体插件的宿主依赖**（如某插件的 ui-workspace hole）由该插件仓库自带补丁提供，不入本补丁。
 
 ## 仓库结构

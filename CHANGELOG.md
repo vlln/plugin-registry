@@ -6,8 +6,14 @@
 
 本仓库是「官方基线 + patch + package」构建式仓库（见 [AGENTS.md](AGENTS.md)），交付时需标明基线：
 
-- **机制分支基线**：官方 0806 快照（`20260806T160212Z`，提交 `28f4c886`）——worktree 分支已对齐
-- **patch 基线**：`patches/dsh-plugin-registry-0806.patch` 基于官方 0806 快照（41 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、host 帧 `client-graph-changed` 自动刷新、tasks/bash 非消耗式 `peek` seam、依赖闭包）
+- **机制分支基线**：官方 0807 快照（`20260807T130646Z`，提交 `ea12f175`）——机制分支 `feat/plugin-registry-mvp-0807` 已对齐
+- **patch 基线**：`patches/dsh-plugin-registry-0807.patch` 基于官方 0807 快照（54 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、host 帧 `client-graph-changed` 自动刷新、tasks/bash 非消耗式 `peek` seam、依赖闭包）；旧 0806 patch 保留供 0806 基线追溯
+
+## 2026-08（0807 基线升级）
+
+官方发布 0807 快照（`snapshot-20260807T130646Z-e8a0f1a758`，551 文件变更）后升级：契约评估（slots/HostFrame/profile-bundle/ModuleLoader/manifest 均未变，DOM 锚点保留，tasks/bash 仅 pwsh 格式改动）→ 0807 验证站 3way 应用旧 patch + 127 测试全过 + web 端到端验证 → 机制分支重放（`feat/plugin-registry-mvp-0807`，适配 `ApiProxyDefaults.provider/model → defaultTarget` 闭包）→ 重建 0807 patch（54 文件，纯净基线 `git apply --check` 通过）。
+
+0807 官方已吸收部分机制文档（`services.md` 的 `BashProcess.peekOutput` 行等）；官方新增 `ui-skill` 包（含 locale 路径引用 bug，非机制引入）。
 
 ## 2026-08（任务输出 tail 零竞争：tasks.peek）
 
