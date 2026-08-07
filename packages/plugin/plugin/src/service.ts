@@ -10,6 +10,7 @@
 
 import { pathToFileURL } from 'node:url'
 import { join, resolve } from 'node:path'
+import { readFile, readdir } from 'node:fs/promises'
 import { Context, Service, type Fiber } from 'cordis'
 import type { ToolRegistry } from '@deepseek-ai/dsh-tools'
 import { normalizePlugin } from './load.ts'
@@ -123,6 +124,16 @@ export class PluginLocalService extends Service {
    */
   async mount(id: string): Promise<void> {
     if (this.mounts.has(id)) return
+    // Mutual-exclusion guard: a package already mounted as a profile bundle
+    // layer (via `dsh plugin --profile <p> add ...`) is not a Loader entry —
+    // the registerExternal collision guard cannot see it — so a second mount
+    // here would double-register its client half and Node entry. Profile
+    // bundles are the official composition channel; keep one owner.
+    if ((await this.profileBundleNames()).has(id)) {
+      throw new Error(
+        `plugin ${id} is already a profile bundle layer — manage it via \`dsh plugin --profile\`, not the registry`,
+      )
+    }
     const manifest = await readManifest(pluginDir(this.dshHome, id))
     // Dependency link best-effort (also re-ensured on reconcile): a plugin
     // whose entry imports checkout packages needs the shared node_modules
@@ -145,6 +156,36 @@ export class PluginLocalService extends Service {
       this.pendingExternal.delete(id)
       throw error
     }
+  }
+
+  /**
+   * Whether the plugin id is mounted as a profile bundle layer under
+   * `<dshHome>/profiles` (via the official `dsh plugin --profile`). Profile
+   * manifests list their layers in `dsh.profile.bundles`; bundle-layer rows
+   * are not Loader entries, so the registerExternal collision guard cannot
+   * see them — this guard is the registry-side half of the mutual exclusion.
+   * @returns the set of package names mounted as profile bundle layers.
+   */
+  private async profileBundleNames(): Promise<Set<string>> {
+    const profilesDir = join(this.dshHome, 'profiles')
+    const bundles = new Set<string>()
+    let entries: string[]
+    try {
+      entries = await readdir(profilesDir)
+    } catch {
+      return bundles // no profiles directory — nothing to exclude
+    }
+    for (const name of entries) {
+      try {
+        const raw = JSON.parse(await readFile(join(profilesDir, name, 'package.json'), 'utf8')) as {
+          dsh?: { profile?: { bundles?: string[] } }
+        }
+        for (const pkg of raw.dsh?.profile?.bundles ?? []) bundles.add(pkg)
+      } catch {
+        // not a profile directory — skip
+      }
+    }
+    return bundles
   }
 
   /**

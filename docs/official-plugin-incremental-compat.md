@@ -98,7 +98,7 @@ registry 仓库内：
 - `packages/plugin/plugin/tests/manifest.spec.ts`——补 scoped id 正例（`@scope/name`、`@scope/foo.bar`）与负例（`@a/b/c`、`@/name`、`@scope/`、大写、`..` 段）
 - 其余（registry.ts、service.ts、catalog、scaffold、CLI）零改动
 
-官方 patch（`patches/dsh-plugin-registry.patch`）：
+官方 patch（`patches/dsh-plugin-registry-0806.patch`）：
 
 - `packages/client/modules/src/index.ts` `registerExternal`——id regex 同步放宽 + 碰撞守卫（拒绝 `ctx.loader.entries()` 同名）
 - `packages/client/modules/tests/node-half.spec.ts`——`'@scope/name'` 从 bad 组移入 good 组（保持 `'a/b/c'`、`'../escape'`、`'acme/../up'` 在 bad 组）

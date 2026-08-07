@@ -467,3 +467,38 @@ describe('client half registration', () => {
     }
   })
 })
+
+describe('profile bundle mutual exclusion', () => {
+  it('rejects a mount when the id is already a profile bundle layer', async () => {
+    const id = 'acme/profile-bound'
+    await installEntry(id)
+    // The official channel mounted the same package as a profile bundle layer
+    // (dsh plugin --profile web add ...) — its dsh.profile.bundles lists it,
+    // and bundle-layer rows are not Loader entries, so only this guard sees it.
+    await mkdir(join(dshHome, 'profiles', 'web'), { recursive: true })
+    await writeFile(join(dshHome, 'profiles', 'web', 'package.json'), JSON.stringify({
+      name: 'web',
+      dsh: { profile: { bundles: [id] } },
+    }))
+    const app = new Context()
+    const service = new PluginLocalService(app, dshHome, '0.2.0')
+    try {
+      await expect(service.mount(id)).rejects.toThrow(/already a profile bundle layer/)
+      expect(service['mounts'].has(id)).toBe(false)
+    } finally {
+      await service.dispose()
+    }
+  })
+
+  it('mounts fine when no profile claims the id', async () => {
+    const id = 'acme/profile-free'
+    await installEntry(id)
+    const app = new Context()
+    const service = new PluginLocalService(app, dshHome, '0.2.0')
+    try {
+      await expect(service.mount(id)).resolves.toBeUndefined()
+    } finally {
+      await service.dispose()
+    }
+  })
+})

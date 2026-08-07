@@ -7,7 +7,7 @@
 本仓库是「官方基线 + patch + package」构建式仓库（见 [AGENTS.md](AGENTS.md)），交付时需标明基线：
 
 - **机制分支基线**：官方 0806 快照（`20260806T160212Z`，提交 `28f4c886`）——worktree 分支已对齐
-- **patch 基线**：`patches/dsh-plugin-registry-0806.patch` 基于官方 0806 快照（27 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、依赖闭包）
+- **patch 基线**：`patches/dsh-plugin-registry-0806.patch` 基于官方 0806 快照（25 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、依赖闭包）
 
 ## 2026-08（0806 对齐的架构修复）
 
