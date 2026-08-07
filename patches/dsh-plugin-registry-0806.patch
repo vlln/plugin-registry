@@ -1,0 +1,204 @@
+diff --git a/apps/cli/package.json b/apps/cli/package.json
+index 87677ce1..ea99a2a7 100644
+--- a/apps/cli/package.json
++++ b/apps/cli/package.json
+@@ -22,6 +22,7 @@
+     "@deepseek-ai/dsh-headless": "workspace:^",
+     "@deepseek-ai/dsh-mcp-client": "workspace:^",
+     "@deepseek-ai/dsh-paths": "workspace:^",
++    "@deepseek-ai/dsh-plugin": "workspace:^",
+     "@deepseek-ai/dsh-pty": "workspace:^",
+     "@deepseek-ai/dsh-pty-local": "workspace:^",
+     "@deepseek-ai/dsh-session-reference": "workspace:^",
+diff --git a/apps/cli/src/args.ts b/apps/cli/src/args.ts
+index 310b5b03..81d33788 100644
+--- a/apps/cli/src/args.ts
++++ b/apps/cli/src/args.ts
+@@ -53,8 +53,17 @@ interface PluginInvocation {
+   args: string[]
+ }
+ 
++/** Local plugin registry management: `dsh plugin-local <action> [target]`. */
++export interface RegistryInvocation {
++  mode: 'registry'
++  /** The registry action to run. */
++  action: 'install' | 'list' | 'enable' | 'disable' | 'uninstall' | 'create'
++  /** Plugin directory/tarball for `install`, or the id for enable/disable/uninstall/create. */
++  target?: string
++}
++
+ /** The resolved `dsh` invocation. Help, version, and errors exit inside {@link parseDshArgs}. */
+-export type DshInvocation = ProfileInvocation | DumpConfigInvocation | WebInvocation | PluginInvocation
++export type DshInvocation = ProfileInvocation | DumpConfigInvocation | WebInvocation | PluginInvocation | RegistryInvocation
+ 
+ /** Raw web-subcommand options straight from Commander. */
+ interface WebOptions {
+@@ -204,6 +213,22 @@ Examples:
+       resolved = { mode: 'plugin', profile: options.profile, args }
+     })
+ 
++  const registryCmd = program.command('registry').description('manage the local plugin registry under $DSH_HOME/plugins (install, list, enable, disable, uninstall, create)')
++  registryCmd
++    .argument('<action>', 'registry action: install <path|tarball> | list | enable <id> | disable <id> | uninstall <id> | create <publisher/name>')
++    .argument('[target]', 'plugin directory/tarball for install, or plugin id for enable/disable/uninstall/create')
++    .action((action: string, target: string | undefined) => {
++      rejectParentOptions('registry')
++      const known = new Set(['install', 'list', 'enable', 'disable', 'uninstall', 'create'])
++      if (!known.has(action)) program.error(`error: registry unknown action ${JSON.stringify(action)}`)
++      if (target === undefined && action !== 'list') program.error(`error: registry ${action} needs a target (path, tarball, or id)`)
++      resolved = {
++        mode: 'registry',
++        action: action as RegistryInvocation['action'],
++        ...target !== undefined && { target },
++      }
++    })
++
+   try {
+     program.parse(argv, { from: 'user' })
+   } catch (error) {
+diff --git a/apps/cli/src/bin.ts b/apps/cli/src/bin.ts
+index 17a288c0..0c329e9b 100644
+--- a/apps/cli/src/bin.ts
++++ b/apps/cli/src/bin.ts
+@@ -47,6 +47,11 @@ switch (invocation.mode) {
+     process.exit(runPlugin(invocation.profile, invocation.args))
+     break
+   }
++  case 'registry': {
++    const { runRegistry } = await import('./registry.ts')
++    await runRegistry(invocation, readVersion())
++    break
++  }
+   case 'dump-config': {
+     const { runDumpConfig } = await import('./dump-config.ts')
+     runDumpConfig(invocation.profile, invocation.defaultOnly, invocation.patches)
+diff --git a/apps/cli/tsconfig.json b/apps/cli/tsconfig.json
+index 36c4bad6..c6600a26 100644
+--- a/apps/cli/tsconfig.json
++++ b/apps/cli/tsconfig.json
+@@ -109,6 +109,12 @@
+     },
+     {
+       "path": "../../packages/client/ui-question"
++    },
++    {
++      "path": "../../packages/plugin/plugin"
++    },
++    {
++      "path": "../../packages/client/ui-plugin-manager"
+     }
+   ]
+ }
+diff --git a/tsconfig.base.json b/tsconfig.base.json
+index cba3a997..53164f6e 100644
+--- a/tsconfig.base.json
++++ b/tsconfig.base.json
+@@ -213,6 +213,7 @@
+         "./packages/mcp/*/src",
+         "./packages/support/*/src",
+         "./packages/host/*/src",
++        "./packages/plugin/*/src",
+         "./packages/client/*/src"
+       ]
+     }
+diff --git a/apps/cli/src/registry.ts b/apps/cli/src/registry.ts
+new file mode 100644
+index 00000000..90245ab3
+--- /dev/null
++++ b/apps/cli/src/registry.ts
+@@ -0,0 +1,95 @@
++/**
++ * `dsh registry` — manage the local plugin registry: install from a
++ * directory or tarball, list, enable/disable, uninstall, and scaffold.
++ * Pure filesystem operations against the registry under `$DSH_HOME/plugins`;
++ * no harness boot.
++ *
++ * Named `registry` (not `plugin`) because the official `dsh plugin`
++ * manages a profile's pnpm plugins; the local registry is a separate surface
++ * and keeps its own command name to avoid collision.
++ * @module @deepseek-ai/dsh/registry
++ */
++
++import { resolveDshHome } from '@deepseek-ai/dsh-paths'
++import {
++  installFromTarball,
++  installPlugin,
++  isTarball,
++  listPlugins,
++  requireDirectory,
++  scaffoldPlugin,
++  setEnabled,
++  uninstallPlugin,
++} from '@deepseek-ai/dsh-plugin'
++import { join } from 'node:path'
++import type { RegistryInvocation } from './args.ts'
++
++/**
++ * Run one plugin-registry action and print its outcome. Domain failures print
++ * to stderr and set the exit code instead of throwing, so a mistyped id or a
++ * bad manifest never surfaces a stack trace.
++ * @param invocation - the resolved plugin-local subcommand.
++ * @param harnessVersion - the running dsh version, checked against `engines.dsh` at install.
++ */
++export async function runRegistry(invocation: RegistryInvocation, harnessVersion: string): Promise<void> {
++  try {
++    const dshHome = resolveDshHome()
++    switch (invocation.action) {
++      case 'install': {
++        if (invocation.target === undefined) throw new Error('dsh registry install needs a plugin directory or tarball')
++        const installed = isTarball(invocation.target)
++          ? await installFromTarball(invocation.target, { dshHome, harnessVersion })
++          : await (async () => {
++            await requireDirectory(invocation.target as string)
++            return installPlugin(invocation.target as string, { dshHome, harnessVersion })
++          })()
++        console.log(`installed ${installed.id}@${installed.record.version} (disabled; run \`dsh registry enable ${installed.id}\` to activate)`)
++        break
++      }
++      case 'create': {
++        if (invocation.target === undefined) throw new Error('dsh registry create needs a plugin id (publisher/name)')
++        const name = invocation.target.split('/').at(-1) ?? invocation.target
++        const dir = await scaffoldPlugin({ id: invocation.target, dir: join(process.cwd(), name) })
++        console.log(`created plugin ${invocation.target} in ${dir}; run \`dsh registry install ${dir}\` to install it`)
++        break
++      }
++      case 'list': {
++        const listed = await listPlugins(dshHome)
++        if (listed.length === 0) {
++          console.log('no plugins installed')
++          break
++        }
++        for (const plugin of listed) {
++          const state = plugin.record.enabled ? 'enabled ' : 'disabled'
++          const summary = plugin.manifest.description ? ` — ${plugin.manifest.description}` : ''
++          console.log(`${state} ${plugin.id}@${plugin.record.version}${summary}`)
++        }
++        break
++      }
++      case 'enable': {
++        if (invocation.target === undefined) throw new Error('dsh registry enable needs a plugin id')
++        await setEnabled(dshHome, invocation.target, true)
++        console.log(`enabled ${invocation.target}`)
++        break
++      }
++      case 'disable': {
++        if (invocation.target === undefined) throw new Error('dsh registry disable needs a plugin id')
++        await setEnabled(dshHome, invocation.target, false)
++        console.log(`disabled ${invocation.target}`)
++        break
++      }
++      case 'uninstall': {
++        if (invocation.target === undefined) throw new Error('dsh registry uninstall needs a plugin id')
++        await uninstallPlugin(dshHome, invocation.target)
++        console.log(`uninstalled ${invocation.target}`)
++        break
++      }
++      default:
++        invocation satisfies never
++        throw new Error(`dsh registry: unhandled action ${JSON.stringify(invocation)}`)
++    }
++  } catch (error) {
++    console.error(String(error))
++    process.exitCode = 1
++  }
++}

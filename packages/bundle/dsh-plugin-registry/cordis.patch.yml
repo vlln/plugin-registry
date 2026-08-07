@@ -1,0 +1,15 @@
+# The dsh-plugin-registry bundle patch: one insert over the profile root that
+# mounts the local plugin registry service and its web settings panel.
+#
+# Applied via the official profile-bundle mechanism (dsh.bundle.patch) — the
+# profile's `dsh.profile.bundles` lists this package, and `dsh plugin --profile
+# <name> add @dsh-external/dsh-plugin-registry-bundle` installs it as a layer.
+# Rows below address the same plugin ids the base bundle inserted; the last
+# write per row wins, matching every other bundle layer.
+
+- insert:
+    - id: plugin-local
+      name: '@deepseek-ai/dsh-plugin'
+
+    - id: ui-plugin-manager
+      name: '@deepseek-ai/dsh-client-ui-plugin-manager'
