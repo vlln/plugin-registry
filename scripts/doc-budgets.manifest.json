@@ -7,6 +7,7 @@
   "docs/generic-client-render-container-design.md": 7000,
   "docs/client-ui-extension-model.md": 7500,
   "docs/official-plugin-incremental-compat.md": 6000,
+  "docs/manifest-format.md": 4000,
   "docs/cookbook/creating-a-plugin.md": 3500,
   "docs/cookbook/integrating-into-dsh.md": 3500,
   "docs/cookbook/distributing-plugins.md": 3500,
