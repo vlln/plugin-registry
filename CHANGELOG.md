@@ -14,7 +14,7 @@
 task-status 实时 tail 与官方 `task_output` 工具的读取竞争问题（`tasks.read` 游标全局 per-task，自动轮询会抢走工具增量）的根治：官方 seam 新增**非消耗式读取**，插件 tail 与工具读取互不干扰：
 
 - **seam（机制分支）**：`TaskService` 抽象 `peek(id, caller?)`（返回保留输出，不推进游标、不标记 reported——终态通知仍由首次消耗式 read/wait 交付）；`TaskHooks` 可选 `peekOutput?()`（缺省回退到与 `read` 一致的终态幂等输出）；`BashProcess.peekOutput()`（bounded 保留窗口非消耗视图，lossy/spill 语义与 `readOutput` 一致），bash-local / pwsh-local 实现，tool-bash 接线
-- **示例**：task-status Node half 输出路由改 `ctx.tasks.peek`，client 由「增量追加」改「整段替换」渲染（peek 重复轮询返回同一全文）
+- **示例**：task-status Node half 输出路由改 `ctx.tasks.peek`，client 由「增量追加」改「整段替换」渲染（peek 重复轮询返回同一全文）；展开卡去冗余行/去包裹层，新增双契约回归测试（`task-status.client.spec.ts`：旧增量契约追加累积 + peek 全文契约整段替换）
 - **验证**：`/tmp/dsh-0806` 集成验证——peek 非消耗（重复轮询同文本）、官方 read 在多次 peek 后仍读完整增量、peek 始终显示保留全文
 
 
