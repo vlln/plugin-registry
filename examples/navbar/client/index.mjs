@@ -6,8 +6,8 @@
 // >11 节点滑动窗口、平时隐形悬停浮现磨砂胶囊、prefers-reduced-motion、
 // <2 条 user 消息自动隐藏。
 //
-// 零数据通道依赖：只靠官方锚点属性（data-chat-flow-kind="user" /
-// data-chat-anchor-key，ChatView 每条消息行都打）。
+// 零数据通道依赖：只靠官方锚点属性（0806 起 user 行为 data-time-hover-root
+//（UserStyleBubble 行），data-chat-flow-kind 已移除）。
 //
 // 构建：复制此文件为 client.js 的手写等价物（CJS + ModuleLoader 包装，
 // 同 greeter 模式），或按 README.md「构建 client bundle」用 bundler 产出。

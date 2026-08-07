@@ -6,10 +6,10 @@
 
 官方 `ChatView` 在每条消息行打两个 DOM 属性（`ChatView.tsx:655-657`）：
 
-- `data-chat-flow-kind="user"` —— 行类型（assistant/command/user/tool-group…）
+- `data-time-hover-root` —— user 消息行（0806 起；`data-chat-flow-kind` 已移除）
 - `data-chat-anchor-key="node:<seq>"` —— 消息锚点
 
-本插件**纯 DOM 自渲染**：扫描 `[data-chat-flow-kind="user"]` 行渲染导航点，点击 `scrollIntoView` 跳转。**零数据通道依赖**，只依赖官方锚点契约（这是设计文档要验证的关键点）。
+本插件**纯 DOM 自渲染**：扫描 `[data-time-hover-root]:not([data-pending-steering])` 行渲染导航点，点击 `scrollIntoView` 跳转。**零数据通道依赖**，只依赖官方锚点契约（这是设计文档要验证的关键点）。
 
 ## 安装与启用
 
