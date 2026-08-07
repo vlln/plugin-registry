@@ -41,10 +41,23 @@
 - **依赖解析**：组合内服务（plugin-local/ui-plugin-manager）走 profile 闭包（`healProfilesModuleFallback`）；动态插件走 deps-link（pnpm 公共层）。插件依赖（node-pty/ws 等）需在 app 闭包或公共层可解析。
 - **`dsh.plugin.json` 清单本身兼容**：字段（id/version/main/engines/contributes/client）不变，无需迁移。
 
+## 4. DOM 锚点（自渲染插件）
+
+0806 重构了对话流行标记：**`data-chat-flow-kind`（行类型属性）被移除**。纯 DOM 自渲染插件（如 navbar）依赖旧锚点会静默不渲染：
+
+| 锚点 | 0805 | 0806 |
+|---|---|---|
+| 对话流列 | `[data-chat-flow=""]` | ✅ 保留 |
+| user 消息行 | `[data-chat-flow-kind="user"]` | **`[data-time-hover-root]`**（UserStyleBubble 专属；pending steering 行另有 `data-pending-steering`，导航应排除） |
+| 消息锚点 | `data-chat-anchor-key` | 仅 call 行保留（`call:<id>`），user/assistant 行无 |
+
+实例：`examples/navbar` 已迁移（`[data-time-hover-root]:not([data-pending-steering])`）。**教训**：自渲染依赖的 DOM 锚点是未版本化实现细节，官方重构即破——保持选择器集中、及时跟随官方变更。
+
 ## 插件作者自查清单
 
 - [ ] 命令引用：文档/脚本/README 无 `dsh plugin install|enable|...`（改为 `dsh registry ...`）
 - [ ] client half：无 `deferRegistration`（改 `ctx.slots.inject`）；无其他 0805 slots API
+- [ ] 自渲染插件：无 `data-chat-flow-kind` 等 0805 锚点（0806 用 `data-time-hover-root`）
 - [ ] 挂载：按 0806 流程（bundle 挂 profile）验证，非 `web.cordis.yml`
 - [ ] 依赖：插件 import 的包在 app 闭包/公共层可解析
 - [ ] 0806 环境实测：`dsh registry install/enable` + web 刷新无插件加载错误
