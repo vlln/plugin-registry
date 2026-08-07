@@ -1,6 +1,6 @@
 // acme/loop client bundle（手写等价物，同 examples/navbar / task-status 模式）。
 // 数据自造缝：轮询 Node half 的 /plugins/acme/loop/loops 路由（?sessionId= 过滤），
-// 经 conversation.input.dock 槽显示活动循环状态条。构建见 README「构建 client bundle」。
+// 经 conversation.input.dock 槽显示活动循环状态条；视觉对齐官方 GoalBar。
 window.__ModuleLoader__.load({
 	id: "acme/loop",
 	factory: (require) => {
@@ -8,19 +8,22 @@ window.__ModuleLoader__.load({
 		var exports = module.exports;
 		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 		let react = require("react");
+		let primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 		let slots = require("@deepseek-ai/dsh-client-ui-slots");
 		//#region src/client/index.tsx
 		const LOOPS_PATH = "/plugins/acme/loop/loops";
 		const POLL_MS = 1000;
 		const NS = "loop";
 		const zh = {
-			"active": "loop: 每 {interval} — {prompt}",
+			"active": "循环中",
 			"next": "下次 {countdown}"
 		};
 		const en = {
-			"active": "loop: every {interval} — {prompt}",
+			"active": "Looping",
 			"next": "next {countdown}"
 		};
+		const DOCK_INSET = "var(--dsh-composer-dock-inset, 8px)";
+		const CARD_MAX = "var(--dsh-composer-card-max-width, 780px)";
 		function useSessionLoops(sessionId) {
 			const [loops, setLoops] = react.useState([]);
 			react.useEffect(() => {
@@ -64,22 +67,27 @@ window.__ModuleLoader__.load({
 			return react.createElement("div", {
 				"data-loop-bar": "",
 				style: {
-					display: "flex", alignItems: "center", gap: 6, height: 28,
-					margin: "0 auto", padding: "0 12px",
-					width: "calc(100% - 2 * var(--dsh-composer-side-clearance, 16px) - 4 * var(--dsh-composer-dock-inset, 8px))",
-					maxWidth: "calc(var(--dsh-composer-card-max-width, 780px) - 4 * var(--dsh-composer-dock-inset, 8px))",
-					border: "1px solid var(--dsw-alias-border-l1)",
-					borderRadius: 10,
-					background: "var(--dsw-specific-tip)",
-					fontSize: 13,
-					fontFamily: "system-ui"
+					boxSizing: "border-box", display: "flex", alignItems: "center", gap: 10,
+					width: "100%", maxWidth: "calc(" + CARD_MAX + " - 4 * " + DOCK_INSET + ")",
+					height: 36, margin: "0 auto", padding: "4px 12px",
+					border: "1px solid var(--dsw-alias-border-l1)", borderRadius: 12,
+					background: "var(--dsw-specific-tip)", fontSize: 13, fontFamily: "system-ui"
 				}
 			},
-				react.createElement("span", { style: { width: 16, fontSize: 14, lineHeight: "16px", textAlign: "center" } }, "🔁"),
-				react.createElement("span", { style: { flex: 1, fontSize: 13, lineHeight: "28px", color: "var(--dsw-alias-label-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
-					t("active", { interval: loop.intervalText, prompt: loop.prompt })),
-				react.createElement("span", { style: { fontSize: 12, color: "var(--dsw-alias-label-caption)", whiteSpace: "nowrap" } },
-					t("next", { countdown: countdownText })));
+				// 活动指示：ongoing 像素点 + 循环 icon
+				react.createElement("span", { style: { display: "inline-flex", flex: "none", alignItems: "center", gap: 8 } },
+					react.createElement(primitives.StateDot, { state: "ongoing", size: 10 }),
+					react.createElement("span", { style: { display: "inline-flex", flex: "none", color: "var(--dsw-alias-label-tertiary)" } },
+						react.createElement(primitives.IconRefreshOutline16, { size: 14 }))),
+				// 状态标签（13/24 medium，与 Todo/Queue 标题同族）
+				react.createElement("span", { style: { flex: "none", fontSize: 13, lineHeight: "24px", fontWeight: 500, color: "var(--dsw-alias-label-primary)" } },
+					t("active")),
+				// prompt：主文本，省略号截断
+				react.createElement("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", fontSize: 13, lineHeight: "20px", color: "var(--dsw-alias-label-primary-dimmed)", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
+					loop.prompt),
+				// 间隔 + 倒计时
+				react.createElement("span", { style: { flex: "none", fontSize: 12, lineHeight: "20px", color: "var(--dsw-alias-label-caption)", whiteSpace: "nowrap" } },
+					loop.intervalText + " · " + t("next", { countdown: countdownText })));
 		}
 		const inject = ["slots", "locale"];
 		function apply(ctx) {

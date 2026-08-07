@@ -1,11 +1,16 @@
 // acme/loop 浏览器端 half：对话页输入框上方的活动循环状态条。经
 // `conversation.input.dock`（list 槽，与 queue/todo/goal/task-status 同一
 // 官方槽家族）注册。Node half 注册只读状态路由，本组件每 1s 轮询并只渲染
-// 当前会话（agentId === session.sessionId）的活动 loop——有则显示
-// "🔁 loop: every 5m — prompt"，无则 null。零官方改动。
+// 当前会话（agentId === session.sessionId）的活动 loop。
+//
+// 视觉对齐官方 GoalBar（Figma 1236:32276 家族）：36px 高、12px 圆角、
+// --dsw-specific-tip 背景、官方 icon（IconRefreshOutline16）+ StateDot
+// （ongoing 活动指示）。有循环显示「● ⟳ 循环中 · prompt · 5m · 下次 23s」，
+// 无则 null。零官方改动。
 import { useEffect, useState } from 'react'
 import type { Context } from 'cordis'
 import type { ReactNode } from 'react'
+import { IconRefreshOutline16, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 // Context merges: slots/locale (runtime) reach this program through their
 // client entries.
 import type {} from '@deepseek-ai/dsh-client-runtime/client'
@@ -30,15 +35,19 @@ const POLL_MS = 1000
 
 const NS = 'loop'
 const zh = {
-  'active': 'loop: 每 {interval} — {prompt}',
+  'active': '循环中',
   'next': '下次 {countdown}',
 } satisfies Record<string, string>
 /** Loop namespace key union. */
 type LoopKey = keyof typeof zh
 const en = {
-  'active': 'loop: every {interval} — {prompt}',
+  'active': 'Looping',
   'next': 'next {countdown}',
 } satisfies Record<string, string>
+
+/** 布局变量对齐官方 dock 家族（ConversationRoot.module.css / GoalBar）。 */
+const DOCK_INSET = 'var(--dsh-composer-dock-inset, 8px)'
+const CARD_MAX = 'var(--dsh-composer-card-max-width, 780px)'
 
 /** Node half 返回的 wire loop 视图（agentId 即宿主 session id）。 */
 interface WireLoop {
@@ -78,7 +87,7 @@ function countdownTo(nextTickAt: number): number {
 
 /**
  * 对话页输入框上方的活动循环状态条：仅 Chat 视图显示（`[data-chat-flow=""]`
- * 探针），轮询该会话活动 loop。有则单行展示；无则 null。
+ * 探针），轮询该会话活动 loop。有则单行展示（官方 dock 卡片视觉）；无则 null。
  */
 export function LoopBar(
   props: PropsRuntime<'conversation.input.dock'> & PropsLocale<'loop'>,
@@ -102,7 +111,6 @@ export function LoopBar(
   if (!inChat) return null
   if (loops.length === 0) return null
 
-  // 每轮渲染时刷新倒计时（轮询本身已驱动重渲染）。
   const loop = loops[0]
   if (loop === undefined) return null
   const countdown = countdownTo(loop.nextTickAt)
@@ -112,23 +120,44 @@ export function LoopBar(
     <div
       data-loop-bar=""
       style={{
-        display: 'flex', alignItems: 'center', gap: 6, height: 28,
-        margin: '0 auto', padding: '0 12px',
-        width: 'calc(100% - 2 * var(--dsh-composer-side-clearance, 16px) - 4 * var(--dsh-composer-dock-inset, 8px))',
-        maxWidth: 'calc(var(--dsh-composer-card-max-width, 780px) - 4 * var(--dsh-composer-dock-inset, 8px))',
+        boxSizing: 'border-box',
+        display: 'flex', alignItems: 'center', gap: 10,
+        width: '100%',
+        maxWidth: `calc(${CARD_MAX} - 4 * ${DOCK_INSET})`,
+        height: 36,
+        margin: '0 auto',
+        padding: '4px 12px',
         border: '1px solid var(--dsw-alias-border-l1)',
-        borderRadius: 10,
+        borderRadius: 12,
         background: 'var(--dsw-specific-tip)',
         fontSize: 13,
         fontFamily: 'system-ui',
       }}
     >
-      <span style={{ width: 16, fontSize: 14, lineHeight: '16px', textAlign: 'center' }}>🔁</span>
-      <span style={{ flex: 1, fontSize: 13, lineHeight: '28px', color: 'var(--dsw-alias-label-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {t('active', { interval: loop.intervalText, prompt: loop.prompt })}
+      {/* 活动指示：ongoing 像素点 + 循环 icon */}
+      <span style={{ display: 'inline-flex', flex: 'none', alignItems: 'center', gap: 8 }}>
+        <StateDot state="ongoing" size={10} />
+        <span style={{ display: 'inline-flex', flex: 'none', color: 'var(--dsw-alias-label-tertiary)' }}>
+          <IconRefreshOutline16 size={14} />
+        </span>
       </span>
-      <span style={{ fontSize: 12, color: 'var(--dsw-alias-label-caption)', whiteSpace: 'nowrap' }}>
-        {t('next', { countdown: countdownText })}
+      {/* 状态标签（13/24 medium，与 Todo/Queue 标题同族） */}
+      <span style={{
+        flex: 'none', fontSize: 13, lineHeight: '24px', fontWeight: 500,
+        color: 'var(--dsw-alias-label-primary)',
+      }}>
+        {t('active')}
+      </span>
+      {/* prompt：主文本，省略号截断 */}
+      <span style={{
+        flex: 1, minWidth: 0, overflow: 'hidden', fontSize: 13, lineHeight: '20px',
+        color: 'var(--dsw-alias-label-primary-dimmed)', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {loop.prompt}
+      </span>
+      {/* 间隔 + 倒计时 */}
+      <span style={{ flex: 'none', fontSize: 12, lineHeight: '20px', color: 'var(--dsw-alias-label-caption)', whiteSpace: 'nowrap' }}>
+        {loop.intervalText} · {t('next', { countdown: countdownText })}
       </span>
     </div>
   )
