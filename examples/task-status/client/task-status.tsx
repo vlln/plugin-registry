@@ -241,15 +241,9 @@ export function TaskStatusBar(
         </div>
         {expanded && (
           <div style={{ padding: '0 12px 8px 34px', fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary)', display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span>类型：{task.kind} · {timeText(task)}</span>
             {task.detail !== undefined && <span>详情：{task.detail}</span>}
             {taskOutput !== '' && (
-              <pre style={{
-                margin: '4px 0 0', padding: '8px 10px', maxHeight: 160, overflowY: 'auto',
-                borderRadius: 8, fontSize: 11, lineHeight: '16px', fontFamily: 'var(--dsh-code-font-family, ui-monospace, monospace)',
-                background: 'var(--dsw-specific-tip)', border: '1px solid var(--dsw-alias-border-l1)',
-                whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-              }}>{taskOutput}</pre>
+              <div style={{ margin: '2px 0 0', fontSize: 11, lineHeight: '16px', fontFamily: 'var(--dsh-code-font-family, ui-monospace, monospace)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{taskOutput}</div>
             )}
           </div>
         )}
