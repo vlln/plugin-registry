@@ -62,7 +62,8 @@ registry 插件是**消费者**：`inject: ['tasks']` 登记自己的后台任�
 ### 新服务 vs 内置服务
 
 - ✅ 可管理「**提供新 `ctx.xxx` 服务**」的插件（其他插件可 inject；enable/disable 即服务出现/消失）。
-- ❌ 不可管理/替换 dsh **内置** `ctx.xxx`（`tools`/`tasks`/`workflows`/`sessions`…）：官方树启动时提供，同名 `provide` 会注册冲突——属产品层。
+- ❌ 不可与官方树**并存**提供同名 `ctx.xxx`（`tools`/`tasks`/`workflows`/`sessions`…）：官方树启动时提供，同名 `provide` 会注册冲突——属产品层。
+- 🔄 可**接管**被官方树移除的服务：若官方树摘除某服务插件（如 workflow 独立化），registry 可挂载其独立版成为唯一提供者——但须全家搬迁（服务实现 + 消费者工具同仓）且 Config 全有默认值。见 [cookbook：独立判定](cookbook/distributing-plugins.md#独立判定什么插件能进-registry需要什么迁移完整性)。
 
 ## 信任边界
 
