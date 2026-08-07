@@ -34,6 +34,11 @@ dsh registry enable vlln/task-status
 
 - `conversation.input.dock` 槽（官方既有，queue/todo 同槽）——**无需 patch**
 
+## 已知限制
+
+- **输出读取与 `task_output` 竞争游标**：展开任务后点「读取输出」经官方 `tasks.read` 读输出——该读游标是**全局 per-task**，与官方 `task_output` 工具**共享**。本插件**不用自动轮询**（避免持续抢走工具增量），改为手动点击读取；但同一任务若同时被插件读取和 `task_output` 读取，增量仍可能被先读者拿走（`task_output` 的描述明示"only output since the previous read"）。查看输出建议二选一：task-status 点读，或 agent 用 `task_output`。
+- **官方输出缓冲上限**：后台任务内存缓冲保留尾部（溢出 spill 落盘），超限任务的早期输出从源头丢弃，任何读端（含本插件）都拿不到完整历史。
+
 ## 构建（保持 bundle 与源码同步）
 
 当前 `client.js` 是手写等价物（同 `examples/navbar`）。若改用 bundler 产出：staging 复制进 DSH monorepo → tsc（类型必须过）→ tsdown → 产物复制回本目录。**改源码必须重建 bundle**。

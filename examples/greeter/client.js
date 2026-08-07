@@ -18,7 +18,7 @@ window.__ModuleLoader__.load({
 				style: {
 					position: "fixed",
 					right: 8,
-					bottom: 8,
+					top: 8,
 					fontSize: 12,
 					opacity: .9
 				},

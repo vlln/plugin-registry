@@ -9,7 +9,8 @@
 // 仅对话页显示：对话流列 `[data-chat-flow=""]` 只存在于 Chat 视图（与
 // navbar 同一信号）——组件用 MutationObserver 检测其存在性，切到
 // trajectory/taskboard 等视图时隐藏、切回恢复。零官方改动。
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Context } from 'cordis'
 import type { ReactNode } from 'react'
 // Context merges: slots/locale (runtime) reach this program through their
@@ -66,12 +67,14 @@ const DOCK_INSET = 'var(--dsh-composer-dock-inset, 8px)'
 const CARD_MAX = 'var(--dsh-composer-card-max-width, 780px)'
 
 /** 每状态视觉：token + glyph 字符（14px outline 家族近似）。 */
-const STATUS_META: Record<string, { color: string; glyph: string; label: string }> = {
-  running: { color: 'var(--dsw-alias-state-business-primary)', glyph: '●', label: 'task.running' },
-  stopping: { color: 'var(--dsw-alias-state-warn-primary)', glyph: '◐', label: 'task.stopping' },
-  completed: { color: 'var(--dsw-alias-state-success-primary)', glyph: '✓', label: 'task.completed' },
-  killed: { color: 'var(--dsw-alias-label-caption)', glyph: '✕', label: 'task.killed' },
-  failed: { color: 'var(--dsw-alias-state-error-primary)', glyph: '!', label: 'task.failed' },
+// 对齐官方 StateDot（@deepseek-ai/dsh-client-ui-primitives）：4 态语义色 +
+// ongoing 像素追逐动画；颜色由 StateDot 经 --dsw-* token 解析。
+const STATUS_META: Record<string, { state: 'ongoing' | 'warning' | 'done' | 'error'; label: string }> = {
+  running: { state: 'ongoing', label: 'task.running' },
+  stopping: { state: 'warning', label: 'task.stopping' },
+  completed: { state: 'done', label: 'task.completed' },
+  killed: { state: 'warning', label: 'task.killed' },
+  failed: { state: 'error', label: 'task.failed' },
 }
 
 /** Node half 返回的 wire 任务视图（ownerSession 为宿主 session id）。 */
@@ -109,6 +112,40 @@ function useSessionTasks(sessionId: string): WireTask[] {
 }
 
 /**
+ * 任务输出读取：**手动**（点击"读取输出"按钮触发一次），不用自动轮询。
+ * `tasks.read` 的游标是全局 per-task——自动轮询会持续消耗官方 `task_output`
+ * 工具的读取增量（两者竞争同一游标），故改为用户主动点击时读一次并追加。
+ * 任务终态后输出幂等（final-output），重读不会重复。
+ * @param taskId - 当前展开的任务 id；null 时不读。
+ * @returns 累计输出 + 手动读取函数 + 重置函数。
+ */
+function useTaskOutput(taskId: string | null): {
+  taskOutput: string
+  readOutput: () => Promise<void>
+  resetOutput: () => void
+} {
+  const [output, setOutput] = useState('')
+  const taskIdRef = useRef(taskId)
+  taskIdRef.current = taskId
+  useEffect(() => { setOutput('') }, [taskId])
+  const readOutput = async (): Promise<void> => {
+    const current = taskIdRef.current
+    if (current === null) return
+    try {
+      const res = await fetch(`${OUTPUT_PATH}?id=${encodeURIComponent(current)}`, { headers: { accept: 'application/json' } })
+      if (!res.ok) return
+      const data = (await res.json()) as { text?: string }
+      if (typeof data.text === 'string' && data.text !== '') {
+        setOutput(prev => prev + data.text)
+      }
+    } catch {
+      // 瞬态网络错误：保持当前输出。
+    }
+  }
+  return { taskOutput: output, readOutput, resetOutput: () => setOutput('') }
+}
+
+/**
  * 对话页对话框上方的后台任务状态条：仅 Chat 视图显示（`[data-chat-flow=""]`
  * 探针），轮询该会话任务（running 高亮 + 展开逐条）。
  */
@@ -120,6 +157,7 @@ export function TaskStatusBar(
   const [inChat, setInChat] = useState(false)
   const [open, setOpen] = useState(false)
   const [expandedTask, setExpandedTask] = useState<string | null>(null)
+  const { taskOutput, readOutput } = useTaskOutput(expandedTask)
 
   // 对话页探针：flow 列存在性（navbar 同信号）。body 级 observer 只跑
   // querySelector，回调轻量；view 切换（flow 移除/重建）都触发。
@@ -140,7 +178,7 @@ export function TaskStatusBar(
   if (active.length === 0) return null
 
   const statusOf = (status: string): { color: string; glyph: string; label: string } =>
-    STATUS_META[status] ?? { color: 'var(--dsw-alias-label-caption)', glyph: '·', label: status }
+    STATUS_META[status] ?? { state: 'warning', label: status }
 
   const header = (
     <div
@@ -186,9 +224,7 @@ export function TaskStatusBar(
           }}
           onClick={() => setExpandedTask(expanded ? null : task.id)}
         >
-          <span style={{ width: 16, fontSize: 14, lineHeight: '16px', textAlign: 'center', color: meta.color }}>
-            {meta.glyph}
-          </span>
+          <StateDot state={meta.state} size={10} />
           <span style={{ flex: 1, fontSize: 13, lineHeight: '20px', color: 'var(--dsw-alias-label-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {task.label}
           </span>
@@ -203,6 +239,26 @@ export function TaskStatusBar(
           <div style={{ padding: '0 12px 8px 34px', fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary)', display: 'flex', flexDirection: 'column', gap: 2 }}>
             <span>类型：{task.kind} · {timeText(task)}</span>
             {task.detail !== undefined && <span>详情：{task.detail}</span>}
+            <button
+              type="button"
+              onClick={() => { void readOutput() }}
+              style={{
+                alignSelf: 'flex-start', marginTop: 2, padding: '2px 8px', borderRadius: 6,
+                fontSize: 11, lineHeight: '18px', cursor: 'pointer',
+                color: 'var(--dsw-alias-text-accent)', background: 'transparent',
+                border: '1px solid var(--dsw-alias-border-l1)',
+              }}
+            >
+              {taskOutput === '' ? '读取输出' : '继续读取'}
+            </button>
+            {taskOutput !== '' && (
+              <pre style={{
+                margin: '4px 0 0', padding: '8px 10px', maxHeight: 160, overflowY: 'auto',
+                borderRadius: 8, fontSize: 11, lineHeight: '16px', fontFamily: 'var(--dsh-code-font-family, ui-monospace, monospace)',
+                background: 'var(--dsw-specific-tip)', border: '1px solid var(--dsw-alias-border-l1)',
+                whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              }}>{taskOutput}</pre>
+            )}
           </div>
         )}
       </div>
@@ -251,8 +307,7 @@ export const inject = ['slots', 'locale']
 
 export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'task-status: dictionaries')
-  // 0806 slots 契约：deferRegistration 已移除，注册走 ctx.slots.inject
-  // （等待槽声明、随声明坍缩自动移除、重声明后重跑）。
+  // 0806 slots 契约：注册走 ctx.slots.inject（等待槽声明、随声明坍缩自动移除）。
   ctx.slots.inject('conversation.input.dock', () =>
     ctx.slots.register({
       name: 'conversation.input.dock',

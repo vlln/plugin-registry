@@ -89,7 +89,10 @@ export default {
       return null
     }
     const userRows = (): HTMLElement[] =>
-      [...document.querySelectorAll<HTMLElement>('[data-time-hover-root]:not([data-pending-steering])')]
+      [...document.querySelectorAll<HTMLElement>('[data-time-hover-root]')].filter(row =>
+      // user 行 = UserStyleBubble（data-time-hover-root + 气泡结构）；排除
+      // assistant/Think 行（body 无 bubble）与 pending steering。
+      !row.hasAttribute('data-pending-steering') && row.querySelector('[class*="bubble"]') !== null)
 
     // 位置：贴近对话流列右缘 + 12px，钳制视口内（列移动时触发，不进每帧路径）。
     const position = (): void => {

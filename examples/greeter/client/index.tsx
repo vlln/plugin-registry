@@ -20,7 +20,7 @@ export function apply(ctx: Context): void {
   document.body.appendChild(host)
   const root = createRoot(host)
   root.render(
-    <div style={{ position: 'fixed', right: 8, bottom: 8, fontSize: 12, opacity: 0.9 }}>
+    <div style={{ position: 'fixed', right: 8, top: 8, fontSize: 12, opacity: 0.9 }}>
       👋 greeter client half active
     </div>,
   )

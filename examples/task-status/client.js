@@ -8,9 +8,11 @@ window.__ModuleLoader__.load({
 		var exports = module.exports;
 		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 		let react = require("react");
+		let primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 		let slots = require("@deepseek-ai/dsh-client-ui-slots");
 		//#region src/client/task-status.tsx
 		const TASKS_PATH = "/plugins/vlln/task-status/tasks";
+		const OUTPUT_PATH = "/plugins/vlln/task-status/output";
 		const POLL_MS = 1000;
 		const NS = "task-status";
 		const zh = {
@@ -38,12 +40,14 @@ window.__ModuleLoader__.load({
 		const SIDE_CLEARANCE = "var(--dsh-composer-side-clearance, 16px)";
 		const DOCK_INSET = "var(--dsh-composer-dock-inset, 8px)";
 		const CARD_MAX = "var(--dsh-composer-card-max-width, 780px)";
+		// 对齐官方 StateDot（@deepseek-ai/dsh-client-ui-primitives）：4 态语义色 +
+		// ongoing 像素追逐动画；颜色由 StateDot 经 --dsw-* token 解析。
 		const STATUS_META = {
-			running: { color: "var(--dsw-alias-state-business-primary)", glyph: "●", label: "task.running" },
-			stopping: { color: "var(--dsw-alias-state-warn-primary)", glyph: "◐", label: "task.stopping" },
-			completed: { color: "var(--dsw-alias-state-success-primary)", glyph: "✓", label: "task.completed" },
-			killed: { color: "var(--dsw-alias-label-caption)", glyph: "✕", label: "task.killed" },
-			failed: { color: "var(--dsw-alias-state-error-primary)", glyph: "!", label: "task.failed" }
+			running: { state: "ongoing", label: "task.running" },
+			stopping: { state: "warning", label: "task.stopping" },
+			completed: { state: "done", label: "task.completed" },
+			killed: { state: "warning", label: "task.killed" },
+			failed: { state: "error", label: "task.failed" }
 		};
 		function useSessionTasks(sessionId) {
 			const [tasks, setTasks] = react.useState([]);
@@ -63,12 +67,32 @@ window.__ModuleLoader__.load({
 			}, [sessionId]);
 			return tasks.filter(task => task.ownerSession === sessionId);
 		}
+		// 手动读取（不用自动轮询）：tasks.read 的游标全局 per-task，自动轮询会
+		// 持续消耗官方 task_output 工具的读取增量（竞争同一游标）。
+		function useTaskOutput(taskId) {
+			const [output, setOutput] = react.useState("");
+			const taskIdRef = react.useRef(taskId);
+			taskIdRef.current = taskId;
+			react.useEffect(() => { setOutput(""); }, [taskId]);
+			const readOutput = async () => {
+				const current = taskIdRef.current;
+				if (current === null) return;
+				try {
+					const res = await fetch(OUTPUT_PATH + "?id=" + encodeURIComponent(current), { headers: { accept: "application/json" } });
+					if (!res.ok) return;
+					const data = await res.json();
+					if (typeof data.text === "string" && data.text !== "") setOutput(prev => prev + data.text);
+				} catch {}
+			};
+			return { taskOutput: output, readOutput };
+		}
 		function TaskStatusBar(props) {
 			const t = props.t;
 			const tasks = useSessionTasks(props.session.sessionId);
 			const [inChat, setInChat] = react.useState(false);
 			const [open, setOpen] = react.useState(false);
 			const [expandedTask, setExpandedTask] = react.useState(null);
+			const { taskOutput, readOutput } = useTaskOutput(expandedTask);
 			react.useEffect(() => {
 				const check = () => { setInChat(document.querySelector('[data-chat-flow=""]') !== null); };
 				check();
@@ -80,7 +104,7 @@ window.__ModuleLoader__.load({
 			const active = tasks.filter(task => task.status === "running" || task.status === "stopping");
 			const running = active.filter(task => task.status === "running").length;
 			if (active.length === 0) return null;
-			const statusOf = (status) => STATUS_META[status] || { color: "var(--dsw-alias-label-caption)", glyph: "·", label: status };
+			const statusOf = (status) => STATUS_META[status] || { state: "warning", label: status };
 			const pad = (n) => String(n).padStart(2, "0");
 			const timeText = (task) => {
 				const start = new Date(task.startedAt);
@@ -93,7 +117,7 @@ window.__ModuleLoader__.load({
 				const meta = statusOf(task.status);
 				const expanded = expandedTask === task.id;
 				const body = [
-					react.createElement("span", { key: "g", style: { width: 16, fontSize: 14, lineHeight: "16px", textAlign: "center", color: meta.color } }, meta.glyph),
+					react.createElement(primitives.StateDot, { key: "g", state: meta.state, size: 10 }),
 					react.createElement("span", { key: "l", style: { flex: 1, fontSize: 13, lineHeight: "20px", color: "var(--dsw-alias-label-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, task.label),
 					react.createElement("span", { key: "tm", style: { fontSize: 12, color: "var(--dsw-alias-label-caption)", whiteSpace: "nowrap" } }, timeText(task)),
 					react.createElement("span", { key: "st", style: { fontSize: 12, color: meta.color, whiteSpace: "nowrap" } }, t(meta.label))
@@ -107,7 +131,9 @@ window.__ModuleLoader__.load({
 					? react.createElement("div", {
 						key: "det",
 						style: { padding: "0 12px 8px 34px", fontSize: 12, lineHeight: "18px", color: "var(--dsw-alias-label-tertiary)", display: "flex", flexDirection: "column", gap: 2 }
-					}, react.createElement("span", null, "类型：" + task.kind + " · " + timeText(task)), task.detail !== undefined ? react.createElement("span", null, "详情：" + task.detail) : null)
+					}, react.createElement("span", null, "类型：" + task.kind + " · " + timeText(task)), task.detail !== undefined ? react.createElement("span", null, "详情：" + task.detail) : null,
+						react.createElement("button", { type: "button", onClick: () => { readOutput(); }, style: { alignSelf: "flex-start", marginTop: 2, padding: "2px 8px", borderRadius: 6, fontSize: 11, lineHeight: "18px", cursor: "pointer", color: "var(--dsw-alias-text-accent)", background: "transparent", border: "1px solid var(--dsw-alias-border-l1)" } }, taskOutput === "" ? "读取输出" : "继续读取"),
+						taskOutput !== "" ? react.createElement("pre", { style: { margin: "4px 0 0", padding: "8px 10px", maxHeight: 160, overflowY: "auto", borderRadius: 8, fontSize: 11, lineHeight: "16px", fontFamily: "var(--dsh-code-font-family, ui-monospace, monospace)", background: "var(--dsw-specific-tip)", border: "1px solid var(--dsw-alias-border-l1)", whiteSpace: "pre-wrap", wordBreak: "break-word" } }, taskOutput) : null)
 					: null;
 				return react.createElement("div", { key: task.id }, line, details);
 			};
@@ -128,7 +154,7 @@ window.__ModuleLoader__.load({
 		const inject = ["slots", "locale"];
 		function apply(ctx) {
 			ctx.effect(() => ctx.locale.register(NS, { zh, en }), "task-status: dictionaries");
-			// 0806 slots 契约：deferRegistration 已移除，注册走 ctx.slots.inject。
+			// 0806 slots 契约：注册走 ctx.slots.inject。
 			ctx.slots.inject("conversation.input.dock", () =>
 				ctx.slots.register({ name: "conversation.input.dock", id: "task-status", order: 10, locale: NS }, TaskStatusBar));
 		}
