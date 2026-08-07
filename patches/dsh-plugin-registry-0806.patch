@@ -847,3 +847,159 @@ index e1d40880..e60a0f76 100644
      { "path": "./packages/client/ui-trajectory" },
      { "path": "./packages/client/ui-theme" },
      { "path": "./packages/client/ui-settings" },
+diff --git a/packages/host/apiproxy/tests/api-proxy-plugins.spec.ts b/packages/host/apiproxy/tests/api-proxy-plugins.spec.ts
+new file mode 100644
+index 00000000..8ad8836b
+--- /dev/null
++++ b/packages/host/apiproxy/tests/api-proxy-plugins.spec.ts
+@@ -0,0 +1,150 @@
++/**
++ * plugins-domain handler tests: browse list, install, enable (with live
++ * mount), disable (with live unmount), and uninstall against a real
++ * `ctx.plugins` service on a temp harness home.
++ */
++
++import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
++import { tmpdir } from 'node:os'
++import { join } from 'node:path'
++import { afterEach, beforeEach, describe, expect, it } from 'vitest'
++import { Context } from 'cordis'
++import AgentRegistry from '@deepseek-ai/dsh-agent'
++import SessionStore from '@deepseek-ai/dsh-session'
++import UserInteractionService from '@deepseek-ai/dsh-user-interaction'
++import { createApiProxy } from '../src/api-proxy.ts'
++import { RpcId, type RpcRequest, type RpcResponse } from '../src/api/rpc.ts'
++import { MANIFEST_FILE_NAME, PluginLocalService } from '@deepseek-ai/dsh-plugin'
++
++declare module 'cordis' {
++  interface Events {
++    'plugin/api-test'(value: string): void
++  }
++}
++
++let nextRpc = 1
++
++function request<P>(payload: P): RpcRequest<P> {
++  return { rpcId: RpcId(`req-${String(nextRpc++)}`), payload }
++}
++
++function expectOk<T>(response: RpcResponse<T>): T {
++  expect(response.result.ok).toBe(true)
++  if (!response.result.ok) throw new Error('unreachable')
++  return response.result.value
++}
++
++function expectErr(response: RpcResponse<unknown>): string {
++  expect(response.result.ok).toBe(false)
++  if (response.result.ok) throw new Error('unreachable')
++  return response.result.error.message
++}
++
++const ENTRY = `
++export default {
++  name: 'api-entry',
++  apply(ctx) {
++    ctx.on('plugin/api-test', (value) => { globalThis.__dshPluginApiTest = value })
++  },
++}
++`
++
++let tempDir: string
++let dshHome: string
++let ctx: Context
++let api: ReturnType<typeof createApiProxy>
++let dispose: () => Promise<void>
++let sequence = 0
++
++async function writeSource(root: string, id: string): Promise<void> {
++  await mkdir(root, { recursive: true })
++  await writeFile(join(root, MANIFEST_FILE_NAME), JSON.stringify({ id, version: '0.1.0', main: './index.mjs' }))
++  await writeFile(join(root, 'index.mjs'), ENTRY)
++}
++
++beforeEach(async () => {
++  tempDir = await mkdtemp(join(tmpdir(), 'dsh-apiproxy-plugin-'))
++  dshHome = join(tempDir, 'home')
++  await mkdir(dshHome, { recursive: true })
++  sequence += 1
++
++  ctx = new Context()
++  await ctx.plugin(SessionStore)
++  await ctx.plugin(UserInteractionService)
++  await ctx.plugin(AgentRegistry)
++  const service = new PluginLocalService(ctx, dshHome, '0.2.0')
++  api = createApiProxy(ctx, { provider: 'p', model: 'm', cwd: '/tmp', workspaceRoot: '/tmp' })
++  dispose = () => service.dispose()
++})
++
++afterEach(async () => {
++  delete (globalThis as Record<string, unknown>).__dshPluginApiTest
++  await dispose()
++  await rm(tempDir, { recursive: true, force: true })
++})
++
++async function writeCatalog(entries: Array<{ id: string; description?: string; version?: string; source: string }>): Promise<void> {
++  await writeFile(join(dshHome, 'plugins-catalog.json'), JSON.stringify(entries))
++}
++
++describe('plugins.list', () => {
++  it('lists catalog rows with install and enable state', async () => {
++    const id = `acme/listed-${sequence}`
++    const source = join(tempDir, 'src-listed')
++    await writeSource(source, id)
++    await writeCatalog([{ id, description: 'listed', version: '0.1.0', source }])
++
++    const value = expectOk(await api.plugins.list(request({})))
++    expect(value.plugins).toEqual([
++      { id, version: '0.1.0', description: 'listed', installed: false, enabled: false },
++    ])
++  })
++
++  it('reports a missing registry service as a composition gap', async () => {
++    const bareCtx = new Context()
++    await bareCtx.plugin(SessionStore)
++    await bareCtx.plugin(UserInteractionService)
++    await bareCtx.plugin(AgentRegistry)
++    const bare = createApiProxy(bareCtx, { provider: 'p', model: 'm', cwd: '/tmp', workspaceRoot: '/tmp' })
++    const message = expectErr(await bare.plugins.list(request({})))
++    expect(message).toContain('does not mount @deepseek-ai/dsh-plugin')
++  })
++})
++
++describe('plugins install/enable/disable/uninstall', () => {
++  it('installs disabled, then enables with a live mount', async () => {
++    const id = `acme/live-${sequence}`
++    const source = join(tempDir, 'src-live')
++    await writeSource(source, id)
++    await writeCatalog([{ id, version: '0.1.0', source }])
++
++    expect(expectOk(await api.plugins.install(request({ id })))).toEqual({ id })
++    const listed = expectOk(await api.plugins.list(request({})))
++    expect(listed.plugins[0]).toMatchObject({ id, installed: true, enabled: false })
++
++    expect(expectOk(await api.plugins.enable(request({ id })))).toEqual({ id })
++    ctx.emit('plugin/api-test', 'mounted-live')
++    expect((globalThis as Record<string, unknown>).__dshPluginApiTest).toBe('mounted-live')
++
++    expect(expectOk(await api.plugins.disable(request({ id })))).toEqual({ id })
++    delete (globalThis as Record<string, unknown>).__dshPluginApiTest
++    ctx.emit('plugin/api-test', 'unmounted')
++    expect((globalThis as Record<string, unknown>).__dshPluginApiTest).toBeUndefined()
++
++    expect(expectOk(await api.plugins.uninstall(request({ id })))).toEqual({ id })
++    const after = expectOk(await api.plugins.list(request({})))
++    expect(after.plugins).toEqual([
++      { id, version: '0.1.0', description: '', installed: false, enabled: false },
++    ])
++  })
++
++  it('fails loud when enabling an unknown plugin', async () => {
++    const message = expectErr(await api.plugins.enable(request({ id: 'acme/ghost' })))
++    expect(message).toContain('not installed')
++  })
++
++  it('fails loud when installing an id absent from the catalog', async () => {
++    const message = expectErr(await api.plugins.install(request({ id: 'acme/ghost' })))
++    expect(message).toContain('not in the catalog')
++  })
++})
