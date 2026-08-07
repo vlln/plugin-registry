@@ -54,12 +54,12 @@ window.__ModuleLoader__.load({
 ## 4. 安装、启用、验证
 
 ```sh
-dsh plugin install ./my-plugin        # 安装（默认禁用；client.main 缺失会在此时报错）
-dsh plugin enable acme/greeter        # 启用：挂载 Node 侧 + 登记 client half
-dsh plugin list                       # enabled acme/greeter@0.1.0
+dsh registry install ./my-plugin        # 安装（默认禁用；client.main 缺失会在此时报错）
+dsh registry enable acme/greeter        # 启用：挂载 Node 侧 + 登记 client half
+dsh registry list                       # enabled acme/greeter@0.1.0
 ```
 
-**验证点**：启用后 Web 刷新页面，bundle 经 `/plugins/acme/greeter/client.js` 进入 `__DSH_BOOT__`，浏览器出现插件 UI；`dsh plugin disable` 后刷新，UI 消失。
+**验证点**：启用后 Web 刷新页面，bundle 经 `/plugins/acme/greeter/client.js` 进入 `__DSH_BOOT__`，浏览器出现插件 UI；`dsh registry disable` 后刷新，UI 消失。
 
 ## 3.5 client half 的 UI 自由度
 
@@ -110,7 +110,7 @@ client half 是浏览器端**完整 Cordis 插件**（`apply(ctx)` 在浏览器�
 
 ### 验证（真实 web 组合）
 
-`dsh plugin install ./registry && dsh plugin enable @deepseek-ai/dsh-subagent-tree`（**前提：该插件未在官方 Loader 树启用**）；检查 `__DSH_BOOT__` 含该行、`/plugins/@deepseek-ai/dsh-subagent-tree/client.js` 200、bundle 导出 `inject`+`apply`、所需模块全在平台模块表；disable 后行移除。
+`dsh registry install ./registry && dsh registry enable @deepseek-ai/dsh-subagent-tree`（**前提：该插件未在官方 Loader 树启用**）；检查 `__DSH_BOOT__` 含该行、`/plugins/@deepseek-ai/dsh-subagent-tree/client.js` 200、bundle 导出 `inject`+`apply`、所需模块全在平台模块表；disable 后行移除。
 
 ### 注意事项
 

@@ -5,8 +5,8 @@
 ## 安装与启用
 
 ```sh
-dsh plugin install ./examples/loop
-dsh plugin enable acme/loop
+dsh registry install ./examples/loop
+dsh registry enable acme/loop
 ```
 
 ## 命令用法

@@ -14,9 +14,9 @@
 ## 安装与启用
 
 ```sh
-dsh plugin install ./examples/greeter   # 安装（默认禁用）
-dsh plugin enable acme/greeter          # 启用：挂载 greet 工具 + 登记 client half
-dsh plugin list                         # 看到 enabled acme/greeter@0.2.0
+dsh registry install ./examples/greeter   # 安装（默认禁用）
+dsh registry enable acme/greeter          # 启用：挂载 greet 工具 + 登记 client half
+dsh registry list                         # 看到 enabled acme/greeter@0.2.0
 ```
 
 启用后：模型可调用 `greet` 工具；Web 端刷新页面后，右下角出现「👋 greeter client half active」——插件**自渲染**（`createRoot` + `document.body.appendChild`），不依赖官方渲染容器。早期的官方 `ctx.ui` 通用渲染容器已从 plugin-registry 移除，本示例即"插件侧自造缝"的演示。

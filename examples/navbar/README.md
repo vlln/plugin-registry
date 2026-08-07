@@ -14,8 +14,8 @@
 ## 安装与启用
 
 ```sh
-dsh plugin install ./examples/navbar
-dsh plugin enable vlln/navbar
+dsh registry install ./examples/navbar
+dsh registry enable vlln/navbar
 ```
 
 启用后刷新 Web 页面：对话流列右侧出现导航条（贴近列、留 12px 间距），圆点 = 每个已渲染的 user 消息；点击跳转对应消息。

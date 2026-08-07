@@ -11,12 +11,12 @@ tar -czf cool-tool.tgz -C ./cool-tool .
 接收方安装：
 
 ```sh
-dsh plugin install cool-tool.tgz
+dsh registry install cool-tool.tgz
 ```
 
 tarball 安装走严格解压（防路径穿越），定位到含 `dsh.plugin.json` 的插件根后按目录安装流程处理（默认禁用、索引原子写、失败回滚）。
 
-**验证点**：打包前在本地 `dsh plugin install ./cool-tool` 通过；`tar -tzf cool-tool.tgz | head` 确认顶层含 `dsh.plugin.json`。
+**验证点**：打包前在本地 `dsh registry install ./cool-tool` 通过；`tar -tzf cool-tool.tgz | head` 确认顶层含 `dsh.plugin.json`。
 
 ## 形态二：社区目录模式（registry 功能分发）
 
@@ -39,7 +39,7 @@ git diff <snapshot-ref>..HEAD -- apps/cli/config/web.cordis.yml apps/cli/package
 只注册工具、监听事件、读服务，**不 provide 新 `ctx.xxx` 服务**。独立 = 复制包 + 清单 + 官方树无对应物。
 
 ```sh
-dsh plugin install ./my-tool   # 直接可用
+dsh registry install ./my-tool   # 直接可用
 ```
 
 示例：`examples/greeter`、`examples/loop`、dsh-tool-calculator 类。

@@ -7,18 +7,18 @@ DeepSeek Harness 的本地插件系统：清单协议、安装/启停、Web 管�
 ### 使用 registry
 
 ```sh
-dsh plugin create acme/cool-tool   # 脚手架：生成 dsh.plugin.json + index.mjs + README
+dsh registry create acme/cool-tool   # 脚手架：生成 dsh.plugin.json + index.mjs + README
 cd cool-tool
 # 编辑 index.mjs 写插件逻辑；编辑 dsh.plugin.json 把 contributes.tools 声明成入口实际注册的工具
-dsh plugin install .               # 安装（默认禁用）
-dsh plugin enable acme/cool-tool   # 启用（实时挂载；声明未注册会报错回滚）
-dsh plugin list                    # 列表
-dsh plugin uninstall acme/cool-tool # 卸载（删目录 + 索引；disable 则保留）
+dsh registry install .               # 安装（默认禁用）
+dsh registry enable acme/cool-tool   # 启用（实时挂载；声明未注册会报错回滚）
+dsh registry list                    # 列表
+dsh registry uninstall acme/cool-tool # 卸载（删目录 + 索引；disable 则保留）
 ```
 
 不想从空脚手架开始？复制示例：`cp -r examples/greeter ./my-tool`，改 `id` 与工具注册即可。完整指南见 [创建插件](docs/cookbook/creating-a-plugin.md)。
 
-要定时循环能力（轮询部署、照看 PR、build-fix-test 循环）？安装 `examples/loop`：`dsh plugin install ./examples/loop && dsh plugin enable acme/loop`，然后 `/loop 5m check the deploy`。
+要定时循环能力（轮询部署、照看 PR、build-fix-test 循环）？安装 `examples/loop`：`dsh registry install ./examples/loop && dsh registry enable acme/loop`，然后 `/loop 5m check the deploy`。
 
 ### 安装 registry
 
@@ -50,7 +50,7 @@ Web 设置页「插件」面板：
 - **官方插件增量兼容**：官方格式插件（npm/cordis 包）加一个 `dsh.plugin.json` 增量清单即可进 registry——bundle 零重构建、官方通道不受影响（非破坏 + 互斥，见 [设计](docs/official-plugin-incremental-compat.md)）
 - **UI 扩展机制件**（官方树提供，示例验证）：`conversation.view` 视图环 + `setView`、`conversation.input.dock` 等官方既有槽、DOM 锚点自渲染契约——统一模型见 [client UI 扩展心智模型](docs/client-ui-extension-model.md)。**注**：早期曾把 `useTasks`/`task/snapshot`、`ctx.ui.mount`、`sidebar.panel`、`conversation.chat.item` 等示例级缝打进官方树，已在缝降级中移除（见 [CHANGELOG](CHANGELOG.md)），示例插件改为插件侧自造缝
 - **信任边界**：安装默认禁用，显式启用才执行
-- **脚手架**：`dsh plugin create <id>` 一键生成标准插件根
+- **脚手架**：`dsh registry create <id>` 一键生成标准插件根
 
 ## 示例插件
 
@@ -68,6 +68,7 @@ Web 设置页「插件」面板：
 ## 文档
 
 - [创建插件](docs/cookbook/creating-a-plugin.md) — 从零开发：脚手架 → 入口 → contributes 同步 → 安装启用
+- [清单格式参考](docs/manifest-format.md) — `dsh.plugin.json` 完整字段定义（原生 + 增量两种形态）
 - [加 client half](docs/cookbook/adding-a-client-half.md) — 给插件带浏览器端 UI：client 声明 → bundle 契约 → 构建 → 验证
 - [官方插件增量兼容](docs/official-plugin-incremental-compat.md) — 官方格式插件加增量清单进 registry（设计规范）
 - [集成到 dsh](docs/cookbook/integrating-into-dsh.md) — 复制包 + 补丁 + 组合启用，接入 DSH 源码环境

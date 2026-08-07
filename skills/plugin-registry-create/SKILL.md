@@ -2,7 +2,7 @@
 name: plugin-registry-create
 description: >
   Use this skill when the user wants to develop a new plugin for the
-  dsh plugin registry (the third-party plugin layer managed by
+  the dsh plugin registry (the third-party plugin layer managed by
   @deepseek-ai/dsh-plugin): scaffold a plugin root, write the Cordis entry,
   keep contributes in sync, add an optional browser client half, then
   install/enable/verify it with the dsh CLI. Also covers converting an
@@ -52,7 +52,7 @@ segment after the slash is the directory name under `<dshHome>/plugins`.
 ### Stage 2: Scaffold the root
 
 ```sh
-dsh plugin create <publisher>/<name>
+dsh registry create <publisher>/<name>
 ```
 
 Creates `./<name>/` with `dsh.plugin.json` (validated manifest), `index.mjs`
@@ -103,16 +103,16 @@ character-for-character.
 ### Stage 5: Install, enable, verify
 
 ```sh
-dsh plugin install ./<name>        # installs disabled by default
-dsh plugin enable <publisher>/<name>
-dsh plugin list                    # expect: enabled <publisher>/<name>@<version>
+dsh registry install ./<name>        # installs disabled by default
+dsh registry enable <publisher>/<name>
+dsh registry list                    # expect: enabled <publisher>/<name>@<version>
 ```
 
 Enable mounts the plugin live into the running harness. If it fails, the
 error lists the declared-but-unregistered tools; fix the entry or the
 manifest, never both silently.
 
-**Checkpoint:** `dsh plugin list` shows the plugin enabled with the expected
+**Checkpoint:** `dsh registry list` shows the plugin enabled with the expected
 version.
 
 ### Stage 6: Add a browser client half (optional)
@@ -195,7 +195,7 @@ already enabled via the Loader tree, the registry enable is rejected by the
 - **Registration is an effect.** `ctx.tools.register(...)` returns a
   disposer; prefer `ctx.effect()`/`ctx.on()` for lifecycle-owned
   registrations so disable cleans up.
-- **`dsh plugin create` id must contain `/`.** `dsh plugin create my-tool`
+- **`dsh registry create` id must contain `/`.** `dsh registry create my-tool`
   fails; use `publisher/my-tool`.
 
 ## Reference

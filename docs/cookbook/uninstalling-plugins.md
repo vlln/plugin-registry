@@ -7,7 +7,7 @@
 CLI：
 
 ```sh
-dsh plugin uninstall <id>          # 如 dsh plugin uninstall vlln/navbar
+dsh registry uninstall <id>          # 如 dsh registry uninstall vlln/navbar
 ```
 
 Web 面板：设置页「插件」区 → 目标插件 → 卸载。
@@ -22,7 +22,7 @@ Web 面板：设置页「插件」区 → 目标插件 → 卸载。
 | 索引记录 | 保留（enabled=false） | **删除** |
 | 再启用 | `enable` 即恢复 | 需重新 `install` |
 
-**卸载后清理**：正常卸载会删净目录。异常中断（进程被杀）可能残留目录或索引不一致——`dsh plugin list` 复查，残留目录手动 `rm -rf <dshHome>/plugins/<id>`。
+**卸载后清理**：正常卸载会删净目录。异常中断（进程被杀）可能残留目录或索引不一致——`dsh registry list` 复查，残留目录手动 `rm -rf <dshHome>/plugins/<id>`。
 
 ## 卸载 registry 本身（从 DSH 移除）
 
@@ -51,7 +51,7 @@ pnpm install
 
 ## 常见问题
 
-- **卸载失败 / 索引不一致**：`dsh plugin uninstall` 重试；仍失败则检查 `<dshHome>/plugins/index.json` 与目录是否匹配，手动修正。
+- **卸载失败 / 索引不一致**：`dsh registry uninstall` 重试；仍失败则检查 `<dshHome>/plugins/index.json` 与目录是否匹配，手动修正。
 - **uninstall 后浏览器仍显示插件 UI**：boot graph 变更跨页面生效——刷新页面。
 - **目录被占用（Windows）**：先停掉 `dsh web` 再卸载。
 - **卸载 registry 后 `dsh web` 报错**：确认 web.cordis.yml 的组合行已删除、patch 已回滚（`git apply -R` 失败说明基线漂移，按 `--3way` 提示手动对齐）。

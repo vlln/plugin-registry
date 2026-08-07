@@ -13,8 +13,8 @@ S2 正确形态：后台任务 UI 是对话页**对话框上方的附加状态�
 ## 安装与启用
 
 ```sh
-dsh plugin install ./examples/task-status
-dsh plugin enable vlln/task-status
+dsh registry install ./examples/task-status
+dsh registry enable vlln/task-status
 ```
 
 启用后刷新 Web 页面：对话页对话框上方出现任务状态卡片——**只显示活跃任务**（running/stopping），任务执行完毕后自动消失；单任务直接显示任务行，多任务折叠头 + 展开列表，点击任务行展开详情（类型/时间/状态详情）。**仅对话页显示**——切到轨迹等视图隐藏，切回恢复。

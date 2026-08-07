@@ -82,12 +82,12 @@ registry **不追求原生兼容**官方插件（不要求零改动自动推导�
 
 **守卫位置：registry 侧（`registerExternal`）**。`registerExternal` 拒绝与 `ctx.loader.entries()` 中存在的名字相同的 id（enable 失败走既有 mount 回滚路径）。理由：loader 扫描对 loader-entry id 拥有 delete/重建权，外部登记在扫描面前不稳定；官方插件的 client half 本来就由官方通道管理，registry 再登记一份只有冲突没有增量价值。
 
-**部署语义**：官方插件请走官方通道（Loader 树 + config.yaml）或 registry 通道（增量清单 + `dsh plugin install`），**二选一**；registry 对已在官方树的插件报错并提示。
+**部署语义**：官方插件请走官方通道（Loader 树 + config.yaml）或 registry 通道（增量清单 + `dsh registry install`），**二选一**；registry 对已在官方树的插件报错并提示。
 
 ## 向后兼容
 
 - 原生 `publisher/name` id（`vlln/navbar`、`acme/greeter` 等）**完全保留**——新 regex 是严格超集，安装/挂载/CLI/路由/浏览器校验零影响
-- `dsh plugin create` 仍生成 `publisher/name` 模板
+- `dsh registry create` 仍生成 `publisher/name` 模板
 - 现有 manifest 负例（大写、无斜杠、`node_modules/` 前缀、多斜杠、路径穿越）全部保留
 
 ## 实现清单

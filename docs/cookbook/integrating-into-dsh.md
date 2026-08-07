@@ -53,16 +53,16 @@ Web 组合再挂载面板：
   name: '@deepseek-ai/dsh-client-ui-plugin-manager'
 ```
 
-**验证点**：`pnpm install` 后 `dsh plugin list` 输出 `no plugins installed`（命令可用）；启动 Web 后设置页出现「插件」面板。
+**验证点**：`pnpm install` 后 `dsh registry list` 输出 `no plugins installed`（命令可用）；启动 Web 后设置页出现「插件」面板。
 
-**client half 生效边界**：`dsh plugin enable` 是服务端实时（`plugin.list` 立即可见），但 client bundle 在 CLI 进程注册——**已运行的 web 需重启**；Web 面板内启用是同进程，**刷新页面即可**。详见 [creating-a-plugin](creating-a-plugin.md#4-安装启用验证)。
+**client half 生效边界**：`dsh registry enable` 是服务端实时（`plugin.list` 立即可见），但 client bundle 在 CLI 进程注册——**已运行的 web 需重启**；Web 面板内启用是同进程，**刷新页面即可**。详见 [creating-a-plugin](creating-a-plugin.md#4-安装启用验证)。
 
 ### 4. 冒烟
 
 ```sh
-dsh plugin create acme/smoke && dsh plugin install ./smoke && dsh plugin enable acme/smoke
-dsh plugin list    # enabled acme/smoke@0.1.0
-dsh plugin uninstall acme/smoke
+dsh registry create acme/smoke && dsh registry install ./smoke && dsh registry enable acme/smoke
+dsh registry list    # enabled acme/smoke@0.1.0
+dsh registry uninstall acme/smoke
 ```
 
 ## 运行
@@ -78,9 +78,9 @@ npm run build                # 官方：更新检出后先构建（tsc -b + tsdo
 `./bin/dsh` 是检出自带的 launcher（tsx ESM hook + 本项目 tsconfig paths，见 `scripts/install.sh`），也可把该树设为 `~/.dsh/source/current` 后用 PATH 上的 `dsh web`（官方安装器模式）。**验证 registry 生效**：
 
 ```sh
-dsh plugin list        # 输出 no plugins installed（命令可用）
-dsh plugin install ./examples/greeter && dsh plugin enable acme/greeter
-dsh plugin list        # enabled acme/greeter@0.2.0
+dsh registry list        # 输出 no plugins installed（命令可用）
+dsh registry install ./examples/greeter && dsh registry enable acme/greeter
+dsh registry list        # enabled acme/greeter@0.2.0
 ```
 
 启动后浏览器打开日志打印的 URL，设置页出现「插件」面板，插件列表显示已启用插件。
