@@ -89,4 +89,4 @@ Web 设置页「插件」面板：
 
 ## 版权
 
-BSD-3-Clause License，与 DSH 官方仓库（dsh2026/test-vlln）一致。见 [LICENSE](LICENSE)。
+BSD-3-Clause License，与 DeepSeek Harness 官方一致。见 [LICENSE](LICENSE)。

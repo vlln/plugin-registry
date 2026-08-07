@@ -1,6 +1,6 @@
 # Changelog
 
-本仓库（plugin-registry 示例 + 文档）的变更记录。官方机制件改动在 worktree（`dsh2026/test-vlln` 的 `feat/plugin-registry-mvp` 分支）按提交记录，本表汇总与示例/文档对应的交付。
+本仓库（plugin-registry 示例 + 文档）的变更记录。机制件改动在 test-vlln 仓库（`dsh2026/test-vlln`，官方 snapshot 宿主 + 社区机制分支 `feat/plugin-registry-mvp`）按提交记录，本表汇总与示例/文档对应的交付。
 
 ## 基线
 
