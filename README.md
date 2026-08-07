@@ -18,6 +18,15 @@ dsh registry uninstall acme/cool-tool # 卸载（删目录 + 索引；disable �
 
 不想从空脚手架开始？复制示例：`cp -r examples/greeter ./my-tool`，改 `id` 与工具注册即可。完整指南见 [创建插件](docs/cookbook/creating-a-plugin.md)。
 
+**命令名说明**：registry 命令是 `dsh registry`，不是 `dsh plugin`——官方 0806 起 `dsh plugin` 是 **profile 的 pnpm 依赖管理**（`dsh plugin --profile <p> add ...`，管理 profile 由哪些 bundle 层组成），与 registry 的**运行时插件管理**（安装/启停/卸载）语义不同；独立命令面避免混淆。从旧版迁移：
+
+| 旧（0805） | 新（0806+） |
+|---|---|
+| `dsh plugin install` | `dsh registry install` |
+| `dsh plugin enable / disable` | `dsh registry enable / disable` |
+| `dsh plugin list` | `dsh registry list` |
+| `dsh plugin uninstall` | `dsh registry uninstall` |
+
 要定时循环能力（轮询部署、照看 PR、build-fix-test 循环）？安装 `examples/loop`：`dsh registry install ./examples/loop && dsh registry enable acme/loop`，然后 `/loop 5m check the deploy`。
 
 ### 安装 registry

@@ -19,7 +19,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 // SlotMap merge: conversation.input.dock (ui-conversation) is declared by its
 // contract.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { deferRegistration, type PropsLocale, type PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -251,14 +251,13 @@ export const inject = ['slots', 'locale']
 
 export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'task-status: dictionaries')
-  ctx.effect(() => {
-    const bar = deferRegistration(ctx.slots, 'conversation.input.dock', TaskStatusBar, () =>
-      ctx.slots.register({
-        name: 'conversation.input.dock',
-        id: 'task-status',
-        order: 10,
-        locale: NS,
-      }, TaskStatusBar))
-    return () => { bar.dispose() }
-  }, 'task-status: registration')
+  // 0806 slots 契约：deferRegistration 已移除，注册走 ctx.slots.inject
+  // （等待槽声明、随声明坍缩自动移除、重声明后重跑）。
+  ctx.slots.inject('conversation.input.dock', () =>
+    ctx.slots.register({
+      name: 'conversation.input.dock',
+      id: 'task-status',
+      order: 10,
+      locale: NS,
+    }, TaskStatusBar))
 }

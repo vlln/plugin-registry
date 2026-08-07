@@ -9,7 +9,7 @@
 | 层次 | 定义 | 加载 | 管理 |
 |---|---|---|---|
 | **官方插件** | 产品随发布固定的组合（agent-loop、llm、tools、fs、skill-local、ui-* 等） | Loader 按配置树启动时静态加载 | 产品结构，随版本发布 |
-| **第三方插件** | 用户安装的带 `dsh.plugin.json` 的插件 | `plugin-local` 扫描 `<dshHome>/plugins` 索引，运行时动态挂载 | 用户通过 `dsh plugin` / Web 面板管理 |
+| **第三方插件** | 用户安装的带 `dsh.plugin.json` 的插件 | `plugin-local` 扫描 `<dshHome>/plugins` 索引，运行时动态挂载 | 用户通过 `dsh registry` / Web 面板管理 |
 
 **边界：**
 

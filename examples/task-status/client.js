@@ -128,11 +128,9 @@ window.__ModuleLoader__.load({
 		const inject = ["slots", "locale"];
 		function apply(ctx) {
 			ctx.effect(() => ctx.locale.register(NS, { zh, en }), "task-status: dictionaries");
-			ctx.effect(() => {
-				const bar = slots.deferRegistration(ctx.slots, "conversation.input.dock", TaskStatusBar, () =>
-					ctx.slots.register({ name: "conversation.input.dock", id: "task-status", order: 10, locale: NS }, TaskStatusBar));
-				return () => { bar.dispose(); };
-			}, "task-status: registration");
+			// 0806 slots 契约：deferRegistration 已移除，注册走 ctx.slots.inject。
+			ctx.slots.inject("conversation.input.dock", () =>
+				ctx.slots.register({ name: "conversation.input.dock", id: "task-status", order: 10, locale: NS }, TaskStatusBar));
 		}
 		//#endregion
 		exports.apply = apply;

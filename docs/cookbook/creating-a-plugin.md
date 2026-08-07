@@ -1,6 +1,6 @@
 # Cookbook：创建 registry 插件
 
-目标：从零产出一个可安装、可启用的 registry 插件。前置：DSH 源码环境已集成 plugin-registry（见 [集成到 dsh](integrating-into-dsh.md)），`dsh plugin` 命令可用。
+目标：从零产出一个可安装、可启用的 registry 插件。前置：DSH 源码环境已集成 plugin-registry（见 [集成到 dsh](integrating-into-dsh.md)），`dsh registry` 命令可用。
 
 ## 1. 脚手架
 

@@ -23,7 +23,7 @@ requires:
 
 This skill covers creating a **registry plugin**: a directory with
 `dsh.plugin.json` + a Cordis entry, installed under `<dshHome>/plugins` and
-managed by `dsh plugin` / the Web plugin panel. It is the third-party layer
+managed by `dsh registry` / the Web plugin panel. It is the third-party layer
 above the official cordis.yml Loader tree — do not confuse it with the
 harness's own plugins. A registry plugin is Node-only by default and may
 additionally ship a browser client half (see Stage 6).
