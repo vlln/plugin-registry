@@ -1,6 +1,6 @@
 # Changelog
 
-本仓库（plugin-registry 示例 + 文档）的变更记录。机制件改动在官方 snapshot 宿主仓库的机制分支（私有，细节见 AGENTS.local.md）按提交记录，本表汇总与示例/文档对应的交付。
+本仓库（plugin-registry 示例 + 文档）的变更记录。机制件改动在官方 snapshot 宿主仓库的机制分支按提交记录，本表汇总与示例/文档对应的交付。
 
 ## 基线
 

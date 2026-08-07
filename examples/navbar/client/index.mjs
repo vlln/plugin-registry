@@ -89,7 +89,7 @@ export default {
       return null
     }
     const userRows = (): HTMLElement[] =>
-      [...document.querySelectorAll<HTMLElement>('[data-chat-flow-kind="user"]')]
+      [...document.querySelectorAll<HTMLElement>('[data-time-hover-root]:not([data-pending-steering])')]
 
     // 位置：贴近对话流列右缘 + 12px，钳制视口内（列移动时触发，不进每帧路径）。
     const position = (): void => {

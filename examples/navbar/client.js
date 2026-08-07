@@ -51,7 +51,7 @@ window.__ModuleLoader__.load({
           return null;
         };
         var userRows = function () {
-          return Array.prototype.slice.call(document.querySelectorAll('[data-chat-flow-kind="user"]'));
+          return Array.prototype.slice.call(document.querySelectorAll('[data-time-hover-root]:not([data-pending-steering])'));
         };
 
         // 位置：贴近对话流列右缘 + 12px，钳制视口内（列移动时触发）。

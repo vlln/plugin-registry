@@ -19,7 +19,7 @@
 
 ## 双仓库格局（防止混淆）
 
-- **机制件的家**：官方 snapshot 宿主仓库的机制分支（社区所有；私有仓库名与迭代细节见仓库根 AGENTS.local.md）。平台机制改动直接改官方源码（snapshot checkout）并提交到该分支（当前纪律：示例的数据/渲染需求由插件自造缝承担，不打进官方树）。
+- **机制件的家**：官方 snapshot 宿主仓库的机制分支（社区所有）。平台机制改动直接改官方源码（snapshot checkout）并提交到该分支（当前纪律：示例的数据/渲染需求由插件自造缝承担，不打进官方树）。
 - **本仓库 = 验证与分发层**：示例验证机制、文档记录契约、patch/package 把机制交给外部构建者。
 - **机制迭代顺序**：机制分支落地 → 本仓库示例/文档同步 → **重新生成 patch**（见下）。
 
@@ -43,13 +43,12 @@
 
 ## Agent 协作约束
 
-- **改机制**：先在机制分支提交（私有仓库细节见 AGENTS.local.md），再同步本仓库（示例 + 文档 + patch），不要只改本仓库。
+- **改机制**：先在机制分支提交，再同步本仓库（示例 + 文档 + patch），不要只改本仓库。
 - **改文档**：遵循 [docs/AGENTS.md](docs/AGENTS.md)（中文默认、one home per fact、字数预算）。
 - **提交前验证**：`node scripts/verify-md-links.mjs` + `node scripts/verify-doc-budgets.mjs`。
 - **CHANGELOG 记交付时标明基线**：机制分支基线（官方快照 ref）与 patch 基线分开写，避免"何时更新"误判。
 
 ## 相关仓库
 
-- 官方 snapshot 宿主仓库（私有，机制分支所在）：仓库名与访问方式见 AGENTS.local.md。
 - `dsh-external/plugin-registry`：本仓库（patch+package 构建式基础设施）。
 - 同模式插件仓库：如 dsh-subagent-tree（自带 `patches/` 提供宿主 hole 补丁，不入本补丁）。
