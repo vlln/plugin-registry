@@ -84,7 +84,7 @@ Web 设置页「插件」面板：
 
 - **清单协议**：`dsh.plugin.json` 声明身份、版本、入口、兼容范围、贡献
 - **声明即契约**：声明的工具未注册 → 启用报错并回滚挂载
-- **安装/启停**：目录或 tarball（解压防路径穿越）；启停实时生效
+- **安装/启停（近似热加载）**：目录或 tarball（解压防路径穿越）；启停实时生效——Web 面板内启停触发浏览器自动刷新拾取新 UI；CLI 命令启停需手动刷新
 - **Web 面板**：设置页「插件」区，浏览、搜索、安装、启停、卸载
 - **client half**：插件可带浏览器端 bundle，启用后进入 `__DSH_BOOT__` 在 Web 端运行（`client` 声明 + 运行时登记）
 - **官方插件增量兼容**：官方格式插件（npm/cordis 包）加一个 `dsh.plugin.json` 增量清单即可进 registry——bundle 零重构建、官方通道不受影响（非破坏 + 互斥，见 [设计](docs/official-plugin-incremental-compat.md)）
