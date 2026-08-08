@@ -8,14 +8,14 @@
  * What it does (mirrors docs/cookbook/integrating-into-dsh.md):
  *   1. copies packages/plugin  -> <repo>/packages/plugin
  *   2. copies packages/ui-plugin-manager -> <repo>/packages/client/ui-plugin-manager
- *   3. applies patches/dsh-plugin-registry-0807.patch (dry-run first)
+ *   3. applies patches/dsh-plugin-registry-0808.patch (dry-run first)
  *   4. runs `pnpm install` so the copied packages' deps resolve
  *
- * The patch is generated against the official 0806 snapshot
- * (20260806T160212Z, commit 28f4c886). On a different baseline use
+ * The patch is generated against the official 0808 snapshot
+ * (20260808T121140Z, commit 57ffa9de). On a different baseline use
  * `git apply --3way` per docs/cookbook/integrating-into-dsh.md.
  *
- * On 0806 the registry services mount through the official profile-bundle
+ * On 0808 the registry services mount through the official profile-bundle
  * mechanism: after this script, add the registry bundle to a profile via
  * `dsh plugin --profile web add <this-repo>/packages/bundle/dsh-plugin-registry`
  * (or list the bundle in the profile's dsh.profile.bundles) — the bundle
@@ -27,7 +27,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const here = resolve(fileURLToPath(import.meta.url), '..', '..')
-const patch = join(here, 'patches', 'dsh-plugin-registry-0807.patch')
+const patch = join(here, 'patches', 'dsh-plugin-registry-0808.patch')
 const target = resolve(process.argv[2] ?? '')
 const step = (s) => console.log(`\n==> ${s}`)
 
@@ -52,7 +52,7 @@ mkdirSync(join(target, 'packages/client'), { recursive: true })
 cpSync(join(here, 'packages/ui-plugin-manager'), join(target, 'packages/client/ui-plugin-manager'), { recursive: true })
 
 // 2. apply the wiring patch (dry-run first so a bad baseline fails cleanly)
-step('applying patches/dsh-plugin-registry-0807.patch')
+step('applying patches/dsh-plugin-registry-0808.patch')
 const check = spawnSync('git', ['apply', '--check', patch], { cwd: target, encoding: 'utf8' })
 if (check.status !== 0) {
   console.error('patch dry-run failed — baseline drift. Try `git apply --3way ' + patch + '` and align conflicts manually.')

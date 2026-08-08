@@ -6,8 +6,8 @@
 
 ## 前置条件
 
-- DSH 源码环境：官方 0807 快照 `20260807T130646Z`（commit `ea12f175`）或兼容布局，pnpm workspace。
-- 仓库根目录可 `git apply`（补丁基于官方 0807 快照生成）。
+- DSH 源码环境：官方 0808 快照 `20260808T121140Z`（commit `57ffa9de`）或兼容布局，pnpm workspace。
+- 仓库根目录可 `git apply`（补丁基于官方 0808 快照生成）。
 
 ## 一键安装
 
@@ -31,10 +31,10 @@ cp -r packages/ui-plugin-manager DSH_MONOREPO/packages/client/
 ### 2. 打接线补丁
 
 ```sh
-git apply patches/dsh-plugin-registry-0807.patch   # 在 DSH monorepo 根目录执行
+git apply patches/dsh-plugin-registry-0808.patch   # 在 DSH monorepo 根目录执行
 ```
 
-补丁基于官方 0807 快照生成，改动 54 个文件（CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、host 帧 `client-graph-changed` 自动刷新、tasks/bash 非消耗式 `peek` seam、tsconfig、依赖闭包、测试与 README——**纯平台接线**，不含示例级数据/渲染缝），验证可干净应用。基线更新导致锚点漂移时，`git apply --3way` 或手动对齐。本补丁只含 plugin-registry 核心机制需要的官方改动；具体插件各自的宿主依赖由各插件仓库自带补丁提供（如 dsh-subagent-tree 的 ui-workspace 会话行 hole 补丁在其仓库 `patches/` 下）。
+补丁基于官方 0808 快照生成，改动 54 个文件（CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、host 帧 `client-graph-changed` 自动刷新、tasks/bash 非消耗式 `peek` seam、tsconfig、依赖闭包、测试与 README——**纯平台接线**，不含示例级数据/渲染缝），验证可干净应用。基线更新导致锚点漂移时，`git apply --3way` 或手动对齐。本补丁只含 plugin-registry 核心机制需要的官方改动；具体插件各自的宿主依赖由各插件仓库自带补丁提供（如 dsh-subagent-tree 的 ui-workspace 会话行 hole 补丁在其仓库 `patches/` 下）。
 
 **验证点**：`git apply --check` 无输出（干净应用）；`git status` 显示改动文件数符合预期。
 

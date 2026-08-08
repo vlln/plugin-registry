@@ -6,8 +6,14 @@
 
 本仓库是「官方基线 + patch + package」构建式仓库（见 [AGENTS.md](AGENTS.md)），交付时需标明基线：
 
-- **机制分支基线**：官方 0807 快照（`20260807T130646Z`，提交 `ea12f175`）——机制分支 `feat/plugin-registry-mvp-0807` 已对齐
-- **patch 基线**：`patches/dsh-plugin-registry-0807.patch` 基于官方 0807 快照（54 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、host 帧 `client-graph-changed` 自动刷新、tasks/bash 非消耗式 `peek` seam、依赖闭包）；旧 0806 patch 保留供 0806 基线追溯
+- **机制分支基线**：官方 0808 快照（`20260808T121140Z`，提交 `57ffa9de`）——机制分支 `feat/plugin-registry-mvp-0808` 已对齐
+- **patch 基线**：`patches/dsh-plugin-registry-0808.patch` 基于官方 0808 快照（54 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、host 帧 `client-graph-changed` 自动刷新、tasks/bash 非消耗式 `peek` seam、依赖闭包）；旧 0807/0806 patch 保留供对应基线追溯
+
+## 2026-08（0808 基线升级）
+
+官方发布 0808 快照（`snapshot-20260808T121140Z-7f25d3e98c`，1248 文件变更）后升级：契约评估（slots 注入 API / HostFrame / ctx 服务名 / profile-bundle 均未变；**web 形状组合变化**——tool 展示从单一 `conversation.chat.toolview` 重构为 `conversation.chat.tool`（whole-call seat）+ `tool.call.toolview`（per-call 子槽）+ `conversation.details.tool`（详情委托），机制分支未触碰这些槽，分发层示例所用 `conversation.chat.turnTail` / `conversation.input.dock` 均保留）→ 0808 验证站 3way 应用 0807 patch（仅 args.ts 冲突，手工并入官方新增 `RunInvocation`）+ CLI registry list / web 插件面板 / 插件 client.js 全验证 → 机制分支重放（`feat/plugin-registry-mvp-0808`，cherry-pick 冲突仅 args.ts 一处；api-proxy session 代理/恢复重构与 plugins 域自动合并共存；125 测试全过）→ 重建 0808 patch（54 文件，纯净基线 `git apply --check` 通过）。
+
+0808 官方新增 `dsh run` 子命令（headless 一次性任务）与 typert 域包；tool 槽重构属 ui-conversation/ui-tool 包内组合变化，不影响 registry 机制契约。
 
 ## 2026-08（0807 基线升级）
 

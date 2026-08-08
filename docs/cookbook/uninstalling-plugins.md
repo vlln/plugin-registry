@@ -33,7 +33,7 @@ Web 面板：设置页「插件」区 → 目标插件 → 卸载。
 #    （或 dsh plugin --profile web remove @dsh-external/dsh-plugin-registry-bundle）
 
 # 2. 回滚接线补丁（与 install-into-dsh.mjs 的 git apply 相反）
-git apply -R patches/dsh-plugin-registry-0807.patch
+git apply -R patches/dsh-plugin-registry-0808.patch
 
 # 3. 删除 copy-in 的插件实现包
 rm -rf packages/plugin packages/client/ui-plugin-manager
