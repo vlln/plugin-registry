@@ -13,7 +13,7 @@ description: >
 license: BSD-3-Clause
 metadata:
   author: dsh-external/plugin-registry
-  version: "0.3.1"
+  version: "0.3.2"
 requires:
   bins:
     - dsh
@@ -144,7 +144,15 @@ at enable. Three pieces:
    refresh. Only enabled plugins register; disable removes the row.
 
 **Checkpoint:** after enable, `curl /plugins/<id>/client.js` returns 200 and
-the boot graph contains the id.
+the boot graph contains the id. Note: this proves the bundle is served and
+registered, **not** that its `apply()` runs clean in the browser — a client
+half that registers into an undeclared slot throws at browser boot
+("Failed to load plugins"). Lightweight apply smoke: load the page in
+headless Chrome (`--headless=new --virtual-time-budget=12000 --dump-dom
+<url>`) and assert the plugin's DOM marker is present and "Failed to load
+plugins" is absent (reference implementation: dsh-pet
+`scripts/verify-client-smoke.mjs`; caught a real empty-stage bug curl could
+not see).
 
 ### Stage 7: Convert an official plugin (incremental compat, optional)
 
