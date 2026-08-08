@@ -50,6 +50,19 @@ registry 插件启停目前是「近似热更新」：服务端实时（plugin-l
 4. **React 状态边界**：fiber 重建 = UI 重挂载丢状态（官方 dev HMR 同样如此）。**不做状态保持**；收益仍是「页面不刷新、会话/输入/滚动保留」
 5. **自渲染 DOM 清理**：CSS 有 `data-plugin` 标记现成；自渲染 DOM 无统一 dispose 契约——机制件提供文档级契约 + 示例跟进（自渲染注册 dispose 进 effect）
 
+## Spike 验证（2026-08，Node 侧同款 cordis loader）
+
+两个关键赌注已实证（`scripts/spike-hotreload.ts`，builtins 直喂插件，无浏览器依赖）：
+
+| 步骤 | 观察 | 结论 |
+|---|---|---|
+| boot 后**运行期 `loader.create`** 新 entry（inject 依赖已有服务） | fiber 直接 **ACTIVE** | 运行期 entry 创建**可行**——`loader.create` 无 boot 状态机守卫（难点 1 降级）|
+| 运行期**拆除 provider**（无替换：disabled）| provider fiber 消失；依赖方 fiber → **PENDING**（非崩溃/悬空）| 级联停用干净（难点 2 降级）|
+| 重新提供后 | 依赖方 **PENDING → ACTIVE 自动恢复** | 增删恢复闭环成立 |
+| 对已存在 entry 重复 `create` | 抛「service 已注册」| 有防双挂保护——**entry 已存在时 enable 必须走 update 激活，不能 create** |
+
+**风险重估**：实施风险主项（运行期 loader 状态机）已排除——Stage 1 从「约五五开」上调为**主要风险在浏览器端集成**（bundle fetch、ModuleLoader、React 渲染的端到端），loader 层不再是不确定点。「entry 预创建」策略从必需降级为可选优化（运行期 create 直接可行）。
+
 ## 渐进 Stage
 
 **Stage 1（核心价值）**：服务端 graph 变化推帧 + 浏览器端 graph diff 应用器（entry 预创建 + 替换复用 reload + 删除 teardown）。验收：面板内 enable/disable/升级插件**页面不刷新**，UI 增删/替换生效；被 inject 插件卸载时依赖方停止且不崩溃；并发串行稳定；失败下帧 self-heal。
