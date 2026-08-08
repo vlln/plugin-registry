@@ -475,10 +475,10 @@ index 54e45fef..4ae4ad13 100644
      list: (payload: unknown) => this.record('session.list', payload, this.onList(payload)),
      search: (payload: unknown, signal?: AbortSignal) => {
 diff --git a/packages/client/modules/src/client/manifest.ts b/packages/client/modules/src/client/manifest.ts
-index eb6b40d5..c956e3ee 100644
+index eb6b40d5..a049c6f1 100644
 --- a/packages/client/modules/src/client/manifest.ts
 +++ b/packages/client/modules/src/client/manifest.ts
-@@ -224,6 +224,14 @@ export interface ClientModuleLoader {
+@@ -224,6 +224,21 @@ export interface ClientModuleLoader {
     * @param id - entry name to invalidate.
     */
    invalidate(id: string): void
@@ -490,14 +490,21 @@ index eb6b40d5..c956e3ee 100644
 +   * @param row - the new graph row.
 +   */
 +  addRow(row: BootModuleRow): void
++  /**
++   * Remove the `<style data-plugin>` tags owned by one module (hot-reload
++   * teardown). The tags were injected and claimed during materialization;
++   * the applier calls this when an entry leaves the graph.
++   * @param id - entry name whose owned styles to remove.
++   */
++  removeStyles(id: string): void
  }
  
  /** Options for {@link ClientModuleSystem} (assembled by the web shell kernel at boot). */
 diff --git a/packages/client/modules/src/client/system.ts b/packages/client/modules/src/client/system.ts
-index 2c881870..cc8a53f7 100644
+index 2c881870..b5cbc542 100644
 --- a/packages/client/modules/src/client/system.ts
 +++ b/packages/client/modules/src/client/system.ts
-@@ -193,4 +193,15 @@ export class ClientModuleSystem implements ClientModuleLoader {
+@@ -193,4 +193,23 @@ export class ClientModuleSystem implements ClientModuleLoader {
      this.factories.delete(id)
      this.loadCache.delete(id)
    }
@@ -511,6 +518,14 @@ index 2c881870..cc8a53f7 100644
 +      this.invalidate(row.id)
 +    }
 +    this.graphRows.set(row.id, row)
++  }
++
++  /** Remove the `<style data-plugin>` tags this module injected (teardown). */
++  removeStyles(id: string): void {
++    if (typeof document === 'undefined') return
++    for (const el of document.querySelectorAll(`style[data-plugin=${JSON.stringify(id)}]`)) {
++      el.remove()
++    }
 +  }
  }
 diff --git a/packages/client/modules/src/index.ts b/packages/client/modules/src/index.ts
@@ -765,7 +780,7 @@ index 186cfe10..b37448e7 100644
 +  })
 +})
 diff --git a/packages/client/runtime/src/client/index.ts b/packages/client/runtime/src/client/index.ts
-index b7226c00..de9addcd 100644
+index b7226c00..84129cf3 100644
 --- a/packages/client/runtime/src/client/index.ts
 +++ b/packages/client/runtime/src/client/index.ts
 @@ -1,6 +1,6 @@
@@ -791,7 +806,7 @@ index b7226c00..de9addcd 100644
      /**
       * A connection generation was (re-)established. Wire-derived caches must
       * treat their state as stale and repull (commands directory; the queue
-@@ -180,6 +188,53 @@ export const inject = ['connection', 'typert']
+@@ -180,6 +188,58 @@ export const inject = ['connection', 'typert']
  /** Mounts the browser runtime services and connection stream.
   * @param ctx - Client Cordis context.
   */
@@ -809,6 +824,7 @@ index b7226c00..de9addcd 100644
 +
 +interface ModulesFace {
 +  addRow(row: { id: string; url: string; rev: string }): void
++  removeStyles(id: string): void
 +}
 +
 +/**
@@ -838,6 +854,10 @@ index b7226c00..de9addcd 100644
 +  for (const [id, entry] of local) {
 +    if (!want.has(id) && !entry.disabled) {
 +      await entry.update({ disabled: true })
++      // Fiber teardown clears registered effects (slots, locale); the module's
++      // injected <style data-plugin> tags are separate — drop them so the
++      // plugin's CSS does not leak after removal.
++      modules.removeStyles(id)
 +    }
 +  }
 +}
@@ -845,7 +865,7 @@ index b7226c00..de9addcd 100644
  export function apply(ctx: Context): void {
    ctx.plugin(SlotsService)
    const connection = ctx.get('connection') as ConnectionHandle
-@@ -193,6 +248,16 @@ export function apply(ctx: Context): void {
+@@ -193,6 +253,16 @@ export function apply(ctx: Context): void {
      () => workspaces.startInitialSelection(),
      'runtime: initial Workspace selection',
    )
@@ -862,7 +882,7 @@ index b7226c00..de9addcd 100644
    const loop = connection.start({
      onMuxEnvelope: (envelope) => {
        sessions.handleMuxEnvelope(envelope)
-@@ -213,6 +278,7 @@ export function apply(ctx: Context): void {
+@@ -213,6 +283,7 @@ export function apply(ctx: Context): void {
        else if (frame.type === 'host/settings-changed') ctx.emit('settings/changed', frame.ns)
        else if (frame.type === 'host/credentials-changed') ctx.emit('credentials/changed', frame.ref)
        else if (frame.type === 'host/models-changed') ctx.emit('models/changed')
@@ -890,10 +910,10 @@ index 64199c48..978689a0 100644
      }
 diff --git a/packages/client/runtime/tests/apply-graph.spec.ts b/packages/client/runtime/tests/apply-graph.spec.ts
 new file mode 100644
-index 00000000..46b5850d
+index 00000000..89d3a12e
 --- /dev/null
 +++ b/packages/client/runtime/tests/apply-graph.spec.ts
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,63 @@
 +import { describe, expect, it } from 'vitest'
 +import { applyClientGraph } from '../src/client/index.ts'
 +import type { ClientGraphEntryView } from '@deepseek-ai/dsh-client-connection/client'
@@ -928,7 +948,7 @@ index 00000000..46b5850d
 +    const added: Array<{ id: string }> = []
 +    const ctx = {
 +      get: (name: string) => name === 'loader' ? loader.face
-+        : name === 'modules' ? { addRow: (row: { id: string }) => { added.push(row) } } : undefined,
++        : name === 'modules' ? { addRow: (row: { id: string }) => { added.push(row) }, removeStyles: () => {} } : undefined,
 +    } as never
 +    await applyClientGraph(ctx as never, [entry('a'), entry('b')])
 +    expect(loader.created).toEqual(['b'])
@@ -938,21 +958,23 @@ index 00000000..46b5850d
 +  it('re-activates a disabled entry instead of creating', async () => {
 +    const loader = fakeLoader(['a'], ['a'])
 +    const ctx = {
-+      get: (name: string) => name === 'loader' ? loader.face : { addRow: () => {} },
++      get: (name: string) => name === 'loader' ? loader.face : { addRow: () => {}, removeStyles: () => {} },
 +    } as never
 +    await applyClientGraph(ctx as never, [entry('a')])
 +    expect(loader.created).toEqual([])
 +    expect(loader.entries.get('a')!.disabled).toBe(false)
 +  })
 +
-+  it('disables removed entries in place', async () => {
++  it('disables removed entries in place and clears their styles', async () => {
 +    const loader = fakeLoader(['a', 'b'])
++    const removed: string[] = []
 +    const ctx = {
-+      get: (name: string) => name === 'loader' ? loader.face : { addRow: () => {} },
++      get: (name: string) => name === 'loader' ? loader.face : { addRow: () => {}, removeStyles: (id: string) => { removed.push(id) } },
 +    } as never
 +    await applyClientGraph(ctx as never, [entry('a')])
 +    expect(loader.entries.get('b')!.disabled).toBe(true)
 +    expect(loader.entries.get('a')!.disabled).toBe(false)
++    expect(removed).toEqual(['b'])
 +  })
 +})
 diff --git a/packages/client/runtime/tests/fake-api.ts b/packages/client/runtime/tests/fake-api.ts
