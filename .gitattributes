@@ -1,0 +1,3 @@
+# Machine-generated unified diffs: blank context rows are single-space lines
+# (standard ` ` diff format), which diff --check flags as trailing whitespace.
+patches/*.patch whitespace=-trailing-space
