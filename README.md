@@ -116,6 +116,7 @@ Web 设置页「插件」面板：
 - [卸载](docs/cookbook/uninstalling-plugins.md) — 卸载插件，或把 registry 从 DSH 移除（集成反操作）
 - [分发插件](docs/cookbook/distributing-plugins.md) — tarball 分发与社区目录模式
 - [架构](docs/architecture.md) — 两层插件模型的系统地图（好奇者阅读）
+- [真热更新设计](docs/hot-reload-design.md) — UI 插件不整页刷新的方案、困难与 Stage（承接 client-half 评审 O3）
 - [变更记录](CHANGELOG.md) — 机制件交付与示例增删汇总
 - [路线图](ROADMAP.md) — 剩余推进项的执行状态
 

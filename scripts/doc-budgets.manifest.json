@@ -13,5 +13,6 @@
   "docs/cookbook/distributing-plugins.md": 3500,
   "docs/cookbook/adding-a-client-half.md": 4600,
   "docs/cookbook/uninstalling-plugins.md": 3500,
-  "docs/migrating-to-0806.md": 3500
+  "docs/migrating-to-0806.md": 3500,
+  "docs/hot-reload-design.md": 3500
 }
