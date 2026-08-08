@@ -26,7 +26,7 @@
 ## patch 维护（关键约束）
 
 - patch 基于**官方快照**生成，基线推进后锚点漂移，需重新生成；生成命令见 [分发插件](docs/cookbook/distributing-plugins.md)。
-- **基线状态**：机制分支已对齐官方 0808 快照；`patches/` 已基于官方 0808 快照重建（54 文件，纯平台接线，见 [CHANGELOG](CHANGELOG.md)「基线」段）。
+- **基线状态**：机制分支已对齐官方 0808 快照；`patches/` 已基于官方 0808 快照重建（41 文件，纯平台接线，见 [CHANGELOG](CHANGELOG.md)「基线」段）。
 - patch 只含 plugin-registry **核心机制**需要的官方改动；**具体插件的宿主依赖**（如某插件的 ui-workspace hole）由该插件仓库自带补丁提供，不入本补丁。
 
 ## 仓库结构

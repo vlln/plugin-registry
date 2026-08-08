@@ -7,7 +7,13 @@
 本仓库是「官方基线 + patch + package」构建式仓库（见 [AGENTS.md](AGENTS.md)），交付时需标明基线：
 
 - **机制分支基线**：官方 0808 快照（`20260808T121140Z`，提交 `57ffa9de`）——机制分支 `feat/plugin-registry-mvp-0808` 已对齐
-- **patch 基线**：`patches/dsh-plugin-registry-0808.patch` 基于官方 0808 快照（54 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、host 帧 `client-graph-changed` 自动刷新、tasks/bash 非消耗式 `peek` seam、依赖闭包）；旧 0807/0806 patch 保留供对应基线追溯
+- **patch 基线**：`patches/dsh-plugin-registry-0808.patch` 基于官方 0808 快照（41 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、host 帧 `client-graph-changed` 自动刷新、tasks/bash 非消耗式 `peek` seam、依赖闭包；不含复制分发包 `packages/plugin`、`packages/client/ui-plugin-manager`）；旧 0807/0806 patch 保留供对应基线追溯
+
+## 2026-08（v0.1.0 release + 一键安装修复）
+
+首次 GitHub Release（tag `v0.1.0`），基线 = 官方 0808 快照（`20260808T121140Z`，commit `57ffa9de`）。
+
+修复一键安装路径的真实缺陷：patch 重建时把复制分发包 `packages/client/ui-plugin-manager`（13 文件）误打进 `patches/dsh-plugin-registry-0808.patch`（0807 同病，0806 正常），而安装流程（install-into-dsh.mjs / 手动集成）都是**先复制 packages 再 git apply**——补丁新增文件与复制文件重叠，`git apply` 报 `already exists in working directory` 直接失败。已按机制分支 `feat/plugin-registry-mvp-0808` 重新生成 patch（41 文件，与旧 patch 其余部分逐字节一致），并补上真实安装顺序的验证点（先复制后 apply）。README「安装 registry」补 git clone 与 release 双路径。
 
 ## 2026-08（0808 基线升级）
 

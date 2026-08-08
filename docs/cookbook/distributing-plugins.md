@@ -22,13 +22,13 @@ tarball 安装走严格解压（防路径穿越），定位到含 `dsh.plugin.js
 
 本仓库自身用此模式：把 `packages/plugin/`、`packages/ui-plugin-manager/` 复制进目标 DSH monorepo + `git apply patches/dsh-plugin-registry-0808.patch`（基于官方 0808 快照生成）；registry 服务经 profile bundle 挂载（`packages/bundle/dsh-plugin-registry`）。见 [集成到 dsh](integrating-into-dsh.md)。
 
-适配新基线：在官方新快照上重新生成补丁（文件范围 = 官方侧接线改动 + 机制件，排除复制分发包 `packages/plugin`、`packages/ui-plugin-manager` 与构建产物）：
+适配新基线：在官方新快照上重新生成补丁。scope 以现有 patch 的文件清单为准并排除复制分发包（`packages/plugin`、`packages/client/ui-plugin-manager`，否则复制+apply 两步骤文件重叠冲突）：
 
 ```sh
-git diff <snapshot-ref>..HEAD -- apps/cli/package.json apps/cli/src/args.ts apps/cli/src/bin.ts apps/cli/src/registry.ts apps/cli/tests/args.spec.ts packages/client/connection packages/client/modules packages/client/ui-plugin-manager packages/host/apiproxy packages/tasks/tasks packages/tasks/tasks-local packages/bash/bash packages/bash/bash-local packages/bash/pwsh-local packages/bash/tool-bash packages/README.md packages/README.zh.md packages/README.i18n.yaml scripts/verify-package-readme-model-experience.ts tsconfig.base.json tsconfig.client.json > patches/dsh-plugin-registry-0808.patch
+git diff --abbrev=8 <snapshot-ref>..HEAD -- $(grep '^diff --git' patches/dsh-plugin-registry-0808.patch | sed 's/^diff --git a\///; s/ b\/.*//' | grep -v '^packages/client/ui-plugin-manager$') > patches/dsh-plugin-registry-0808.patch
 ```
 
-**验证点**：在干净的新快照 checkout 上 `git apply --check` 通过。
+**验证点**：在干净的新快照 checkout 上 `git apply --check` 通过；再按真实安装顺序验证——先复制 `packages/` 进目标、后 `git apply`（复制分发包与补丁不重叠）。
 
 ## 独立判定：什么插件能进 registry，需要什么迁移完整性
 
