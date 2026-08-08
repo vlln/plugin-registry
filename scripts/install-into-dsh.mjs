@@ -75,7 +75,8 @@ if (install.status !== 0) {
 }
 
 console.log('\nDone. Registry is wired into ' + target)
-console.log('Next: mount the registry services into a profile (official bundle mechanism):')
+console.log('Next: build the tree, then mount the registry services into a profile (official bundle mechanism):')
+console.log('  npm run build')   // produces lib/ for the copied packages and the web frontend dist
 console.log('  dsh plugin --profile web add ' + join(here, 'packages/bundle/dsh-plugin-registry'))
 console.log('Then start the web app (`./bin/dsh web`), open Settings → 插件 panel.')
 console.log('To verify the CLI surface: `dsh registry list` should print "no plugins installed".')
