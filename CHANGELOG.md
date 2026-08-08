@@ -7,7 +7,16 @@
 本仓库是「官方基线 + patch + package」构建式仓库（见 [AGENTS.md](AGENTS.md)），交付时需标明基线：
 
 - **机制分支基线**：官方 0808 快照（`20260808T121140Z`，提交 `57ffa9de`）——机制分支 `feat/plugin-registry-mvp-0808` 已对齐
-- **patch 基线**：`patches/dsh-plugin-registry-0808.patch` 基于官方 0808 快照（41 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、host 帧 `client-graph-changed` 自动刷新、tasks/bash 非消耗式 `peek` seam、依赖闭包；不含复制分发包 `packages/plugin`、`packages/client/ui-plugin-manager`）；旧 0807/0806 patch 保留供对应基线追溯
+- **patch 基线**：`patches/dsh-plugin-registry-0808.patch` 基于官方 0808 快照（49 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、host 帧 `client-graph-changed` 自动刷新（Stage 1 起携带完整 graph）、浏览器端 graph diff 应用器（启停不整页刷新）、tasks/bash 非消耗式 `peek` seam、依赖闭包；不含复制分发包 `packages/plugin`、`packages/client/ui-plugin-manager`）；旧 0807/0806 patch 保留供对应基线追溯
+
+## 2026-08（热更新 Stage 1：启停插件不再整页刷新）
+
+registry UI 插件的「近似热更新」升级为**真热更新（增删路径）**：启停/升级 client half 插件时浏览器不再整页 reload。
+
+- **服务端**（apiproxy）：`host/client-graph-changed` 帧从纯信号改为携带完整 entry 表（id/url/rev，`ClientGraphEntryView` + zod schema）；`onGraphChanged` 回调推当前 graph（跨 isolate 读 `clientModuleHost.graph()`）
+- **浏览器端**（runtime + modules）：`ClientModuleSystem.addRow`（运行期注册新 graph row；rev 变化 invalidate 旧 bundle——升级场景自动覆盖）；runtime `onHostEnvelope` 转 `client/graph-changed` 事件 → `applyClientGraph` 应用器 diff loader 树（added → addRow + create / re-activate，removed → disabled in place；串行 + 失败 self-heal）；manager 移除 `window.location.reload()`
+- **验证**：机制分支 798 既有测试 + 新增（modules addRow、events schema、runtime diff 应用器）；验证站 web 启动无错；浏览器 UI 端到端（面板内启停不刷新）为后续人工/自动化验收
+- 设计细节与 spike 证据见 [热更新设计](docs/hot-reload-design.md)
 
 ## 2026-08（v0.1.0 release + 一键安装修复）
 

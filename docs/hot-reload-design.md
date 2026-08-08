@@ -78,6 +78,15 @@ jsdom 复用真实链路（cordis Loader + ClientModuleSystem 作 `loader.intern
 
 **风险重估（终）**：浏览器端集成主风险（bundle 加载 / ModuleLoader 链路 / fiber 激活 / 渲染 / 清理）也实证通过——Stage 1 剩余为**工程实施**（服务端帧编码 + 浏览器 diff 应用器接线，复用既有通道与已验证机制），不再有未验证的核心机制赌注。
 
+## 实施状态（2026-08，Stage 1 已落地）
+
+服务端与浏览器端改动已进机制分支（`feat/plugin-registry-mvp-0808`，patch 同步）：
+
+- **服务端**：`host/client-graph-changed` 帧带 `entries`（`ClientGraphEntryView` id/url/rev + zod schema）；`onGraphChanged` 推 `clientModuleHost.graph()` 当前表
+- **浏览器端**：`ClientModuleSystem.addRow`（rev 变 invalidate 旧 bundle，升级自动覆盖）；runtime 帧路由转 `client/graph-changed` 事件 → `applyClientGraph`（added → addRow + create / re-activate，removed → disabled in place；串行 + self-heal）；manager 移除 reload
+- **测试**：modules addRow（新 id import、rev 变重载）、events schema（带 entries、旧形拒绝）、runtime 应用器（create / re-activate / disable 三用例）；既有相关包 798 测试通过
+- **剩余验收点**：浏览器 UI 端到端（真实面板内启停 → 页面不刷新 + UI 增删）——机制层已全部验证，UI 层为后续人工/自动化验收
+
 ## 渐进 Stage
 
 **Stage 1（核心价值）**：服务端 graph 变化推帧 + 浏览器端 graph diff 应用器（entry 预创建 + 替换复用 reload + 删除 teardown）。验收：面板内 enable/disable/升级插件**页面不刷新**，UI 增删/替换生效；被 inject 插件卸载时依赖方停止且不崩溃；并发串行稳定；失败下帧 self-heal。

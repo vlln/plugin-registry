@@ -399,6 +399,19 @@ index 71e3124e..c03e0646 100644
        kill: () => false,
        ...over,
      }
+diff --git a/packages/client/connection/src/client/api.ts b/packages/client/connection/src/client/api.ts
+index 6f29b2dd..b40313be 100644
+--- a/packages/client/connection/src/client/api.ts
++++ b/packages/client/connection/src/client/api.ts
+@@ -6,7 +6,7 @@
+ // The ./api and ./client subpath exports are the browser-safe channels added for this.
+ 
+ export type {
+-  ApiProxy, SessionsApi, SessionSearchItem, SessionSummary, HostApi, EventsApi, MuxFrame, HostFrame,
++  ApiProxy, ClientGraphEntryView, SessionsApi, SessionSearchItem, SessionSummary, HostApi, EventsApi, MuxFrame, HostFrame,
+   ApprovalResponsePayload, QuestionResponsePayload, HistoryEntry, ToolEventView,
+   DirectoryEntry, DirectoryListing,
+   WorkspaceApi, WorkspaceId, WorkspaceView,
 diff --git a/packages/client/connection/src/client/fixture.ts b/packages/client/connection/src/client/fixture.ts
 index df9712ab..969b9df5 100644
 --- a/packages/client/connection/src/client/fixture.ts
@@ -429,6 +442,19 @@ index df9712ab..969b9df5 100644
      }
    }
  
+diff --git a/packages/client/connection/src/client/index.ts b/packages/client/connection/src/client/index.ts
+index c2a6668d..1df4393c 100644
+--- a/packages/client/connection/src/client/index.ts
++++ b/packages/client/connection/src/client/index.ts
+@@ -14,7 +14,7 @@ import type { ClientConnectionRpc } from '../rpc.ts'
+ 
+ // ---- Contract re-exports (browser-safe apiproxy channels + core types) ----
+ export type {
+-  ApiProxy, SessionsApi, SessionSearchItem, SessionSummary, HostApi, EventsApi, MuxFrame, HostFrame,
++  ApiProxy, ClientGraphEntryView, SessionsApi, SessionSearchItem, SessionSummary, HostApi, EventsApi, MuxFrame, HostFrame,
+   ApprovalResponsePayload, QuestionResponsePayload, HistoryEntry, ToolEventView,
+   DirectoryEntry, DirectoryListing,
+   ToolCallView, ToolResultView, WorkspaceApi, WorkspaceId, WorkspaceView,
 diff --git a/packages/client/connection/tests/fake-api.ts b/packages/client/connection/tests/fake-api.ts
 index 54e45fef..4ae4ad13 100644
 --- a/packages/client/connection/tests/fake-api.ts
@@ -448,6 +474,45 @@ index 54e45fef..4ae4ad13 100644
    readonly sessions: IApiClient['sessions'] = {
      list: (payload: unknown) => this.record('session.list', payload, this.onList(payload)),
      search: (payload: unknown, signal?: AbortSignal) => {
+diff --git a/packages/client/modules/src/client/manifest.ts b/packages/client/modules/src/client/manifest.ts
+index eb6b40d5..c956e3ee 100644
+--- a/packages/client/modules/src/client/manifest.ts
++++ b/packages/client/modules/src/client/manifest.ts
+@@ -224,6 +224,14 @@ export interface ClientModuleLoader {
+    * @param id - entry name to invalidate.
+    */
+   invalidate(id: string): void
++  /**
++   * Register a graph row added after boot (hot-reload: a plugin's client half
++   * enabled while the page is live). Overwrites an existing row; a row whose
++   * bundle already arrived keeps its loaded factory (version replacement is
++   * the applier's concern — it invalidates first when a rev differs).
++   * @param row - the new graph row.
++   */
++  addRow(row: BootModuleRow): void
+ }
+ 
+ /** Options for {@link ClientModuleSystem} (assembled by the web shell kernel at boot). */
+diff --git a/packages/client/modules/src/client/system.ts b/packages/client/modules/src/client/system.ts
+index 2c881870..cc8a53f7 100644
+--- a/packages/client/modules/src/client/system.ts
++++ b/packages/client/modules/src/client/system.ts
+@@ -193,4 +193,15 @@ export class ClientModuleSystem implements ClientModuleLoader {
+     this.factories.delete(id)
+     this.loadCache.delete(id)
+   }
++
++  /** Register a graph row added after boot (hot-reload enable path). */
++  addRow(row: BootModuleRow): void {
++    const previous = this.graphRows.get(row.id)
++    if (previous !== undefined && previous.rev !== row.rev) {
++      // Rev changed = the bundle content changed; drop the stale factory and
++      // materialized record so the next import reloads the new bundle.
++      this.invalidate(row.id)
++    }
++    this.graphRows.set(row.id, row)
++  }
+ }
 diff --git a/packages/client/modules/src/index.ts b/packages/client/modules/src/index.ts
 index ec3822e5..2644f910 100644
 --- a/packages/client/modules/src/index.ts
@@ -535,6 +600,45 @@ index ec3822e5..2644f910 100644
    /**
     * Re-hash one bundle (the HMR watch's registration hook — the only entry
     * point through which bundle content changes reach the graph).
+diff --git a/packages/client/modules/tests/loader.spec.ts b/packages/client/modules/tests/loader.spec.ts
+index 4c41419c..bc7a648a 100644
+--- a/packages/client/modules/tests/loader.spec.ts
++++ b/packages/client/modules/tests/loader.spec.ts
+@@ -23,7 +23,7 @@ afterEach(() => {
+   for (const el of document.querySelectorAll('style, script')) el.remove()
+ })
+ 
+-const row = (id: string): BootModuleRow => ({ id, url: `/plugins/${id}/client.js?rev=0`, rev: '0' })
++const row = (id: string, rev = '0'): BootModuleRow => ({ id, url: `/plugins/${id}/client.js?rev=${rev}`, rev })
+ 
+ interface Bench {
+   loader: ClientModuleLoader
+@@ -303,3 +303,25 @@ describe('default transport seam', () => {
+     expect([...document.querySelectorAll('script')]).toEqual([])
+   })
+ })
++
++describe('hot-reload addRow', () => {
++  it('addRow makes a post-boot id importable', async () => {
++    const b = bench([row('a')], { a: () => ({ marker: 'a' }), b: () => ({ marker: 'b' }) })
++    await b.loader.import('a', '', {})
++    b.loader.addRow(row('b', '1'))
++    const surface = await b.loader.import('b', '', {})
++    expect((surface as { marker: string }).marker).toBe('b')
++    expect(b.fetched).toContain('/plugins/b/client.js?rev=1')
++  })
++
++  it('addRow with a changed rev invalidates the stale bundle and reloads', async () => {
++    const b = bench([row('a')], { a: () => ({ marker: 'v1' }) })
++    await b.loader.import('a', '', {})
++    expect(b.fetched).toEqual(['/plugins/a/client.js?rev=0'])
++    b.loader.addRow(row('a', '2'))
++    expect(b.loader.loadCache.size).toBe(0) // invalidated by the rev change
++    const surface = await b.loader.import('a', '', {})
++    expect(b.fetched).toEqual(['/plugins/a/client.js?rev=0', '/plugins/a/client.js?rev=2'])
++    expect((surface as { marker: string }).marker).toBe('v1')
++  })
++})
 diff --git a/packages/client/modules/tests/node-half.spec.ts b/packages/client/modules/tests/node-half.spec.ts
 index 186cfe10..b37448e7 100644
 --- a/packages/client/modules/tests/node-half.spec.ts
@@ -660,26 +764,197 @@ index 186cfe10..b37448e7 100644
 +    expect(service.graph().entries).toHaveLength(0)
 +  })
 +})
+diff --git a/packages/client/runtime/src/client/index.ts b/packages/client/runtime/src/client/index.ts
+index b7226c00..de9addcd 100644
+--- a/packages/client/runtime/src/client/index.ts
++++ b/packages/client/runtime/src/client/index.ts
+@@ -1,6 +1,6 @@
+ /** Browser runtime services for slots, sessions, workspaces, and connection-stream delivery. */
+ import type { Context } from 'cordis'
+-import type { ConnectionHandle, SessionId } from '@deepseek-ai/dsh-client-connection/client'
++import type { ConnectionHandle, ClientGraphEntryView, SessionId } from '@deepseek-ai/dsh-client-connection/client'
+ import type { TypeRTContext } from '@deepseek-ai/dsh-type-meta'
+ import type { MaybeSnapshotSelectorHook, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
+ import { SlotsService } from './slots.ts'
+@@ -155,6 +155,14 @@ declare module 'cordis' {
+      * @mode emit
+      */
+     'models/changed'(): void
++    /**
++     * The web client-modules graph changed (host/client-graph-changed
++     * passthrough). Carries the full entry table; the hot-reload applier
++     * diffs the local loader tree and applies added/removed entries in place.
++     * @mode emit
++     * @param entries - the current graph entry table (id/url/rev).
++     */
++    'client/graph-changed'(entries: ClientGraphEntryView[]): void
+     /**
+      * A connection generation was (re-)established. Wire-derived caches must
+      * treat their state as stale and repull (commands directory; the queue
+@@ -180,6 +188,53 @@ export const inject = ['connection', 'typert']
+ /** Mounts the browser runtime services and connection stream.
+  * @param ctx - Client Cordis context.
+  */
++/** Loader-tree face the applier touches (local structural type — the loader service lives in the client boot program). */
++interface LoaderEntryFace {
++  options: { name: string }
++  disabled: boolean
++  update(options: { disabled: boolean }): Promise<void>
++}
++
++interface LoaderFace {
++  entries(): Iterable<LoaderEntryFace>
++  create(options: { name: string }): Promise<string>
++}
++
++interface ModulesFace {
++  addRow(row: { id: string; url: string; rev: string }): void
++}
++
++/**
++ * Hot-reload applier: reconcile the local loader tree against a graph frame
++ * (host/client-graph-changed with the full entry table). Added entries get a
++ * module row first (addRow — a rev change invalidates a stale bundle so the
++ * next import loads the new one), then a loader entry (create, or re-activate
++ * a disabled one); removed entries are disabled in place so a later re-add
++ * re-activates without a fresh create. Runs serialized; failures log and the
++ * next frame self-heals.
++ */
++export async function applyClientGraph(ctx: Context, entries: ClientGraphEntryView[]): Promise<void> {
++  const loader = ctx.get('loader') as LoaderFace
++  const modules = ctx.get('modules') as ModulesFace
++  const want = new Set(entries.map(entry => entry.id))
++  const local = new Map([...loader.entries()].map(entry => [entry.options.name, entry]))
++  for (const view of entries) {
++    modules.addRow({ id: view.id, url: view.url, rev: view.rev })
++    const entry = local.get(view.id)
++    if (entry === undefined) {
++      await loader.create({ name: view.id })
++    } else if (entry.disabled) {
++      await entry.update({ disabled: false })
++    }
++    // Active entry with unchanged rev: already running, no-op.
++  }
++  for (const [id, entry] of local) {
++    if (!want.has(id) && !entry.disabled) {
++      await entry.update({ disabled: true })
++    }
++  }
++}
++
+ export function apply(ctx: Context): void {
+   ctx.plugin(SlotsService)
+   const connection = ctx.get('connection') as ConnectionHandle
+@@ -193,6 +248,16 @@ export function apply(ctx: Context): void {
+     () => workspaces.startInitialSelection(),
+     'runtime: initial Workspace selection',
+   )
++  // Hot-reload applier: reconcile the loader tree against graph frames
++  // instead of reloading. Serialized — a frame arriving mid-apply queues.
++  let graphApply: Promise<void> = Promise.resolve()
++  ctx.effect(() => ctx.on('client/graph-changed', (entries) => {
++    graphApply = graphApply
++      .then(() => applyClientGraph(ctx, entries))
++      .catch((error) => {
++        console.error('[web-runtime] client-graph apply failed:', error)
++      })
++  }), 'runtime: client-graph applier')
+   const loop = connection.start({
+     onMuxEnvelope: (envelope) => {
+       sessions.handleMuxEnvelope(envelope)
+@@ -213,6 +278,7 @@ export function apply(ctx: Context): void {
+       else if (frame.type === 'host/settings-changed') ctx.emit('settings/changed', frame.ns)
+       else if (frame.type === 'host/credentials-changed') ctx.emit('credentials/changed', frame.ref)
+       else if (frame.type === 'host/models-changed') ctx.emit('models/changed')
++      else if (frame.type === 'host/client-graph-changed') ctx.emit('client/graph-changed', frame.entries)
+       try {
+         sessionHistory.handleHostEnvelope(envelope)
+       } catch (error) {
 diff --git a/packages/client/runtime/src/client/sessions/manager.ts b/packages/client/runtime/src/client/sessions/manager.ts
-index 64199c48..986ee989 100644
+index 64199c48..978689a0 100644
 --- a/packages/client/runtime/src/client/sessions/manager.ts
 +++ b/packages/client/runtime/src/client/sessions/manager.ts
-@@ -806,6 +806,15 @@ export class SessionManager {
+@@ -806,6 +806,13 @@ export class SessionManager {
          this.sessions.get(frame.sessionId)?.handleAgentError(frame.message)
          return // not reflected in the list
        }
 +      case 'host/client-graph-changed': {
 +        // The plugin-registry client-modules graph changed (registerExternal/
-+        // unregisterExternal). The boot manifest is fixed at page load, so a
-+        // reload is the only way to pick up the new __DSH_BOOT__ — the
-+        // browser-side half of "no manual refresh needed" after enabling or
-+        // disabling a plugin's client half.
-+        window.location.reload()
++        // unregisterExternal). Consumed by the runtime's hot-reload applier
++        // (client/graph-changed event → loader-tree diff, no page reload);
++        // the session layer has no graph routing of its own.
 +        return
 +      }
        default:
          return // stream/error ignored; unknown frames ignored (documented default)
      }
+diff --git a/packages/client/runtime/tests/apply-graph.spec.ts b/packages/client/runtime/tests/apply-graph.spec.ts
+new file mode 100644
+index 00000000..46b5850d
+--- /dev/null
++++ b/packages/client/runtime/tests/apply-graph.spec.ts
+@@ -0,0 +1,61 @@
++import { describe, expect, it } from 'vitest'
++import { applyClientGraph } from '../src/client/index.ts'
++import type { ClientGraphEntryView } from '@deepseek-ai/dsh-client-connection/client'
++
++interface FakeEntry {
++  options: { name: string }
++  disabled: boolean
++  update: (o: { disabled: boolean }) => Promise<void>
++  updated: Array<{ disabled: boolean }>
++}
++
++function fakeLoader(initial: string[], disabled: string[] = []) {
++  const entries = new Map<string, FakeEntry>()
++  for (const name of initial) {
++    entries.set(name, { options: { name }, disabled: disabled.includes(name), updated: [], update: async (o) => { entries.get(name)!.disabled = o.disabled; entries.get(name)!.updated.push(o) } })
++  }
++  const created: string[] = []
++  return {
++    face: {
++      entries: () => entries.values(),
++      create: async (o: { name: string }) => { created.push(o.name); entries.set(o.name, { options: o, disabled: false, updated: [], update: async (x) => { entries.get(o.name)!.disabled = x.disabled } }) },
++    },
++    entries, created,
++  }
++}
++
++const entry = (id: string, rev = 'r1'): ClientGraphEntryView => ({ id, url: `/plugins/${id}/client.js?rev=${rev}`, rev })
++
++describe('applyClientGraph diff applier', () => {
++  it('creates added entries and registers their module rows', async () => {
++    const loader = fakeLoader(['a'])
++    const added: Array<{ id: string }> = []
++    const ctx = {
++      get: (name: string) => name === 'loader' ? loader.face
++        : name === 'modules' ? { addRow: (row: { id: string }) => { added.push(row) } } : undefined,
++    } as never
++    await applyClientGraph(ctx as never, [entry('a'), entry('b')])
++    expect(loader.created).toEqual(['b'])
++    expect(added.map(r => r.id)).toEqual(['a', 'b'])
++  })
++
++  it('re-activates a disabled entry instead of creating', async () => {
++    const loader = fakeLoader(['a'], ['a'])
++    const ctx = {
++      get: (name: string) => name === 'loader' ? loader.face : { addRow: () => {} },
++    } as never
++    await applyClientGraph(ctx as never, [entry('a')])
++    expect(loader.created).toEqual([])
++    expect(loader.entries.get('a')!.disabled).toBe(false)
++  })
++
++  it('disables removed entries in place', async () => {
++    const loader = fakeLoader(['a', 'b'])
++    const ctx = {
++      get: (name: string) => name === 'loader' ? loader.face : { addRow: () => {} },
++    } as never
++    await applyClientGraph(ctx as never, [entry('a')])
++    expect(loader.entries.get('b')!.disabled).toBe(true)
++    expect(loader.entries.get('a')!.disabled).toBe(false)
++  })
++})
 diff --git a/packages/client/runtime/tests/fake-api.ts b/packages/client/runtime/tests/fake-api.ts
 index 2f4299ce..ca4c0856 100644
 --- a/packages/client/runtime/tests/fake-api.ts
@@ -700,7 +975,7 @@ index 2f4299ce..ca4c0856 100644
  
    respond(message: ClientResponse): Promise<RpcReceipt> {
 diff --git a/packages/host/apiproxy/src/api-proxy.ts b/packages/host/apiproxy/src/api-proxy.ts
-index 46dbde98..4e397a84 100644
+index 46dbde98..eac3ebd0 100644
 --- a/packages/host/apiproxy/src/api-proxy.ts
 +++ b/packages/host/apiproxy/src/api-proxy.ts
 @@ -26,6 +26,7 @@ import {
@@ -733,7 +1008,7 @@ index 46dbde98..4e397a84 100644
    /** Map one redacted seam descriptor to its wire view. */
    function namespaceView(descriptor: SettingsDescriptor): SettingsNamespaceView {
      return {
-@@ -2695,6 +2711,23 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
+@@ -2695,6 +2711,29 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
            ctx.on('commands/change', () => {
              queue.push(frame({ type: 'host/commands-changed' }))
            }),
@@ -747,17 +1022,23 @@ index 46dbde98..4e397a84 100644
 +            // the client/web fiber — reach it through the root store the same
 +            // way @deepseek-ai/dsh-plugin's service does.
 +            const clientModuleHost = (ctx.root as {
-+              clientModuleHost?: { onGraphChanged?: (l: () => void) => () => void }
++              clientModuleHost?: {
++                onGraphChanged?: (l: () => void) => () => void
++                graph?: () => { entries: Array<{ id: string; url: string; rev: string }> }
++              }
 +            }).clientModuleHost
 +            if (clientModuleHost === undefined || clientModuleHost.onGraphChanged === undefined) return () => {}
 +            return clientModuleHost.onGraphChanged(() => {
-+              queue.push(frame({ type: 'host/client-graph-changed' }))
++              // Full entry table rides the frame: the browser diffs its local
++              // loader tree instead of reloading (hot-reload path).
++              const entries = clientModuleHost.graph?.().entries ?? []
++              queue.push(frame({ type: 'host/client-graph-changed', entries }))
 +            })
 +          })(),
            ctx.on('settings/document-updated', (ns) => {
              // The RAW-section event, not the resolved one: a field going from
              // inherited to overridden leaves the resolved value equal, and a
-@@ -2771,5 +2804,61 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
+@@ -2771,5 +2810,61 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
        pending.resolve(payload.answer)
        return Promise.resolve({ accepted: true })
      },
@@ -820,38 +1101,58 @@ index 46dbde98..4e397a84 100644
    }
  }
 diff --git a/packages/host/apiproxy/src/api/events.schema.ts b/packages/host/apiproxy/src/api/events.schema.ts
-index 13ead7d0..a750f0c1 100644
+index 13ead7d0..c6991027 100644
 --- a/packages/host/apiproxy/src/api/events.schema.ts
 +++ b/packages/host/apiproxy/src/api/events.schema.ts
-@@ -81,6 +81,7 @@ export const hostFrameSchema = z.discriminatedUnion('type', [
+@@ -81,6 +81,10 @@ export const hostFrameSchema = z.discriminatedUnion('type', [
    z.object({ type: z.literal('host/workspace-removed'), workspaceId: workspaceIdSchema }),
    z.object({ type: z.literal('host/archived-sessions-changed'), archivedSessionIds: z.array(sessionIdSchema) }),
    z.object({ type: z.literal('host/commands-changed') }),
-+  z.object({ type: z.literal('host/client-graph-changed') }),
++  z.object({
++    type: z.literal('host/client-graph-changed'),
++    entries: z.array(z.object({ id: z.string(), url: z.string(), rev: z.string() })),
++  }),
    z.object({ type: z.literal('host/settings-changed'), ns: z.string() }),
    z.object({ type: z.literal('host/credentials-changed'), ref: z.string() }),
    z.object({ type: z.literal('host/models-changed') }),
 diff --git a/packages/host/apiproxy/src/api/events.ts b/packages/host/apiproxy/src/api/events.ts
-index 7fc54f6f..ad2535c4 100644
+index 7fc54f6f..9c887045 100644
 --- a/packages/host/apiproxy/src/api/events.ts
 +++ b/packages/host/apiproxy/src/api/events.ts
-@@ -123,6 +123,14 @@ export type HostFrame =
+@@ -108,6 +108,16 @@ export type MuxFrame =
+  * archive set after every durable change (same full-snapshot posture as
+  * workspace-changed — `workspace.list` re-baselines it on reconnect).
+  */
++/** Wire shape of one web client-modules graph entry (browser diff currency). */
++export interface ClientGraphEntryView {
++  /** Entry name == plugin id (module-table key). */
++  id: string
++  /** Bundle endpoint ('/plugins/<id>/client.js?rev=<rev>'). */
++  url: string
++  /** Bundle content hash — the diff's version check. */
++  rev: string
++}
++
+ export type HostFrame =
+   | {
+     type: 'host/session-added'
+@@ -123,6 +133,14 @@ export type HostFrame =
    | { type: 'host/workspace-changed'; workspace: WorkspaceView }
    | { type: 'host/workspace-removed'; workspaceId: WorkspaceView['workspaceId'] }
    | { type: 'host/archived-sessions-changed'; archivedSessionIds: SessionId[] }
 +  /**
 +   * The web client-modules graph changed (plugin-registry enable/disable
-+   * registered or removed a client half via registerExternal). Pure signal,
-+   * no payload: the boot manifest is fixed at page load, so the browser
-+   * reloads to pick up the new `__DSH_BOOT__` — the alternative to a manual
-+   * refresh.
++   * registered or removed a client half via registerExternal). Carries the
++   * full current entry table (id/url/rev) so the browser can diff its local
++   * loader tree and apply added/removed entries in place — the hot-reload
++   * path. A client without a diff applier falls back to a reload.
 +   */
-+  | { type: 'host/client-graph-changed' }
++  | { type: 'host/client-graph-changed'; entries: ClientGraphEntryView[] }
    /**
     * The command registry changed (`commands/change` passthrough). Pure
     * invalidation signal, no payload: clients refetch `command.list` in the
 diff --git a/packages/host/apiproxy/src/api/index.ts b/packages/host/apiproxy/src/api/index.ts
-index cb83c532..56e15a49 100644
+index cb83c532..161aae14 100644
 --- a/packages/host/apiproxy/src/api/index.ts
 +++ b/packages/host/apiproxy/src/api/index.ts
 @@ -15,6 +15,7 @@ import type { GoalsApi } from './goals.ts'
@@ -870,7 +1171,13 @@ index cb83c532..56e15a49 100644
    /** Response entry for server-requests (client-response, echoing their rpcId); not a domain method (four-quadrant model). */
    respond(message: ClientResponse): Promise<RpcReceipt>
  }
-@@ -52,6 +54,7 @@ export type { GoalsApi, GoalId, GoalRef } from './goals.ts'
+@@ -47,11 +49,12 @@ export type {
+ export type { WorkspaceApi, WorkspaceId, WorkspaceView } from './workspace.ts'
+ export type { CommandsApi, CommandDescriptor } from './commands.ts'
+ export type { SkillsApi, SkillEntry } from './skills.ts'
+-export type { EventsApi, MuxFrame, HostFrame, QueuedInboxItem, ToolCallView, ToolEventView, ToolResultView } from './events.ts'
++export type { ClientGraphEntryView, EventsApi, MuxFrame, HostFrame, QueuedInboxItem, ToolCallView, ToolEventView, ToolResultView } from './events.ts'
+ export type { GoalsApi, GoalId, GoalRef } from './goals.ts'
  export type { SettingsApi, SettingsNamespaceView, SettingsPathOpView, SettingsSecretView } from './settings.ts'
  export type { CredentialsApi, CredentialView } from './credentials.ts'
  export type { ConfigurableProviderView, DiscoveredModelView, LlmApi } from './llm.ts'
@@ -1265,6 +1572,33 @@ index fb2e86d9..ceffcd61 100644
      sessions: {
        list: r => ok(r, { items: [] }),
        search: r => ok(r, { items: [], hasMore: false }),
+diff --git a/packages/host/apiproxy/tests/events-schema.spec.ts b/packages/host/apiproxy/tests/events-schema.spec.ts
+new file mode 100644
+index 00000000..83845c3d
+--- /dev/null
++++ b/packages/host/apiproxy/tests/events-schema.spec.ts
+@@ -0,0 +1,21 @@
++import { describe, expect, it } from 'vitest'
++import { hostFrameSchema } from '../src/api/events.schema.ts'
++
++describe('host frame schema: client-graph-changed payload', () => {
++  it('accepts the graph frame with the full entry table', () => {
++    const parsed = hostFrameSchema.parse({
++      type: 'host/client-graph-changed',
++      entries: [
++        { id: 'vlln/navbar', url: '/plugins/vlln/navbar/client.js?rev=abc123', rev: 'abc123' },
++        { id: 'acme/greeter', url: '/plugins/acme/greeter/client.js?rev=def456', rev: 'def456' },
++      ],
++    })
++    expect(parsed.type).toBe('host/client-graph-changed')
++    expect(parsed.entries).toHaveLength(2)
++    expect(parsed.entries[1]?.id).toBe('acme/greeter')
++  })
++
++  it('rejects a graph frame without entries (old pure-signal shape)', () => {
++    expect(() => hostFrameSchema.parse({ type: 'host/client-graph-changed' })).toThrow()
++  })
++})
 diff --git a/packages/host/apiproxy/tests/fetch-carrier.spec.ts b/packages/host/apiproxy/tests/fetch-carrier.spec.ts
 index 5289edf8..a2611787 100644
 --- a/packages/host/apiproxy/tests/fetch-carrier.spec.ts
