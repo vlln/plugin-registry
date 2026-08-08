@@ -2,6 +2,14 @@
 
 DeepSeek Harness 的本地插件系统：清单协议、安装/启停、Web 管理面板、声明校验、脚手架与 tarball 分发，兼容官方格式插件（增量清单，bundle 零重构建）。
 
+## 为什么需要（Why）
+
+DSH 的官方插件机制是**产品结构**：cordis 是系统元框架——一切能力都是 cordis 插件（`apply(ctx)` + `inject`/`effect`），bundle/profile 是官方组合的声明式层。两者面向「组合」：随发布固定，版本、顺序、跨 surface 差异由产品控制，没有面向最终用户的安装/启停/卸载、可浏览的管理界面、第三方清单与分发契约——对用户插件来说太底层。
+
+本插件系统在官方机制之上提供**面向用户的第二层**：同一 Cordis 运行时，不同管理权——官方插件是产品结构，registry 插件由用户经 `dsh registry` / Web 面板安装管理（能力见下节）；官方格式插件加增量清单即可进入，无需重构建。
+
+两层模型、加载路径与信任边界见 [架构](docs/architecture.md)。
+
 ## 快速上手
 
 ### 使用 registry
@@ -73,7 +81,7 @@ Web 设置页「插件」面板：
 - **Web 面板**：设置页「插件」区，浏览、搜索、安装、启停、卸载
 - **client half**：插件可带浏览器端 bundle，启用后进入 `__DSH_BOOT__` 在 Web 端运行（`client` 声明 + 运行时登记）
 - **官方插件增量兼容**：官方格式插件（npm/cordis 包）加一个 `dsh.plugin.json` 增量清单即可进 registry——bundle 零重构建、官方通道不受影响（非破坏 + 互斥，见 [设计](docs/official-plugin-incremental-compat.md)）
-- **UI 扩展机制件**（官方树提供，示例验证）：`conversation.view` 视图环 + `setView`、`conversation.input.dock` 等官方既有槽、DOM 锚点自渲染契约——统一模型见 [client UI 扩展心智模型](docs/client-ui-extension-model.md)。**注**：早期曾把 `useTasks`/`task/snapshot`、`ctx.ui.mount`、`sidebar.panel`、`conversation.chat.item` 等示例级缝打进官方树，已在缝降级中移除（见 [CHANGELOG](CHANGELOG.md)），示例插件改为插件侧自造缝
+- **UI 扩展机制件**（官方树提供，示例验证）：`conversation.view` 视图环 + `setView`、`conversation.input.dock` 等官方既有槽、DOM 锚点自渲染契约——统一模型见 [client UI 扩展心智模型](docs/client-ui-extension-model.md)。示例级缝已降级为插件侧自造缝（见 [CHANGELOG](CHANGELOG.md)）
 - **信任边界**：安装默认禁用，显式启用才执行
 - **脚手架**：`dsh registry create <id>` 一键生成标准插件根
 
