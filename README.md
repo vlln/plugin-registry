@@ -31,17 +31,23 @@ dsh registry uninstall acme/cool-tool # 卸载（删目录 + 索引；disable �
 
 ### 安装 registry
 
-先获取本仓库（二选一）：
+先获取本仓库（二选一，后续命令都在仓库根执行）：
 
 ```sh
 # A. GitHub clone
 git clone https://github.com/dsh-external/plugin-registry.git
-# B. GitHub Releases：下载最新 release 的源码压缩包（tar.gz / zip），解压后进入解压出的目录
+cd plugin-registry
+
+# B. GitHub Releases：在 https://github.com/dsh-external/plugin-registry/releases
+#    下载最新 release 的 Assets 源码包 plugin-registry-<版本>.tar.gz（或 .zip）
+tar -xzf plugin-registry-<版本>.tar.gz   # 解压出 plugin-registry-<版本>/ 目录
+cd plugin-registry-<版本>
 ```
 
 再集成进 DSH 源码树：
 
 ```sh
+# 在仓库根（clone 目录或解压出的 plugin-registry-<版本>/）执行
 node scripts/install-into-dsh.mjs <dsh-monorepo路径>
 ```
 

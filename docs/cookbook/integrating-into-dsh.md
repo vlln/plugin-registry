@@ -6,8 +6,23 @@
 
 ## 前置条件
 
-- 本仓库：`git clone https://github.com/dsh-external/plugin-registry.git`，或从 [GitHub Releases](https://github.com/dsh-external/plugin-registry/releases) 下载最新 Source code (tar.gz) 解压（每个 release 对应一个官方基线，见 release notes）。
-- DSH 源码环境：官方 0808 快照 `20260808T121140Z`（commit `57ffa9de`）或兼容布局，pnpm workspace。
+- **本仓库（两种获取方式，后续所有命令都在本仓库根执行）**：
+
+```sh
+# 方式 A：git clone
+git clone https://github.com/dsh-external/plugin-registry.git
+cd plugin-registry
+
+# 方式 B：GitHub Releases 下载源码包
+#   在 https://github.com/dsh-external/plugin-registry/releases 下载
+#   最新 release 的 Assets：plugin-registry-<版本>.tar.gz（或 .zip）
+tar -xzf plugin-registry-<版本>.tar.gz   # 解压出 plugin-registry-<版本>/ 目录
+cd plugin-registry-<版本>
+```
+
+  一键 / 手动安装里的 `packages/`、`patches/`、`scripts/` 均相对**本仓库根**（clone 目录或解压出的 `plugin-registry-<版本>/`），非 DSH monorepo。
+
+- **DSH 源码环境**：官方 0808 快照 `20260808T121140Z`（commit `57ffa9de`）或兼容布局的 DSH monorepo 检出（pnpm workspace）。
 - 仓库根目录可 `git apply`（补丁基于官方 0808 快照生成）。
 
 ## 一键安装
@@ -22,7 +37,7 @@ node scripts/install-into-dsh.mjs <dsh-monorepo路径>
 
 ### 1. 放插件
 
-把 `packages/plugin/`、`packages/ui-plugin-manager/` 复制到 DSH monorepo 对应路径：
+`packages/plugin/`、`packages/ui-plugin-manager/` 复制到 DSH monorepo 对应路径：
 
 ```sh
 cp -r packages/plugin DSH_MONOREPO/packages/
@@ -35,7 +50,7 @@ cp -r packages/ui-plugin-manager DSH_MONOREPO/packages/client/
 git apply patches/dsh-plugin-registry-0808.patch   # 在 DSH monorepo 根目录执行
 ```
 
-补丁基于官方 0808 快照生成，改动 41 个文件（CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、host 帧 `client-graph-changed` 自动刷新、tasks/bash 非消耗式 `peek` seam、tsconfig、依赖闭包、测试与 README——**纯平台接线**，不含示例级数据/渲染缝，也不含复制分发包 `packages/plugin` 与 ui-plugin-manager），验证可干净应用。基线更新导致锚点漂移时，`git apply --3way` 或手动对齐。本补丁只含 plugin-registry 核心机制需要的官方改动；具体插件各自的宿主依赖由各插件仓库自带补丁提供（如 dsh-subagent-tree 的 ui-workspace 会话行 hole 补丁在其仓库 `patches/` 下）。
+补丁基于官方 0808 快照生成，改动 41 个官方文件（**纯平台接线**：CLI `dsh registry`、apiproxy `plugins` 域、`client-graph-changed` 自动刷新、tasks/bash `peek` seam、tsconfig、依赖闭包），不含复制分发包 `packages/plugin` 与 ui-plugin-manager。基线漂移时 `git apply --3way` 或手动对齐。具体插件的宿主依赖由各插件仓库自带补丁提供。
 
 **验证点**：`git apply --check` 无输出（干净应用）；`git status` 显示改动文件数符合预期。
 
@@ -47,11 +62,11 @@ git apply patches/dsh-plugin-registry-0808.patch   # 在 DSH monorepo 根目录�
 dsh plugin --profile web add <this-repo>/packages/bundle/dsh-plugin-registry
 ```
 
-该 bundle 的 patch 向组合 insert 两行（plugin-local + ui-plugin-manager），两包都是 app（apps/cli）的 workspace 依赖，经 profile 依赖 fallback（`<dshHome>/profiles/node_modules`）解析——bundle 自身不声明任何依赖。
+该 bundle 的 patch 向组合 insert 两行（plugin-local + ui-plugin-manager），两包是 app（apps/cli）的 workspace 依赖，经 profile 依赖 fallback（`<dshHome>/profiles/node_modules`）解析——bundle 自身不声明依赖。
 
-**验证点**：`dsh --profile web --dump-config | grep plugin-local`（组合含两行）；`pnpm install` 后 `dsh registry list` 输出 `no plugins installed`（命令可用）；启动 Web 后设置页出现「插件」面板。
+**验证点**：`dsh --profile web --dump-config | grep plugin-local`（组合含两行）；`dsh registry list` 输出 `no plugins installed`（命令可用）；Web 设置页出现「插件」面板。
 
-**client half 生效边界**：`dsh registry enable` 是服务端实时（`plugin.list` 立即可见），但 client bundle 在 CLI 进程注册——**已运行的 web 需重启**；Web 面板内启用是同进程，**刷新页面即可**。详见 [creating-a-plugin](creating-a-plugin.md#4-安装启用验证)。
+**client half 生效边界**：CLI `registry enable` 需重启已运行的 web（client bundle 在 CLI 进程注册）；Web 面板内启用同进程，刷新即可。详见 [creating-a-plugin](creating-a-plugin.md#4-安装启用验证)。
 
 ### 4. 冒烟
 
