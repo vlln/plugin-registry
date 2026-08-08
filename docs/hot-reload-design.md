@@ -63,6 +63,21 @@ registry 插件启停目前是「近似热更新」：服务端实时（plugin-l
 
 **风险重估**：实施风险主项（运行期 loader 状态机）已排除——Stage 1 从「约五五开」上调为**主要风险在浏览器端集成**（bundle fetch、ModuleLoader、React 渲染的端到端），loader 层不再是不确定点。「entry 预创建」策略从必需降级为可选优化（运行期 create 直接可行）。
 
+### 浏览器端端到端 spike（jsdom + 真实 bundle）
+
+jsdom 复用真实链路（cordis Loader + ClientModuleSystem 作 `loader.internal` + 真实 tsdown 产物 bundle，`loadBundle` 注入本地文件免网络）验证四步（`packages/client/web/tests/spike-e2e.spec.ts`）：
+
+| 步骤 | 观察 | 结论 |
+|---|---|---|
+| boot：create entry → await | fiber ACTIVE + bundle 渲染 DOM | 真实 bundle 运行时加载/激活/渲染链路通 |
+| 运行期 create 第二 entry | fiber ACTIVE + 第二个 DOM 渲染 | 浏览器端运行期新增 entry 可行 |
+| 拆除（disabled）| fiber 消失 + ctx.effect disposer 清理 DOM（2→1）| 卸载清理走 effect 链 |
+| 重新激活 | fiber ACTIVE + 恢复渲染 | 增删恢复闭环（浏览器端）|
+
+**实现契约发现**：bundle 的 `apply` **直接返回 disposer 不会被 fiber 卸载调用**（spike 初版失败）；必须用 `ctx.effect(() => disposer)` 显式注册才会被 `_unload` 清理。真实插件（`ctx.effect(() => ctx.slots.register(...))`）天然符合——插件卸载契约 = 副作用一律走 `ctx.effect`。
+
+**风险重估（终）**：浏览器端集成主风险（bundle 加载 / ModuleLoader 链路 / fiber 激活 / 渲染 / 清理）也实证通过——Stage 1 剩余为**工程实施**（服务端帧编码 + 浏览器 diff 应用器接线，复用既有通道与已验证机制），不再有未验证的核心机制赌注。
+
 ## 渐进 Stage
 
 **Stage 1（核心价值）**：服务端 graph 变化推帧 + 浏览器端 graph diff 应用器（entry 预创建 + 替换复用 reload + 删除 teardown）。验收：面板内 enable/disable/升级插件**页面不刷新**，UI 增删/替换生效；被 inject 插件卸载时依赖方停止且不崩溃；并发串行稳定；失败下帧 self-heal。
