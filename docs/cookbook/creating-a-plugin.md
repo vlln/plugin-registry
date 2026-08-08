@@ -62,6 +62,8 @@ dsh registry list                       # 验证：enabled acme/cool-tool@0.1.0
 
 **验证点**：`dsh registry list` 显示 enabled 且版本正确；若启用失败，报错列出声明但未注册的工具。
 
+**验证边界**：`enable` 只校验 contributes 名称与 manifest；工具 schema（value-schema DSL）与挂载错误只在 **web 重启**时暴露——验证循环必须包含一次 web 重启并确认日志无 `plugin tree failed to load`（实例：输出 schema 的 `required` 数组通过 enable 却在 web boot 崩溃）。
+
 **带 client half 的生效边界**：enable 是**服务端实时**（`plugin.list` 立即可见），但浏览器端有进程边界——`dsh registry enable` 在 CLI 进程注册 client bundle，**已运行的 web 不感知，需重启 web**；在 **Web 面板里点启用**则是同进程，**刷新页面即可**（`__DSH_BOOT__` 在页面加载时固定，运行时新增的 bundle 不进已加载页面）。开发期 HMR 只对已在图内的 bundle 生效，新增 bundle 仍需刷新。
 
 ## 5. 开发-验证循环

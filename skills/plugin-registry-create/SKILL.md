@@ -13,7 +13,7 @@ description: >
 license: BSD-3-Clause
 metadata:
   author: dsh-external/plugin-registry
-  version: "0.3.0"
+  version: "0.3.1"
 requires:
   bins:
     - dsh
@@ -112,8 +112,15 @@ Enable mounts the plugin live into the running harness. If it fails, the
 error lists the declared-but-unregistered tools; fix the entry or the
 manifest, never both silently.
 
+**`enable` validates names, not the full mount.** `defineTool` value-schema
+DSL violations and apply-time errors surface only when the plugin is actually
+mounted — restart the web and confirm the boot log has no `plugin tree failed
+to load` before declaring the Node half verified (real case: an output schema
+`required` array passed `enable` and crashed the web boot).
+
 **Checkpoint:** `dsh registry list` shows the plugin enabled with the expected
-version.
+version; after a web restart the boot log contains no `plugin tree failed to
+load` for this plugin.
 
 ### Stage 6: Add a browser client half (optional)
 
