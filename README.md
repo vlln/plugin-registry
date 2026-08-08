@@ -36,7 +36,7 @@ dsh registry uninstall acme/cool-tool # 卸载（删目录 + 索引；disable �
 ```sh
 # A. GitHub clone
 git clone https://github.com/dsh-external/plugin-registry.git
-# B. GitHub Releases：下载最新 Source code (tar.gz)，解压后进入解压出的目录
+# B. GitHub Releases：下载最新 release 的源码压缩包（tar.gz / zip），解压后进入解压出的目录
 ```
 
 再集成进 DSH 源码树：
