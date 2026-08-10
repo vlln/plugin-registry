@@ -3,6 +3,7 @@
   "description": "薄控制台：浏览器 UI 管理官方 repository-plugins（读/写 $DSH_HOME/cordis.patch.yml），0 patch",
   "version": "0.1.0",
   "private": true,
+  "license": "BSD-3-Clause",
   "type": "module",
   "main": "lib/index.mjs",
   "exports": {

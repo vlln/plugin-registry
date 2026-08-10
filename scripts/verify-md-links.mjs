@@ -17,7 +17,10 @@ const failures = []
 for (const file of mdFiles) {
   const text = readFileSync(join(repoRoot, file), 'utf8')
   // Markdown link destinations: [text](dest) and bare <dest> in link position.
-  const linkRe = /\[[^\]]*\]\(([^)]+)\)|^<([^>]+)>$/gm
+  // The bare form excludes HTML tags (<p …>, </div>, <br>): a tag name is a
+  // letter run followed by whitespace or '>', which a URL/relative path never
+  // has (protocols carry ':', paths carry '/').
+  const linkRe = /\[[^\]]*\]\(([^)]+)\)|^<(?!\/?[a-zA-Z]+[\s>])[^>]+>$/gm
   let match
   while ((match = linkRe.exec(text)) !== null) {
     const dest = (match[1] ?? match[2]).trim()
