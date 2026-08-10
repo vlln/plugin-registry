@@ -1,15 +1,13 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import type { PluginEntryView } from '@deepseek-ai/dsh-host-apiproxy'
+import type { PluginEntryView } from '../src/client/api.ts'
 import { PluginPanel, type PluginPanelProps } from '../src/client/PluginPanel.tsx'
 
-afterEach(cleanup)
-
-/** Enable-call shape with the RPC failure branch (ok:false) a test stubs. */
-type EnableCall = (payload: { id: string }) => Promise<{
-  result: { ok: boolean; error?: { code: string; message: string; details: unknown }; value?: { id: string } }
-}>
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
 
 function entry(overrides: Partial<PluginEntryView>): PluginEntryView {
   return {
@@ -23,59 +21,72 @@ function entry(overrides: Partial<PluginEntryView>): PluginEntryView {
 }
 
 /**
- * A stateful in-memory registry backing the mock API: each mutation applies
- * to the rows synchronously, so the panel's post-action refresh observes the
- * new state (mirroring the host's live registry).
+ * A stateful in-memory registry behind a fetch stub for `/api/plugin-registry`:
+ * each mutation applies to the rows synchronously, so the panel's post-action
+ * refresh observes the new state (mirroring the host's live registry).
  */
-function pluginsApi() {
+function stubRegistry() {
   const calls: string[] = []
   let rows: PluginEntryView[] = []
   const patch = (id: string, change: Partial<PluginEntryView>): void => {
     rows = rows.map(row => row.id === id ? { ...row, ...change } : row)
   }
-  const api = {
-    plugins: {
-      list: vi.fn(async () => ({ result: { ok: true as const, value: { plugins: rows } } })),
-      install: vi.fn(async (payload: { id: string }) => {
-        calls.push(`install:${payload.id}`)
-        patch(payload.id, { installed: true, enabled: false })
-        return { result: { ok: true as const, value: payload } }
-      }),
-      // RPC responses carry both outcomes; the wide return type lets a test
-      // stub a business failure (ok:false) through mockImplementation.
-      enable: vi.fn<EnableCall>(async (payload: { id: string }) => {
-        calls.push(`enable:${payload.id}`)
-        patch(payload.id, { enabled: true })
-        return { result: { ok: true as const, value: payload } }
-      }),
-      disable: vi.fn(async (payload: { id: string }) => {
-        calls.push(`disable:${payload.id}`)
-        patch(payload.id, { enabled: false })
-        return { result: { ok: true as const, value: payload } }
-      }),
-      uninstall: vi.fn(async (payload: { id: string }) => {
-        calls.push(`uninstall:${payload.id}`)
-        patch(payload.id, { installed: false, enabled: false })
-        return { result: { ok: true as const, value: payload } }
-      }),
-    },
+  let failNext: { action: string; message: string } | undefined
+
+  const fetchStub = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = String(input)
+    const method = init?.method ?? 'GET'
+    if (method === 'GET' && url === '/api/plugin-registry/plugins') {
+      return Response.json({ ok: true, plugins: rows })
+    }
+    const match = /^\/api\/plugin-registry\/plugins\/(install|enable|disable|uninstall)$/.exec(url)
+    if (method === 'POST' && match !== null) {
+      const action = match[1] as 'install' | 'enable' | 'disable' | 'uninstall'
+      const body = JSON.parse(String(init?.body)) as { id: string }
+      calls.push(`${action}:${body.id}`)
+      if (failNext !== undefined && failNext.action === action) {
+        const { message } = failNext
+        failNext = undefined
+        return Response.json({ ok: false, message }, { status: 500 })
+      }
+      if (action === 'install') patch(body.id, { installed: true, enabled: false })
+      if (action === 'enable') patch(body.id, { enabled: true })
+      if (action === 'disable') patch(body.id, { enabled: false })
+      if (action === 'uninstall') patch(body.id, { installed: false, enabled: false })
+      return Response.json({ ok: true, id: body.id })
+    }
+    return Response.json({ ok: false, message: 'not found' }, { status: 404 })
+  })
+
+  return {
+    fetchStub,
+    calls,
+    setRows: (next: PluginEntryView[]): void => { rows = next },
+    failNext: (action: string, message: string): void => { failNext = { action, message } },
+    stub: (): void => { vi.stubGlobal('fetch', fetchStub) },
   }
-  return { api, calls, setRows: (next: PluginEntryView[]): void => { rows = next } }
 }
 
-function props(api: unknown): PluginPanelProps {
-  return { api: api as PluginPanelProps['api'] } as PluginPanelProps
+let stubRegistryState: ReturnType<typeof stubRegistry> | undefined
+
+beforeEach(() => {
+  stubRegistryState = stubRegistry()
+  stubRegistryState.stub()
+})
+
+function props(): PluginPanelProps {
+  return {} as PluginPanelProps
 }
 
 describe('PluginPanel', () => {
   it('renders the browse rows with state badges and actions', async () => {
-    const { api, setRows } = pluginsApi()
+    const { setRows } = stubRegistryState!
     setRows([
       entry({ id: 'acme/available' }),
       entry({ id: 'acme/installed', installed: true, enabled: false }),
       entry({ id: 'acme/running', installed: true, enabled: true }),
     ])
-    render(<PluginPanel {...props(api)} />)
+    render(<PluginPanel {...props()} />)
 
     await screen.findByText('acme/available')
     expect(screen.getByText('未安装')).toBeTruthy()
@@ -89,9 +100,9 @@ describe('PluginPanel', () => {
   })
 
   it('filters rows by id and description', async () => {
-    const { api, setRows } = pluginsApi()
+    const { setRows } = stubRegistryState!
     setRows([entry({ id: 'acme/alpha' }), entry({ id: 'zeta/beta', description: 'weather tool' })])
-    render(<PluginPanel {...props(api)} />)
+    render(<PluginPanel {...props()} />)
     await screen.findByText('acme/alpha')
 
     fireEvent.change(screen.getByLabelText('搜索插件'), { target: { value: 'weather' } })
@@ -103,9 +114,9 @@ describe('PluginPanel', () => {
   })
 
   it('installs, enables, disables, and uninstalls through the API and refreshes', async () => {
-    const { api, calls, setRows } = pluginsApi()
+    const { calls, setRows } = stubRegistryState!
     setRows([entry({ id: 'acme/one' })])
-    render(<PluginPanel {...props(api)} />)
+    render(<PluginPanel {...props()} />)
     await screen.findByText('acme/one')
 
     fireEvent.click(screen.getByText('安装'))
@@ -124,24 +135,18 @@ describe('PluginPanel', () => {
   })
 
   it('shows an empty hint when nothing is discovered', async () => {
-    const { api } = pluginsApi()
-    render(<PluginPanel {...props(api)} />)
+    render(<PluginPanel {...props()} />)
     await screen.findByText(/尚未发现插件/)
   })
 
   it('surfaces an enable failure instead of staying silent', async () => {
-    const { api, setRows } = pluginsApi()
+    const { setRows, failNext } = stubRegistryState!
     setRows([entry({ id: 'broken/ghost', installed: true, enabled: false })])
-    // The RPC carrier returns ok:false for business failures (declared tool
-    // never registered), not a thrown rejection — the failure shape is the
-    // runtime reality the panel must surface.
-    api.plugins.enable.mockImplementation(async () => ({
-      result: {
-        ok: false,
-        error: { code: 'internal', message: 'plugin broken/ghost declares tools [ghost-tool] but registered none', details: {} },
-      },
-    }))
-    render(<PluginPanel {...props(api)} />)
+    // The route returns ok:false for business failures (declared tool never
+    // registered), not a thrown rejection — the failure shape is the runtime
+    // reality the panel must surface.
+    failNext('enable', 'plugin broken/ghost declares tools [ghost-tool] but registered none')
+    render(<PluginPanel {...props()} />)
     await screen.findByText('broken/ghost')
 
     fireEvent.click(screen.getByText('启用'))
