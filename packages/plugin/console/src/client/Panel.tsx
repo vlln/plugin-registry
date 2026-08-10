@@ -1,11 +1,13 @@
 /**
- * 薄控制台面板：两个管理区——
- * 1. repository 插件（.dsh-plugin 包）：repositories 列表增删
- * 2. UI 插件（bundle 插件）：disabled 标记启停
- * 经 /api/plugin-console 自建路由。零 CSS 依赖（inline 样式，对齐
- * create-dsh-plugin 的零 CSS 构建形态——保持构建链简单）。
+ * 薄控制台面板：
+ * 1. 已加载插件（读 boot 图 __DSH_BOOT__.entries）——Pill 状态 + 启停（写
+ *    profile 级 cordis.patch.yml 的 disabled 标记）
+ * 2. repository 插件（.dsh-plugin 包）——repositories 列表增删 + 检查更新
+ * 官方组件（Button/Input/Pill）对齐设置页视觉；零 CSS 依赖（官方组件自带
+ * module css，经 __ModuleLoader__ 加载）。
  */
 import { useCallback, useEffect, useState } from 'react'
+import { Button, Input, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
 
 interface RepositoryState {
   repositories: string[]
@@ -27,6 +29,12 @@ interface UpdateRow {
   error?: string
 }
 
+/** boot 图里已加载的插件（官方 __DSH_BOOT__.entries）。 */
+interface BootEntry {
+  id: string
+  url: string
+}
+
 const rowStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
@@ -37,45 +45,39 @@ const rowStyle: React.CSSProperties = {
   marginBottom: 6,
 }
 
-const badgeStyle = (on: boolean): React.CSSProperties => ({
-  display: 'inline-block',
-  marginLeft: 8,
-  padding: '1px 8px',
-  borderRadius: 999,
+const rowTitleStyle: React.CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  fontSize: 13,
+  color: 'var(--dsw-alias-label-primary)',
+  fontFamily: 'ui-monospace, monospace',
+}
+
+const sectionTitleStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 14,
+  fontWeight: 600,
+  color: 'var(--dsw-alias-label-primary)',
+}
+
+const hintStyle: React.CSSProperties = {
+  margin: '2px 0 8px',
   fontSize: 12,
-  color: on ? 'var(--dsw-alias-success, #1a7f37)' : 'var(--dsw-alias-label-tertiary)',
-  background: on ? 'var(--dsw-alias-success-weak, rgba(26,127,55,0.12))' : 'var(--dsw-alias-surface-l3)',
-})
+  color: 'var(--dsw-alias-label-caption)',
+}
 
 const shortSha = (sha: string): string => sha.slice(0, 7)
 
-const updateBadgeStyle = (tone: 'ok' | 'warn' | 'error' | 'muted'): React.CSSProperties => ({
-  display: 'inline-block',
-  marginLeft: 8,
-  padding: '1px 8px',
-  borderRadius: 999,
-  fontSize: 12,
-  color: tone === 'ok'
-    ? 'var(--dsw-alias-success, #1a7f37)'
-    : tone === 'warn'
-      ? 'var(--dsw-alias-warning, #9a6700)'
-      : tone === 'error'
-        ? 'var(--dsw-alias-danger, #d93026)'
-        : 'var(--dsw-alias-label-tertiary)',
-  background: tone === 'ok'
-    ? 'var(--dsw-alias-success-weak, rgba(26,127,55,0.12))'
-    : tone === 'warn'
-      ? 'var(--dsw-alias-warning-weak, rgba(154,103,0,0.12))'
-      : 'var(--dsw-alias-surface-l3)',
-})
-
-/** repository 源行的更新状态徽章。 */
-function UpdateBadge({ row }: { row: UpdateRow }): React.ReactNode {
-  if (row.error !== undefined) return <span style={updateBadgeStyle('error')}>无法检查</span>
-  if (row.latestSha === null) return <span style={updateBadgeStyle('muted')}>未知</span>
-  if (row.refKind === 'sha' && !row.hasUpdate) return <span style={updateBadgeStyle('ok')}>已最新 {shortSha(row.ref)}</span>
-  if (row.refKind === 'sha') return <span style={updateBadgeStyle('warn')}>有更新 {shortSha(row.ref)}→{shortSha(row.latestSha)}</span>
-  return <span style={updateBadgeStyle('warn')}>分支 {row.ref}@{shortSha(row.latestSha)}</span>
+/** repository 源行的更新状态文本。 */
+function updateText(row: UpdateRow): string {
+  if (row.error !== undefined) return '无法检查'
+  if (row.latestSha === null) return '未知'
+  if (row.refKind === 'sha' && !row.hasUpdate) return `已最新 ${shortSha(row.ref)}`
+  if (row.refKind === 'sha') return `有更新 ${shortSha(row.ref)}→${shortSha(row.latestSha)}`
+  return `分支 ${row.ref}@${shortSha(row.latestSha)}`
 }
 
 /** 设置页面板主体。 */
@@ -199,74 +201,72 @@ export function ConsolePanel(): React.ReactNode {
 
   if (loading) return <p style={{ color: 'var(--dsw-alias-label-tertiary)' }}>加载中…</p>
 
+  // 已加载插件 = boot 图 entries（官方 __DSH_BOOT__），合并 profile 配置的 disabled。
+  const boot = (window as { __DSH_BOOT__?: { entries?: BootEntry[] } }).__DSH_BOOT__
+  const loaded = (boot?.entries ?? []).map(entry => ({
+    id: entry.id,
+    disabled: uiPlugins.find(u => u.id === entry.id)?.disabled ?? false,
+  }))
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 720, color: 'var(--dsw-alias-label-primary)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 720, color: 'var(--dsw-alias-label-primary)' }}>
       {error !== undefined ? <p role="alert" style={{ color: 'var(--dsw-alias-danger, #d93026)' }}>{error}</p> : null}
 
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>repository 插件（.dsh-plugin 包）</h3>
-            <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--dsw-alias-label-tertiary)' }}>
-              配置在 home 级 $DSH_HOME/cordis.patch.yml，增删行 = 装/卸。
-            </p>
+      <section>
+        <h3 style={sectionTitleStyle}>已加载插件（{loaded.length}）</h3>
+        <p style={hintStyle}>boot 图中的插件；bundle 插件的启停写 profile 级配置，重启生效。</p>
+        {loaded.map(plugin => (
+          <div key={plugin.id} style={rowStyle}>
+            <span style={rowTitleStyle}>{plugin.id}</span>
+            <Pill active={!plugin.disabled}>{plugin.disabled ? '已停用' : '运行中'}</Pill>
+            <Button size="sm" disabled={busy} onClick={() => { void toggleUiPlugin(plugin.id, !plugin.disabled) }}>
+              {plugin.disabled ? '启用' : '停用'}
+            </Button>
           </div>
-          <button type="button" disabled={busy || checking} onClick={() => { void checkUpdates() }}>
+        ))}
+      </section>
+
+      <section>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div>
+            <h3 style={sectionTitleStyle}>repository 插件（.dsh-plugin）</h3>
+            <p style={hintStyle}>源列表写 home 级配置；更新 = 固定到远端最新 commit。</p>
+          </div>
+          <Button size="sm" disabled={busy || checking} onClick={() => { void checkUpdates() }}>
             {checking ? '检查中…' : '检查更新'}
-          </button>
+          </Button>
         </div>
-        {!state.present ? <p style={{ color: 'var(--dsw-alias-label-tertiary)' }}>暂无 repository-plugins 行</p> : null}
-        {state.repositories.length === 0 && state.present ? <p style={{ color: 'var(--dsw-alias-label-tertiary)' }}>已配置 0 个插件</p> : null}
+        {!state.present && state.repositories.length === 0 ? (
+          <p style={{ color: 'var(--dsw-alias-label-tertiary)', fontSize: 13 }}>未配置 repository 插件源。</p>
+        ) : null}
         {state.repositories.map(id => {
           const upd = updates?.find(u => u.source === id)
+          const canUpdate = upd !== undefined && (upd.hasUpdate || upd.refKind === 'branch') && upd.latestSha !== null
           return (
             <div key={id} style={rowStyle}>
-              <span style={{ flex: 1 }}>
-                {id}
-                <span style={badgeStyle(true)}>已装</span>
-                {upd !== undefined ? <UpdateBadge row={upd} /> : null}
-              </span>
-              {upd !== undefined && (upd.hasUpdate || upd.refKind === 'branch') && upd.latestSha !== null && (
-                <button type="button" disabled={busy} onClick={() => { void applyUpdate(id) }}>更新</button>
-              )}
-              <button type="button" disabled={busy} onClick={() => { void remove(id) }}>移除</button>
+              <span style={rowTitleStyle}>{id}</span>
+              {upd !== undefined ? <Pill active={!upd.hasUpdate && upd.error === undefined && upd.latestSha !== null}>{updateText(upd)}</Pill> : null}
+              {canUpdate ? (
+                <Button size="sm" disabled={busy} onClick={() => { void applyUpdate(id) }}>更新</Button>
+              ) : null}
+              <Button size="sm" variant="ghost" disabled={busy} onClick={() => { remove(id) }}>移除</Button>
             </div>
           )
         })}
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            style={{ flex: 1, height: 32, padding: '0 12px', borderRadius: 8, border: '1px solid var(--dsw-alias-border-l2)' }}
-            type="text"
+        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+          <Input
+            style={{ flex: 1 }}
             value={input}
-            placeholder="github:owner/repo#ref&path:/.dsh-plugin"
+            placeholder="github:owner/repo#ref"
             onChange={(e) => { setInput(e.target.value) }}
             aria-label="新增插件源"
           />
-          <button type="button" disabled={busy} onClick={() => { void add() }}>添加</button>
+          <Button size="sm" disabled={busy} onClick={() => { void add() }}>添加</Button>
         </div>
-      </div>
+      </section>
 
-      <div>
-        <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>UI 插件（bundle 插件）</h3>
-        <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--dsw-alias-label-tertiary)' }}>
-          配置在 profile 级 cordis.patch.yml，disabled 标记 = 停/启。
-        </p>
-        {uiPlugins.length === 0 ? <p style={{ color: 'var(--dsw-alias-label-tertiary)' }}>无已配置的 UI 插件（未配置的默认启用）</p> : null}
-        {uiPlugins.map(plugin => (
-          <div key={plugin.id} style={rowStyle}>
-            <span style={{ flex: 1 }}>
-              {plugin.id}
-              <span style={badgeStyle(!plugin.disabled)}>{plugin.disabled ? '已停用' : '运行中'}</span>
-            </span>
-            <button type="button" disabled={busy} onClick={() => { void toggleUiPlugin(plugin.id, !plugin.disabled) }}>
-              {plugin.disabled ? '启用' : '停用'}
-            </button>
-          </div>
-        ))}
-      </div>
-
-      <p style={{ fontSize: 13, color: 'var(--dsw-alias-label-tertiary)' }}>
-        修改写入 $DSH_HOME/cordis.patch.yml；web 默认无运行中 HMR，重启后生效（官方启用 web hmr 后自动换代）。
+      <p style={{ fontSize: 12, color: 'var(--dsw-alias-label-tertiary)' }}>
+        修改写入 $DSH_HOME/cordis.patch.yml；web 默认无运行中 HMR，重启后生效。
       </p>
     </div>
   )
