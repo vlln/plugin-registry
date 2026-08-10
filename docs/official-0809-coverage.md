@@ -55,11 +55,35 @@
 4. **patch 瘦身**：既有 49→26 瘦身自然收尾，不再投入新机制
 5. **归档候选**：若控制台价值不成立（官方后续补 UI），整个仓库转为归档状态
 
-## 待决策项
+## 决策（2026-08-10 拍板，转向「薄控制台」）
 
-- [ ] 控制台是否值得保留（官方 config 无 UI，但用户是否真的需要插件管理 UI）
-- [ ] `registerExternal` 是保留为可选缝还是移除（取决于是否有官方 dshClient 动态需求）
-- [ ] 转向后 patch 与分发包的处置（继续维护 0808/0809 patch，还是随归档冻结）
+- ✅ **控制台保留，形态 = 写 config 触发重载**：薄控制台读官方 config.yaml 的 `repository-plugins.repositories`，写操作直接编辑该列表 → 官方 HMR watcher 事务性换代生效。控制台需要写文件能力（经官方 entry 注入 httpServer 的自建路由，或官方配置写入面）
+- ✅ **`registerExternal` 完全移除**：依赖官方静态 dshClient 通道，不保留可选缝
+- ✅ **patch 倾向删除**：转向后不再维护 0808/0809 patch，机制件冻结或删除
+
+## 转向「薄控制台」——spike 验证（2026-08-10）
+
+纯净 0809 快照实测（`/tmp/dsh-0809-spike`）：
+
+| 验证点 | 结果 |
+|---|---|
+| entry 经 httpServer 自渲染 UI | ✅ 真实 HTTP 200 返回 UI 数据（`/tmp/dsh-0809-pure` 实证） |
+| 写 `$DSH_HOME/cordis.patch.yml` → 官方消费 repository 行 | ✅ 启动加载 → 官方 repository-plugin git 准备插件（web4/web6 实证） |
+| 运行中写 config → 即时 HMR 换代 | ❌ **0809 web 默认 hmr disabled**（web-app bundle 显式 `hmr: disabled: true`，官方 TODO「Re-enable shared HMR for Web after its reload lifecycle is tested」）——watcher 未注册 |
+| 0 patch 可行性 | ✅ 全部官方机制（config 文件 + repository-plugin + dshClient 面板） |
+
+**关键发现（影响形态）**：
+- **写入目标实为 `$DSH_HOME/cordis.patch.yml`**（home 级 patch 层，`homePatchPath()`），不是文档所称 `config.yaml`——同一 HMR watch 通道
+- **web 默认无运行中换代**：薄控制台写 config 后需**提示重启**（或触发整站 reload）；官方若启用 web hmr（TODO），运行中换代自动成立——控制台设计应兼容两种
+
+## 转向规划（4 阶段）
+
+| 阶段 | 内容 | 验证标准 |
+|---|---|---|
+| 1 冻结 | patch 瘦身收尾；CLI/`ctx.plugins`/`registerExternal` 标 deprecated，不再投入 | CHANGELOG 标注 |
+| 2 spike | 薄控制台最小原型（读/写 cordis.patch.yml + dshClient 面板） | 0 patch；能列出/启停 .dsh-plugin 包 |
+| 3 转型 | 新建薄控制台包替代 ui-plugin-manager；移除机制分发包与 patch | 旧机制可整体移除不影响控制台 |
+| 4 发布 | 控制台独立发版；旧 v0.1.0 标 legacy | 发布流程验证 |
 
 ## 相关
 
