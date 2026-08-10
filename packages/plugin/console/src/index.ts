@@ -10,6 +10,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { execFile, spawnSync } from 'node:child_process'
 import { join } from 'node:path'
 import type { Context } from 'cordis'
+import { createPluginTools } from './discovery/tools.ts'
 
 /** 解析 resolveDshHome（官方 dsh-paths）。 */
 function resolveDshHome(): string {
@@ -367,8 +368,8 @@ interface WebServerLike {
 /** Cordis 插件名。 */
 export const name = 'plugin-console'
 
-/** 需要宿主 web server（web 组合）+ loader（读/改 loader 树条目）。 */
-export const inject = ['httpServer', 'loader']
+/** 需要宿主 web server（web 组合）+ loader（读/改 loader 树条目）+ tools（注册 plugin_* 管理工具）。 */
+export const inject = ['httpServer', 'loader', 'tools']
 
 /** loader 树条目投影（条目短 id + 包名 + 当前 disabled + 当前版本）。 */
 interface LoadedEntryRow {
@@ -467,13 +468,33 @@ function collectLoaderEntries(ctx: ConsoleCtx): LoadedEntryRow[] {
 
 interface ConsoleCtx extends Context {
   httpServer?: WebServerLike
+  /** 官方工具注册服务（工具面；web 组合提供）。 */
+  tools?: { register(definition: unknown): () => void }
 }
 
 /** 注册控制台路由：GET 读列表，POST 写列表。 */
 export function apply(ctx: ConsoleCtx): void {
   ctx.effect(() => {
+    // AI-native 插件管理工具（plugin_*）：agent 面 = 面板写同一安装态。
+    const pluginTools = createPluginTools({
+      dshHome: () => resolveDshHome(),
+      readRepositories,
+      writeRepositories,
+      bundleInstall: (source) => {
+        const result = runPnpm(['add', source])
+        return result.ok ? { names: result.names, output: result.output } : null
+      },
+    })
+    const disposeTools = (ctx.tools?.register !== undefined)
+      ? pluginTools.map((tool) => ctx.tools!.register(tool))
+      : []
+    if (disposeTools.length > 0) {
+      console.log(`[plugin-console] registered plugin tools: ${pluginTools.map((t) => (t as { name?: string }).name).join(', ')}`)
+    }
     const httpServer = ctx.httpServer
-    if (httpServer === undefined) return () => {}
+    if (httpServer === undefined) {
+      return () => { for (const dispose of disposeTools) dispose() }
+    }
     // 启动延迟预扫描：web 起来 30 秒后批量查一次 registry 版本，填充缓存
     // （此后面板 GET /versions 零网络，直到用户手动刷新）。
     const prescanTimer = setTimeout(() => {
@@ -682,7 +703,8 @@ export function apply(ctx: ConsoleCtx): void {
     })
     return () => {
       clearTimeout(prescanTimer)
+      for (const dispose of disposeTools) dispose()
       disposeRoutes()
     }
-  }, 'plugin-console: config read/write route')
+  }, 'plugin-console: config read/write route + plugin tools')
 }
