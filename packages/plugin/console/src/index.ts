@@ -536,6 +536,22 @@ export function apply(ctx: ConsoleCtx): void {
             json(200, { ok: true, plugins: collectLoaderEntries(ctx) })
             return
           }
+          // bundle 版本检查：对每个包查 registry 最新版（npm view，缓存 10 分钟）
+          if (method === 'GET' && (path === '/api/plugin-console/versions' || path === '/api/plugin-console/versions/')) {
+            void (async () => {
+              try {
+                const names = [...new Set(collectLoaderEntries(ctx).map(row => row.name).filter(name => !name.startsWith('@deepseek-ai/') && !name.startsWith('@cordisjs/') && !name.startsWith('cordis:')))]
+                const versions = names.map(name => ({
+                  name,
+                  latest: npmLatestVersion(name),
+                }))
+                json(200, { ok: true, versions })
+              } catch (error) {
+                json(500, { ok: false, message: error instanceof Error ? error.message : String(error) })
+              }
+            })()
+            return
+          }
           // 已加载插件：运行时启停 + 写 profile patch 持久化
           // （POST /installed/<id>，body {disabled: bool}）
           const installedMatch = /^\/api\/plugin-console\/installed\/([^/]+)$/.exec(path)

@@ -29,6 +29,22 @@ interface LoadedPluginRow {
   id: string
   name: string
   disabled: boolean
+  version?: string
+}
+
+const versionTextStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: 'var(--dsw-alias-label-caption)',
+  whiteSpace: 'nowrap',
+  fontFamily: 'ui-monospace, monospace',
+}
+
+/** 版本行：v当前 · latest（可更新时高亮）；本地/非 registry 包无 latest。 */
+function versionText(plugin: LoadedPluginRow, latest: string | null): { text: string; canUpdate: boolean } {
+  const current = plugin.version === undefined ? '?' : `v${plugin.version}`
+  if (latest === null) return { text: `${current} · 本地`, canUpdate: false }
+  if (latest === plugin.version) return { text: `${current} · 已最新`, canUpdate: false }
+  return { text: `${current} → v${latest}`, canUpdate: true }
 }
 
 const rowStyle: React.CSSProperties = {
@@ -90,17 +106,23 @@ export function ConsolePanel(): React.ReactNode {
   const [bundleInput, setBundleInput] = useState('')
   const [bundleBusy, setBundleBusy] = useState(false)
   const [bundleMsg, setBundleMsg] = useState<string | undefined>(undefined)
+  const [versions, setVersions] = useState<Record<string, string | null>>({})
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
-      const [repoRes, installedRes] = await Promise.all([
+      const [repoRes, installedRes, versionsRes] = await Promise.all([
         fetch('/api/plugin-console/repositories', { headers: { accept: 'application/json' } }),
         fetch('/api/plugin-console/installed', { headers: { accept: 'application/json' } }),
+        fetch('/api/plugin-console/versions', { headers: { accept: 'application/json' } }),
       ])
       const repoBody = (await repoRes.json()) as RepositoryState & { ok?: boolean }
       const installedBody = (await installedRes.json()) as { plugins?: LoadedPluginRow[]; ok?: boolean }
+      const versionsBody = (await versionsRes.json()) as { versions?: { name: string; latest: string | null }[]; ok?: boolean }
       setState({ repositories: repoBody.repositories ?? [], present: repoBody.present ?? false })
       setInstalled(installedBody.plugins ?? [])
+      const map: Record<string, string | null> = {}
+      for (const row of versionsBody.versions ?? []) map[row.name] = row.latest
+      setVersions(map)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught))
     } finally {
@@ -270,19 +292,26 @@ export function ConsolePanel(): React.ReactNode {
             </Button>
           ) : null}
         </div>
-        {shown.map(plugin => (
-          <div key={plugin.id} style={rowStyle}>
-            <span style={rowTitleStyle}>{plugin.name}</span>
-            {official.includes(plugin) ? <Pill>内置</Pill> : null}
-            <Pill active={!plugin.disabled}>{plugin.disabled ? '已停用' : '运行中'}</Pill>
-            {!official.includes(plugin) ? (
-              <Button size="sm" variant="ghost" disabled={busy || bundleBusy} onClick={() => { void updateBundle(plugin.name) }}>更新</Button>
-            ) : null}
-            <Button size="sm" disabled={busy} onClick={() => { void togglePlugin(plugin.id, !plugin.disabled) }}>
-              {plugin.disabled ? '启用' : '停用'}
-            </Button>
-          </div>
-        ))}
+        {shown.map(plugin => {
+          const latest = versions[plugin.name] ?? null
+          const version = versionText(plugin, latest)
+          return (
+            <div key={plugin.id} style={rowStyle}>
+              <span style={rowTitleStyle}>
+                {plugin.name}
+                <span style={{ display: 'block', ...versionTextStyle }}>{version.text}</span>
+              </span>
+              {official.includes(plugin) ? <Pill>内置</Pill> : null}
+              <Pill active={!plugin.disabled}>{plugin.disabled ? '已停用' : '运行中'}</Pill>
+              {!official.includes(plugin) && version.canUpdate ? (
+                <Button size="sm" variant="ghost" disabled={busy || bundleBusy} onClick={() => { void updateBundle(plugin.name) }}>更新</Button>
+              ) : null}
+              <Button size="sm" disabled={busy} onClick={() => { void togglePlugin(plugin.id, !plugin.disabled) }}>
+                {plugin.disabled ? '启用' : '停用'}
+              </Button>
+            </div>
+          )
+        })}
       </section>
 
       <section>
