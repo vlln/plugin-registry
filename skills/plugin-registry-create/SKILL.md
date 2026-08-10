@@ -139,6 +139,8 @@ installed `.dsh-plugin` packages.
   are unpublished — `npm install` fails locally. Distribution resolves them
   in the official environment (github: source); local verification needs
   symlinks to the monorepo build or a mock registry. Don't change deps.
+  Bundle plugins (dshClient) have the same constraint but declare no deps —
+  the profile's pnpm closure injects them at mount; declaring them fails.
 - **Install is separate from enable** — the plugin never executes until it is
   in the config and mounted; don't claim verified until the boot log is clean.
 - **Entry contract failures surface at mount**: `dsh.entry` pointing outside

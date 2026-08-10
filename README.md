@@ -29,7 +29,7 @@ dsh plugin --profile web add <本仓库>/packages/plugin/console
 
 ## 开发前须知（踩过的坑）
 
-- **官方包未发布到公共 npm**：`@deepseek-ai/dsh-tools` 等 `npm install` 会失败——正式分发由官方环境经 github: 源解析，本地验证需 symlink 至 monorepo 产物或 mock registry。**不要改依赖声明**。
+- **官方包未发布到公共 npm**：`@deepseek-ai/dsh-tools` 等 `npm install` 会失败——正式分发由官方环境经 github: 源解析，本地验证需 symlink 至 monorepo 产物或 mock registry。**不要改依赖声明**。bundle 插件（loop/task-status）同坑但更隐蔽：`dependencies` 为空是设计，依赖由 profile 的 pnpm 闭包挂载时注入。
 - **改已挂载插件的 Node half 需重启 web**：ESM 缓存按 URL 永久缓存，disable/enable 不生效，只能重启。
 - **宿主可能覆盖注入的 CSS**：关键 UI 样式用 JS 内联，勿依赖 CSS class。
 
