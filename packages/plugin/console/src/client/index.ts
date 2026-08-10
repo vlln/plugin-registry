@@ -13,18 +13,14 @@ export const name = 'plugin-console-client'
 export const inject = ['slots']
 
 /**
- * 拼图块图标（插件语义，subagent 审查重画版 SF）：
- * - 顶部 U 型凹槽（0.75 圆角 + 直壁 + r1.25 圆底）与右侧胶囊凸起
- *   （0.75 圆角 + r1.25 半圆顶）共用同一半径组——槽是凸起的负形，
- *   设计语言一致；四角统一 r1.5
- * - stroke 1.5（对齐官方细条 1.34-1.45 视觉）、currentColor
- * - 18 个接点程序化验证 0 处切线不连续；墨迹 x∈[2.0,15.5] 16px 完整
- * 设置页 tab 图标为官方硬编码（仅 models 特例），0 patch 下用
+ * 插头图标（plugin-line，参考 Clarity 图标库，dsh 风格：fill
+ * currentColor 细条 + 16px 显示）——设置页导航的 tab 图标是官方硬编码
+ * （仅 models 特例，其余统一齿轮，零扩展点），0 patch 下用
  * MutationObserver 找到「插件」tab 行替换其 svg 内容。
  */
-const PLUGIN_TAB_ICON_SVG = '<path d="M4.25 2.75 H5.75 A0.75 0.75 0 0 1 6.5 3.5 V4.25 A1.25 1.25 0 0 0 9.0 4.25 V3.5 A0.75 0.75 0 0 1 9.75 2.75 H11.25 A1.5 1.5 0 0 1 12.75 4.25 V6.0 A0.75 0.75 0 0 0 13.5 6.75 A1.25 1.25 0 0 1 13.5 9.25 A0.75 0.75 0 0 0 12.75 10.0 V11.75 A1.5 1.5 0 0 1 11.25 13.25 H4.25 A1.5 1.5 0 0 1 2.75 11.75 V4.25 A1.5 1.5 0 0 1 4.25 2.75 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>'
+const PLUGIN_TAB_ICON_SVG = '<path fill="currentColor" d="M29.81 16H29V8.83a2 2 0 0 0-2-2h-6A5.14 5.14 0 0 0 16.51 2A5 5 0 0 0 11 6.83H4a2 2 0 0 0-2 2V17h2.81A3.13 3.13 0 0 1 8 19.69A3 3 0 0 1 7.22 22A3 3 0 0 1 5 23H2v8.83a2 2 0 0 0 2 2h23a2 2 0 0 0 2-2V26h1a5 5 0 0 0 5-5.51A5.15 5.15 0 0 0 29.81 16m2.41 7A3 3 0 0 1 30 24h-3v7.83H4V25h1a5 5 0 0 0 5-5.51A5.15 5.15 0 0 0 4.81 15H4V8.83h9V7a3 3 0 0 1 1-2.22A3 3 0 0 1 16.31 4A3.13 3.13 0 0 1 19 7.19v1.64h8V18h2.81A3.13 3.13 0 0 1 33 20.69a3 3 0 0 1-.78 2.31"/>'
 
-/** 替换设置页导航里「插件」tab 的默认齿轮图标为拼图块图标（幂等）。 */
+/** 替换设置页导航里「插件」tab 的默认齿轮图标为插头图标（幂等）。 */
 function patchPluginTabIcon(): void {
   for (const btn of document.querySelectorAll('button')) {
     const host = btn as HTMLButtonElement & { dataset: { dshConsoleIcon?: string } }
@@ -32,7 +28,8 @@ function patchPluginTabIcon(): void {
     if (btn.textContent?.trim() !== '插件') continue
     const svg = btn.querySelector('svg')
     if (svg === null) continue
-    svg.setAttribute('viewBox', '0 0 16 16')
+    // plugin-line 是 36 坐标系，缩放到 16px 显示（外层 svg 保持官方 width/height=16）。
+    svg.setAttribute('viewBox', '0 0 36 36')
     svg.setAttribute('fill', 'none')
     svg.innerHTML = PLUGIN_TAB_ICON_SVG
     host.dataset.dshConsoleIcon = '1'
