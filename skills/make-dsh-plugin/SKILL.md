@@ -159,15 +159,24 @@ DSH 插件：<一句话功能>。官方 repository-plugin（.dsh-plugin 格式�
 遵循形态 "DSH plugin: <what it does>; official repository-plugin format,
 install via config.yaml `<repo-ref>`"。双语可选（英文在前利于国际发现）。
 
-**仓库 topics（GitHub 标签）**：打标签便于 `gh`/搜索/发现。建议集合（适用
-都打）：
+**仓库 topics（GitHub 标签）**：打标签便于 `gh`/搜索/发现。**标签要描述插件实际做什么，而非只贴生态通用词**。两类组合：
 
-- `dsh` / `dsh-plugin` / `dsh-repository-plugin` — 生态发现
-- `deepseek-harness` — 宿主产品
-- 能力标签：`plugin`、`skill`、`mcp`（或领域标签如 `pet`、`tool`）
-- `agent` / `agents` — agentic 上下文
+**生态标签**（固定少量，标识 dsh 生态身份）：
+- `dsh` / `dsh-repository-plugin`（bundle 用 `dsh-bundle`）
+- `deepseek-harness`
 
-用 `gh repo edit <owner>/<repo> --add-topic dsh --add-topic dsh-plugin ...`
+**功能标签**（有意义——描述插件能力/领域，按插件实际内容定）：
+- 能力：`tool` / `skill` / `mcp` / `command` / `ui`（按插件含什么）
+- **领域/用途**（关键——让搜索命中「能干什么」）：如 `pet`（宠物）、
+  `loop`（定时循环）、`terminal`（终端）、`status`（状态条）、`automation`
+  （自动化）、`workflow`（工作流）等——从插件的核心功能提炼 1-2 个具体
+  领域词，避免泛词
+- 形态：`agent` / `agents`（agentic 上下文，可选）
+
+**原则**：想象用户搜什么词能找到这个插件——`dsh-plugin` 人人都有，
+`<你的功能词>` 才是区分度。标签总数 3-6 个（生态 2-3 + 功能 2-3）。
+
+用 `gh repo edit <owner>/<repo> --add-topic dsh --add-topic <功能词> ...`
 打标签。
 
 **发布检查清单**（分享仓库前）：
