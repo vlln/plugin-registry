@@ -101,3 +101,12 @@ sources:
 - 存储：单层 `sources.yml`（不做内置 + 用户两层合并）+ `lock.yml` + `cache/` 派生数据
 - 不追求实时反映 UI（面板刷新即可见，agent 写入与面板写同一文件天然一致）
 - 发现层不做：诊断/推荐工具（保持精简）、GPG 签名/透明日志
+
+## 实现同步（2026-08，落地后补充）
+
+- **已实现**（`ea7f285` + 测试）：4 工具注册（`inject tools` + `ctx.tools.register`）；`src/discovery/{store,enumerate,tools,types}.ts`；web boot 日志 `registered plugin tools` 实证；39 项 node:test + 20 项 e2e（真实 hub 索引 159 条 → 安装写 `cordis.patch.yml` → 状态/更新/卸载/裸 ref 拒绝）
+- **实现偏差**：
+  - `index` 源 locator 支持**本地文件**（`file://` 或裸路径）——hub 仓库为私有，匿名 `raw.githubusercontent` 404，本机经 hub clone 的 `plugins.json` 走本地通道（hub 2h 自动刷新同步）
+  - `plugin_search` 的 `source` 参数按形态推断：URL/file → index，`github:` → single，npm 包 → 仅记住源（bundle 无发现元数据，直接 install）
+  - 测试管线用 **node:test + tsx**（vitest 4/vite 8 与 vite 7 的 NodeNext 解析在独立包环境不兼容；`tests/tsconfig.json` paths 把未发布的 `@deepseek-ai/dsh-tools` 映射到 stub）
+  - `plugin_install` 对 bundle 走 `pnpm add` + reconcile；`plugin_uninstall` 仅覆盖 repository 行（bundle 卸载留面板/手动）

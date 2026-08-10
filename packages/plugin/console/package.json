@@ -7,7 +7,8 @@
   "type": "module",
   "main": "lib/index.mjs",
   "scripts": {
-    "build": "tsdown --config tsdown.config.ts"
+    "build": "tsdown --config tsdown.config.ts",
+    "test": "TSX_TSCONFIG_PATH=tests/tsconfig.json node --import tsx --test tests/discovery/*.spec.ts"
   },
   "exports": {
     ".": {
@@ -38,7 +39,8 @@
     "@types/react": "~18.3.1",
     "react": "^18.2.0",
     "tsdown": "^0.22.2",
-    "yaml": "^2.4.0"
+    "yaml": "^2.4.0",
+    "tsx": "^4.19.0"
   },
   "dependencies": {
     "yaml": "^2.4.0"

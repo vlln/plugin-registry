@@ -9,7 +9,7 @@ plugin-registry 的推进路线。状态标注：`待决策`（需先拍板形�
 | **S4 动态卡片** | 暂缓 | 基于已移除的旧机制件（ToolRow toolview 渲染缝、`conversation.view`、轮询投影通道，0809 转向后已移除）——需先按当前官方机制（entry 自渲染 / repository 插件）重评估 |
 | 跨 session 全局看板 | 暂缓 | 同上，基于已移除的 `conversation.view` 机制，需重评估 |
 | task-status 输出投影 | 暂缓 | 基于已移除的轮询投影通道，需重评估 |
-| **agent native 插件生态管理** | 下轮 | 设计定稿（`docs/plugin-discovery-design.md`）：tool 方式 4 个 `plugin_*` 工具（search/install/uninstall/status），console Node half 注册；发现层 = `$DSH_HOME/plugin-sources/`（sources.yml 源集合 + lock.yml TOFU + cache/ 快照），index/manifest/single 三源类型，懒加载探测 + 1h 缓存防 GitHub 限流，trust 层级 + first-index 多源。实现 = console 加工具 + 存储读写 + 0810 站 agent 端到端验证 |
+| **agent native 插件生态管理** | 实施完成（agent 真调待 LLM 环境） | 设计定稿（`docs/plugin-discovery-design.md`）；实现落地——console Node half 注册 `plugin_search/install/uninstall/status` ×4 工具（`ea7f285`）；发现层 `$DSH_HOME/plugin-sources/`（sources.yml 源集合 + lock.yml TOFU + cache/ 快照）；index（URL/本地文件）/single（懒加载探测 1h 缓存）/manifest 三源类型；trust 层级 + first-index + 禁裸分支。验证：39 项 node:test + 20 项 e2e + web 注册日志实证。剩余：GUI 会话 agent 真调（需 LLM key） |
 
 
 ## 文档项（零代码）

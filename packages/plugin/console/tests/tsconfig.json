@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "paths": {
+      "@deepseek-ai/dsh-tools": ["./tests/stubs/dsh-tools.ts"],
+      "@deepseek-ai/dsh-llm": ["./tests/stubs/dsh-llm.ts"]
+    }
+  }
+}
