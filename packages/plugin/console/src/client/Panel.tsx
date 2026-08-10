@@ -353,7 +353,7 @@ export function ConsolePanel(): React.ReactNode {
             const latest = versions[plugin.name] ?? null
             const version = versionText(plugin, latest, versionChecked[plugin.name] === true)
             return (
-              <div key={plugin.id} style={rowCardStyle}>
+              <div key={showAll ? `a${plugin.id}` : `u${plugin.id}`} style={rowCardStyle}>
                 <div style={rowHeadStyle}>
                   <span style={identityStyle}>
                     <span style={nameStyle}>{plugin.name}</span>

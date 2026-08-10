@@ -450,20 +450,27 @@ function readInstalledVersion(name: string): string | undefined {
 function collectLoaderEntries(ctx: ConsoleCtx): LoadedEntryRow[] {
   const loader = (ctx as unknown as { loader?: { entries?(): Generator<unknown> } }).loader
   if (loader?.entries === undefined) return []
-  const rows: LoadedEntryRow[] = []
+  // 0810 的 loader 树存在同 id 双条目（一条禁用一条启用，如工具插件
+  // 重复注册）——按 id 去重，优先保留启用条目，避免 React key 冲突
+  // 导致列表切换时 reconciliation 残留。
+  const byId = new Map<string, LoadedEntryRow>()
   for (const raw of loader.entries()) {
     const entry = raw as { id?: string; options?: { id?: string; name?: string }; disabled?: boolean }
     const id = entry.options?.id ?? entry.id
     if (typeof id !== 'string' || id.length === 0) continue
     const name = entry.options?.name ?? id
-    rows.push({
+    const row: LoadedEntryRow = {
       id,
       name,
       disabled: entry.disabled === true,
       version: readInstalledVersion(name),
-    })
+    }
+    const prev = byId.get(id)
+    if (prev === undefined || (prev.disabled === true && row.disabled === false)) {
+      byId.set(id, row)
+    }
   }
-  return rows
+  return [...byId.values()]
 }
 
 interface ConsoleCtx extends Context {
