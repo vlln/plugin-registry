@@ -1,124 +1,38 @@
 # dsh 插件注册表（Plugin Registry）
 
-> **转向（2026-08）**：官方 0809 仓库插件机制（`.dsh-plugin` + config）覆盖本仓库独立机制的 ~95%。当前交付 **0 patch 薄控制台**（`packages/plugin/console`，管理官方 repository 插件）；旧机制（patch/CLI/`ctx.plugins`/旧面板）冻结待移除。依据见 [官方 0809 覆盖度](docs/official-0809-coverage.md)。
+> **转向（2026-08）**：官方 0809 仓库插件机制（`.dsh-plugin` + config）覆盖本仓库旧独立机制 ~95%。当前定位 = **薄控制台 + 插件开发规范和引导**。旧机制（patch/CLI/`ctx.plugins`/旧面板）已移除，依据见 [官方 0809 覆盖度](docs/official-0809-coverage.md)。
 
-DeepSeek Harness 的本地插件系统：清单协议、安装/启停、Web 管理面板、声明校验、脚手架与 tarball 分发，兼容官方格式插件（增量清单，bundle 零重构建）。
+## 定位
 
-## 为什么需要（Why）
+DeepSeek Harness 官方机制管「插件是什么、怎么跑」；本仓库补两件事：
 
-**痛点**：官方插件机制是给产品团队设计的——
+1. **薄控制台**（`packages/plugin/console`）——管理已装的官方 repository 插件与 UI 插件的浏览器面板（读写作 `$DSH_HOME/cordis.patch.yml`）
+2. **开发规范和引导**——`plugin-registry-create` skill + cookbook，指导创建官方 repository-plugin（0809 格式）
 
-- 插件组合随版本固定，用户改不了
-- 安装、启停、管理、分发不对外开放
-- 想在官方能力之外加点东西，没有入口
-
-**registry 补上这一层**：
-
-- 把「写插件」变成「装插件」：清单声明、安装/启停/卸载、Web 管理面板、脚手架、tarball 分发，全部面向用户
-- 官方已有插件加一个清单就能进入，不用重写
-
-一句话定位：官方机制管「产品结构」，registry 管「用户安装」，两者共用一个运行时。细节见 [架构](docs/architecture.md)。
-
-## 快速上手
-
-### 使用 registry
+## 安装薄控制台
 
 ```sh
-dsh registry create acme/cool-tool   # 脚手架：生成 dsh.plugin.json + index.mjs + README
-cd cool-tool
-# 编辑 index.mjs 写插件逻辑；编辑 dsh.plugin.json 把 contributes.tools 声明成入口实际注册的工具
-dsh registry install .               # 安装（默认禁用）
-dsh registry enable acme/cool-tool   # 启用（实时挂载；声明未注册会报错回滚）
-dsh registry list                    # 列表
-dsh registry uninstall acme/cool-tool # 卸载（删目录 + 索引；disable 则保留）
+dsh plugin --profile web add <本仓库>/packages/plugin/console
 ```
 
-不想从空脚手架开始？复制示例：`cp -r examples/greeter ./my-tool`，改 `id` 与工具注册即可。完整指南见 [创建插件](docs/cookbook/creating-a-plugin.md)。
+挂载后设置页出现「插件」面板：repository 插件区（增删 `repositories` 列表）+ UI 插件区（`disabled` 启停标记）。
 
-**命令名说明**：registry 命令是 `dsh registry`，不是 `dsh plugin`——官方 0806 起 `dsh plugin` 是 **profile 的 pnpm 依赖管理**（`dsh plugin --profile <p> add ...`，管理 profile 由哪些 bundle 层组成），与 registry 的**运行时插件管理**（安装/启停/卸载）语义不同；独立命令面避免混淆。从旧版迁移：
+## 安装其他插件
 
-| 旧（0805） | 新（0806+） |
-|---|---|
-| `dsh plugin install` | `dsh registry install` |
-| `dsh plugin enable / disable` | `dsh registry enable / disable` |
-| `dsh plugin list` | `dsh registry list` |
-| `dsh plugin uninstall` | `dsh registry uninstall` |
-
-要定时循环能力（轮询部署、照看 PR、build-fix-test 循环）？安装 `examples/loop`：`dsh registry install ./examples/loop && dsh registry enable acme/loop`，然后 `/loop 5m check the deploy`。
-
-### 安装 registry
-
-先获取本仓库（二选一，后续命令都在仓库根执行）：
-
-```sh
-# A. GitHub clone
-git clone https://github.com/dsh-external/plugin-registry.git
-cd plugin-registry
-
-# B. GitHub Releases：在 https://github.com/dsh-external/plugin-registry/releases
-#    下载最新 release 的 Assets 源码包 plugin-registry-<版本>.tar.gz（或 .zip）
-tar -xzf plugin-registry-<版本>.tar.gz   # 解压出 plugin-registry-<版本>/ 目录
-cd plugin-registry-<版本>
-```
-
-再集成进 DSH 源码树：
-
-```sh
-# 在仓库根（clone 目录或解压出的 plugin-registry-<版本>/）执行
-node scripts/install-into-dsh.mjs <dsh-monorepo路径>
-```
-
-一键完成：复制插件包 + 打接线补丁 + 装依赖。之后 `npm run build && ./bin/dsh web` 按官方方式启动（设置页出现「插件」面板）。完整步骤见 [集成到 dsh](docs/cookbook/integrating-into-dsh.md)。
-
-## 展示
-
-Web 设置页「插件」面板：
-
-![插件管理面板 1](screenshots/plugin-panel-1.png)
-
-插件列表：搜索框、状态徽章（已启用/已禁用/未安装）、版本与描述、操作按钮。
-
-![插件管理面板 2](screenshots/plugin-panel-2.png)
-
-操作后状态：启用实时生效（徽章变绿胶囊）、禁用与卸载的反馈。
-
-## 能力一览
-
-- **清单协议**：`dsh.plugin.json` 声明身份、版本、入口、兼容范围、贡献
-- **声明即契约**：声明的工具未注册 → 启用报错并回滚挂载
-- **安装/启停（近似热加载）**：目录或 tarball（解压防路径穿越）；启停实时生效——Web 面板内启停触发浏览器自动刷新拾取新 UI；CLI 命令启停需手动刷新
-- **Web 面板**：设置页「插件」区，浏览、搜索、安装、启停、卸载
-- **client half**：插件可带浏览器端 bundle，启用后进入 `__DSH_BOOT__` 在 Web 端运行（`client` 声明 + 运行时登记）
-- **官方插件增量兼容**：官方格式插件（npm/cordis 包）加一个 `dsh.plugin.json` 增量清单即可进 registry——bundle 零重构建、官方通道不受影响（非破坏 + 互斥，见 [设计](docs/official-plugin-incremental-compat.md)）
-- **UI 扩展机制件**（官方树提供，示例验证）：`conversation.view` 视图环 + `setView`、`conversation.input.dock` 等官方既有槽、DOM 锚点自渲染契约——统一模型见 [client UI 扩展心智模型](docs/client-ui-extension-model.md)。示例级缝已降级为插件侧自造缝（见 [CHANGELOG](CHANGELOG.md)）
-- **信任边界**：安装默认禁用，显式启用才执行
-- **脚手架**：`dsh registry create <id>` 一键生成标准插件根
-
-## 示例插件
-
-| 示例 | 说明 |
-|---|---|
-| [`examples/greeter`](examples/greeter/README.md) | Node 侧 greet 工具 + 浏览器端 client half（纯 DOM 自渲染浮层） |
-| [`examples/navbar`](examples/navbar/README.md) | S1 自渲染导航条：对话流 user 消息导航，仅对话页显示（DOM 锚点契约） |
-| [`examples/task-status`](examples/task-status/README.md) | S2 后台任务状态条：对话框上方显示该会话后台任务（官方槽 + Node 轮询路由，仅对话页、完成后消失、点击展开详情） |
-| [`examples/loop`](examples/loop/README.md) | `/loop` 命令 + `loop` 工具，按间隔向当前 agent 重复投递 prompt（对齐 Claude Code `/loop`） |
+本仓库不含插件代码——插件是独立仓库/包。安装示例（loop/task-status/whale-girl 等，两种官方路径）见 [examples](examples/README.md)。
 
 ## Agent Skill
 
-仓库自带 `plugin-registry-create` Skill（`skills/plugin-registry-create/SKILL.md`），指导 agent 创建官方 repository-plugin（0809 格式）：先选形态（skill 包 / MCP / Node 工具 / 带 UI）→ 按对应路径搭建 `.dsh-plugin/` → prepack → `config.yaml` 安装 → 验证纪律。详情分置 `references/`；完整契约见 [cookbook](docs/cookbook/creating-a-repository-plugin.md)，参考实现 `whale-girl`。
-
-**插件管理面板**：薄控制台（`packages/plugin/console`）管理已装的官方 repository 插件与 UI 插件（读写作 `$DSH_HOME/cordis.patch.yml`）。
+仓库自带 `plugin-registry-create` Skill（`skills/plugin-registry-create/SKILL.md`），指导 agent 创建官方 repository-plugin（0809 格式）：**先选形态**（skill 包 / MCP / Node 工具 / 带 UI）→ 按对应路径搭建 `.dsh-plugin/` → prepack → `config.yaml` 安装 → 验证纪律。详情分置 `references/`（entry 契约 / 安装验证 / 开发规范）；完整契约见 [cookbook](docs/cookbook/creating-a-repository-plugin.md)，参考实现 `whale-girl`。
 
 ## 文档
 
 - [创建官方 repository-plugin](docs/cookbook/creating-a-repository-plugin.md) — 0809 格式权威契约：仓库布局 → entry → 自渲染 client → 安装 → 开发规范
 - [官方 0809 覆盖度评估](docs/official-0809-coverage.md) — 官方机制覆盖度、UI 自渲染实证、转向决策
 - [薄控制台设计](docs/console-ui-plugin-management.md) — 统一管理两类插件的设计
+- [架构](docs/architecture.md) — 两层插件模型的系统地图
 - 历史机制文档（已转向，仅存档）：[创建插件（旧）](docs/cookbook/creating-a-plugin.md)、[清单格式（旧）](docs/manifest-format.md)、[0805→0806 迁移](docs/migrating-to-0806.md) 等
-- [架构](docs/architecture.md) — 两层插件模型的系统地图（好奇者阅读）
-- [真热更新设计](docs/hot-reload-design.md) — UI 插件不整页刷新的方案、困难与 Stage（承接 client-half 评审 O3）
-- [变更记录](CHANGELOG.md) — 机制件交付与示例增删汇总
-- [路线图](ROADMAP.md) — 剩余推进项的执行状态
+- [变更记录](CHANGELOG.md) / [路线图](ROADMAP.md)
 
 ## 版权
 

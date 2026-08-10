@@ -23,7 +23,7 @@
 | 路径 | 内容 |
 |---|---|
 | [`docs/`](docs/) | 转向决策（official-0809-coverage）、机制历史（patch-slimming 等，标注历史）、cookbook（文档标准见 [docs/AGENTS.md](docs/AGENTS.md)） |
-| [`examples/`](examples/) | 示例插件（历史机制演示，转型中） |
+| [`examples/`](examples/) | 安装示例（如何装外部插件：bundle 与 repository 两种官方路径） |
 | [`packages/plugin/console`](packages/plugin/console/) | 薄控制台（当前交付物） |
 | [`scripts/`](scripts/) | 校验脚本（md 链接、文档预算） |
 | [`skills/`](skills/) | agent skill（plugin-registry-create） |

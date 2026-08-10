@@ -47,7 +47,7 @@ git diff --abbrev=8 <snapshot-ref>..HEAD -- $(grep '^diff --git' patches/dsh-plu
 dsh registry install ./my-tool   # 直接可用
 ```
 
-示例：`examples/greeter`、`examples/loop`、dsh-tool-calculator 类。
+示例：官方 repository 插件（`.dsh-plugin` 包）经 config.yaml 分发。
 
 ### 服务型（可以独立，但要求"全家一起搬"）
 

@@ -9,6 +9,7 @@
 - ✅ **薄控制台**（`packages/plugin/console`）：0 patch 管理官方 repository-plugins——bundle 挂载 + Node half 读写 `$DSH_HOME/cordis.patch.yml` + client half 设置页面板。端到端验证（纯净 0809）：挂载 → boot graph 含面板 → 读写路由 → 写后官方消费
 - ✅ **spike 实证**：写 config 触发官方换代 0 patch 可行；web 默认无运行中 HMR（官方 TODO），写后提示重启
 - ✅ **开发规范引导（skills/cookbook）**：`plugin-registry-create` skill 重写为官方 repository-plugin 开发引导（废弃旧机制教学）；新增 `docs/cookbook/creating-a-repository-plugin.md` 权威契约（仓库布局/entry/prepack/安装/开发规范）；console README 链接引导——「薄控制台 + 开发规范引导」定位落实
+- ✅ **examples 改为安装示例**：删除 4 个旧机制插件示例（greeter/loop/navbar/task-status，`dsh.plugin.json` 已废弃）；`examples/README.md` 重写为「如何安装外部插件」——bundle 路径（`dsh plugin --profile web add`，loop/task-status/navbar）+ repository 路径（`config.yaml`，whale-girl）+ 薄控制台管理；README/AGENTS/活文档 examples 引用清理（历史文档保留）
 - ⏳ **冻结中（独立一步移除）**：patch 加载（0808）、`dsh registry` CLI、`ctx.plugins`、`ui-plugin-manager` 旧面板
 - 澄清：官方用户配置层为 `$DSH_HOME/cordis.patch.yml`（08-05 取代 `config.yaml`）
 

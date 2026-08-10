@@ -94,7 +94,7 @@ npm run build                # 官方：更新检出后先构建（tsc -b + tsdo
 
 ```sh
 dsh registry list        # 输出 no plugins installed（命令可用）
-dsh registry install ./examples/greeter && dsh registry enable acme/greeter
+（旧机制示例，已移除——当前经 config.yaml 安装，见 creating-a-repository-plugin）
 dsh registry list        # enabled acme/greeter@0.2.0
 ```
 

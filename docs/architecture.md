@@ -100,7 +100,7 @@ registry 插件是**消费者**：`inject: ['tasks']` 登记自己的后台任�
 - **分发**：tarball/目录携带构建产物，安装时整目录复制进 `<dshHome>/plugins/`，`/plugins/<publisher>/<name>/client.js` 路由直接可服务。
 - **构建契约**：bundle 调用 `window.__ModuleLoader__.load({ id, factory })`（id 必须等于插件 id），factory 返回 **Cordis 插件导出面**；外部依赖只允许平台模块，其余内联。生产构建用 tsdown client preset 或等价 bundler。
 
-完整机制与设计决策见 [registry client half 设计稿](registry-client-half-design.md)（已实现）。示例：`examples/greeter` 带可安装的 client half。
+完整机制与设计决策见 [registry client half 设计稿](registry-client-half-design.md)（已实现）。示例：`whale-girl` 带自渲染 client（entry 自渲染，非 client half）。
 
 **UI 挂载扩展方向**：client half 的 UI 挂载走两条官方通道——**官方 slot hole**（如 `conversation.input.dock` 等官方既有槽）或**插件自渲染**（裸 DOM / 自建通道）。统一扩展心智模型见 [client UI 扩展统一模型](client-ui-extension-model.md)（设计稿）；早期为示例打进官方树的缝（`useTasks`/`task/snapshot`、`ctx.ui.mount`、`sidebar.panel`、`conversation.chat.item`）已回退，示例插件（navbar/task-status/greeter）演示插件侧自造缝。
 

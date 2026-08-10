@@ -52,7 +52,7 @@ window.__ModuleLoader__.load({
 1. **在 dsh 源码环境内**：插件目录放 `tsdown.config.ts`，引用 dsh 的 client preset 或等价配置，产出 `client.js` 随插件分发。
 2. **任意 bundler**：按契约手工产出（外部依赖只能是平台模块 `connection`/`runtime` 等，其余内联；跨插件值导入是运行时 loud 错误，协作走 cordis 服务）。
 
-完整契约见 [registry client half 设计稿](../registry-client-half-design.md#构建契约bundle-格式--模块表面)；可安装示例：`examples/greeter`（含手写 `client.js` 与源码）。
+完整契约见 [registry client half 设计稿](../registry-client-half-design.md#构建契约bundle-格式--模块表面)；可安装示例：`whale-girl`（自渲染 client，entry 路由服务）。
 
 ## 4. 安装、启用、验证
 
@@ -71,10 +71,10 @@ client half 是浏览器端**完整 Cordis 插件**（`apply(ctx)` 在浏览器�
 | 方式 | 机制 | 需官方 hole？ | 适用 |
 |---|---|---|---|
 | **填官方 hole** | `ctx.slots.register` 进 `SlotMap` 扩展点（如 `sidebar.workspaces.*`） | ✅ | 深度集成官方 UI |
-| **自渲染** | 直接操作 DOM（`createElement`+`appendChild` 或 React portal） | ❌ | 浮层、标记、面板——`examples/greeter` 即此形态 |
+| **自渲染** | 直接操作 DOM（`createElement`+`appendChild` 或 React portal） | ❌ | 浮层、标记、面板——`whale-girl` 即此形态 |
 | **无 UI 行为** | `ctx.commands` / `ctx.on` / `ctx.provide` | ❌ | 命令、监听、后台行为 |
 
-**关键认知**：client half **不局限于填 hole**——`examples/greeter` 零 slot 依赖，`body.appendChild` 画标记。「改官方 UI 结构」（往官方组件树内部插入）才受限于官方预留的 hole——所有 client 插件（官方包同样）的通用边界；「新增自己的 UI/行为」完全自由。选型：嵌入官方树内部 → 填 hole；只要自己的可见表面 → 自渲染。
+**关键认知**：client half **不局限于填 hole**——`whale-girl` 零 slot 依赖，`body.appendChild` 画标记。「改官方 UI 结构」（往官方组件树内部插入）才受限于官方预留的 hole——所有 client 插件（官方包同样）的通用边界；「新增自己的 UI/行为」完全自由。选型：嵌入官方树内部 → 填 hole；只要自己的可见表面 → 自渲染。
 
 **hole 缺失时**：`ctx.slots.register` 类型与运行时都要求 hole 存在。官方树未声明期望的 hole（如 ui-workspace 至今无 `sidebar.workspaces.sessionRow`）时，填 hole 的组件不注册——两个补救：由依赖该 hole 的**插件项目自带补丁**补声明（如 dsh-subagent-tree 仓库 `patches/`；plugin-registry 补丁不含插件特定改动），或改用自渲染。
 
