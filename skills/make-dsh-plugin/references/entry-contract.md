@@ -1,6 +1,6 @@
 # Entry 契约详情（dsh.entry + skill + MCP）
 
-本文件是 make-dsh-plugin 的**自带权威契约**（skill 独立分发，不依赖仓库 docs）。完整参考实现：`whale-girl`（GUI 宠物插件，门禁/决策/素材契约/自渲染 client）。
+本文件是 make-dsh-plugin 的**自带权威契约**（skill 独立分发，不依赖仓库文档）。完整参考实现：`whale-girl`（GUI 宠物插件，门禁/决策/素材契约/自渲染 client）。
 
 ## 仓库布局
 
@@ -43,7 +43,7 @@ my-plugin/
 - **`scripts.prepack` 必须调用 `dsh-plugin-prepare`**（devDep `@deepseek-ai/dsh-repository-plugin`），生成固定 wrapper `dsh-plugin.mjs` + `dsh-plugin-assets/`，勿手写。
 - **`dsh.entry` 是完整 Cordis 插件**：`name`/`inject`/`Config`/注册/启动失败/effect 清理语义全保留。
 
-### dsh.skills（skill pack）
+### dsh.skills（skill 包）
 
 `SKILL.md` 文件放 `.dsh-plugin/skills/<name>/`，在 `dsh.skills` 声明（相对 `.dsh-plugin/` 路径）：
 

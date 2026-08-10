@@ -1,14 +1,12 @@
 ---
 name: make-dsh-plugin
 description: >
-  Use this skill when the user wants to develop a new plugin for DeepSeek
-  Harness as an official repository-plugin (0809 format). Guides shape
-  selection (pure skill pack / MCP server / Node tools / browser UI), then
-  scaffolds a `.dsh-plugin/` package: package.json#dsh.entry (or dsh.skills /
-  dsh.mcpServers), Cordis entry, optional self-rendering client, prepack, and
-  install via $DSH_HOME/config.yaml. Also covers dev conventions (gates,
-  decision records, verification). Not the legacy dsh.plugin.json / dsh
-  registry mechanism (removed 2026-08).
+  当用户要为 DeepSeek Harness 开发官方 repository-plugin（0809 格式）插件时
+  使用本 skill。引导形态选择（纯 skill 包 / MCP server / Node 工具 / 浏览器
+  UI），然后搭建 `.dsh-plugin/` 包：package.json#dsh.entry（或 dsh.skills /
+  dsh.mcpServers）、Cordis entry、可选自渲染 client、prepack、config.yaml
+  安装。也覆盖开发规范（门禁、决策记录、验证纪律）。不是已移除的旧机制
+  （dsh.plugin.json / dsh registry）。
 license: BSD-3-Clause
 metadata:
   author: dsh-external/plugin-registry
@@ -18,95 +16,89 @@ requires:
     - dsh
 ---
 
-# Create an official repository-plugin
+# 创建官方 repository-plugin
 
-This skill builds a **repository-plugin** (0809 official format): a repo (or
-subdirectory) that is itself a plugin, installed via `$DSH_HOME/config.yaml`.
-There is **no** manifest protocol, no `__ModuleLoader__`, no `dsh registry`
-CLI — legacy mechanisms removed 2026-08.
+本 skill 构建 **repository-plugin**（0809 官方格式）：一个仓库（或子目录）
+本身即插件，经 `$DSH_HOME/config.yaml` 安装。**没有** manifest 协议、没有
+`__ModuleLoader__`、没有 `dsh registry` CLI——旧机制已于 2026-08 移除。
 
-**Authoritative contracts are self-contained in this skill's `references/`**
-(entry + skill + MCP in `entry-contract.md`, bundle in `bundle-plugins.md`,
-verification in `install-and-verify.md`, conventions in `dev-conventions.md`,
-gotchas in `gotchas.md`) — no repo docs needed to develop. Reference
-implementation: `whale-girl` (GUI pet plugin). Read the references below when
-you reach the relevant stage.
+**权威契约内嵌在本 skill 的 `references/`**（entry + skill + MCP 在
+`entry-contract.md`、bundle 在 `bundle-plugins.md`、验证在
+`install-and-verify.md`、规范在 `dev-conventions.md`、坑在
+`gotchas.md`）——开发不需要任何仓库文档。参考实现：`whale-girl`（GUI
+宠物插件）。到达对应阶段时读对应 reference。
 
-## When to use
+## 何时使用
 
-- The user wants to build a new plugin for dsh (tool, skill pack, MCP server,
-  event listener, service, command, prompt, browser UI).
-- The user asks for a scaffold / example / template of a repository-plugin.
-- A plugin fails to mount and the cause is the entry contract.
+- 用户想为 dsh 开发新插件（工具、skill 包、MCP server、事件监听、服务、
+  命令、prompt、浏览器 UI）。
+- 用户要 repository-plugin 的脚手架 / 示例 / 模板。
+- 插件挂载失败且原因是 entry 契约。
 
-## Step 0: Choose the plugin shape
+## Step 0：选择插件形态
 
-Pick the official path by what the plugin ships. `dsh` field is strict —
-exactly one of these capability faces:
+按插件分发什么选官方路径。`dsh` 字段 strict——能力面二选一：
 
-| Need | Official path | `dsh` field | Start at |
+| 需求 | 官方路径 | `dsh` 字段 | 起点 |
 |---|---|---|---|
-| Pure skill pack (no code) | `.dsh-plugin/skills/` + prepack | `dsh.skills` | Step 2 (skills) |
-| MCP server | `.dsh-plugin/mcp/` + declaration | `dsh.mcpServers` | Step 2 (mcp) |
-| Node tools / events / services | Cordis entry + `defineTool` | `dsh.entry` | Step 3 |
-| Node + browser UI | entry + httpServer route + self-rendering client | `dsh.entry` | Step 4 |
-| Bundle (product service, dshClient UI) | npm package + `dsh.bundle` | `dsh.bundle` | read `references/bundle-plugins.md` |
+| 纯 skill 包（无代码） | `.dsh-plugin/skills/` + prepack | `dsh.skills` | Step 2（skills） |
+| MCP server | `.dsh-plugin/mcp/` + 声明 | `dsh.mcpServers` | Step 2（mcp） |
+| Node 工具 / 事件 / 服务 | Cordis entry + `defineTool` | `dsh.entry` | Step 3 |
+| Node + 浏览器 UI | entry + httpServer 路由 + 自渲染 client | `dsh.entry` | Step 4 |
+| Bundle（产品服务、dshClient UI） | npm 包 + `dsh.bundle` | `dsh.bundle` | 读 `references/bundle-plugins.md` |
 
-Combine faces when the plugin ships several (e.g. a skill pack + a tool both
-fit one `.dsh-plugin`). The first four rows are **repository plugins** (user
-installs via config.yaml, this skill's main path — Steps 1-6 below); the last
-row is a **bundle plugin** (ships with a profile, different install/manage —
-see `references/bundle-plugins.md`).
+插件可组合多面（如一个 skill 包 + 一个工具共存于一个 `.dsh-plugin`）。前四行是
+**repository 插件**（用户经 config.yaml 安装，本 skill 主路径——下方 Step 1-6）；
+最后一行是 **bundle 插件**（随 profile 分发，安装/管理不同——见
+`references/bundle-plugins.md`）。
 
-## Step 1: Repo layout
+## Step 1：仓库布局
 
-`my-plugin/` root keeps docs/decisions/originals (not shipped); all shipped
-paths live inside `.dsh-plugin/` (official containment contract):
+`my-plugin/` 根保留 docs/decisions/originals（不分发）；分发路径全部在
+`.dsh-plugin/` 内（官方 containment 契约）：
 
 ```
 my-plugin/
 ├── .dsh-plugin/
 │   ├── package.json            # name/version + dsh.* + scripts.prepack
-│   ├── index.mjs               # Node half entry: full Cordis plugin
-│   ├── client/  client.js      # self-rendering client source / built bundle
-│   ├── assets/                 # static files served by entry routes
-│   └── src/                    # pure logic (zero host deps, unit-testable)
+│   ├── index.mjs               # Node half 入口：完整 Cordis 插件
+│   ├── client/  client.js      # 自渲染 client 源码 / 构建产物
+│   ├── assets/                 # entry 路由静态服务的文件
+│   └── src/                    # 纯逻辑（零宿主依赖，可单测）
 ├── docs/  decisions/
-└── scripts/                    # gates + generators
+└── scripts/                    # 门禁 + 生成器
 ```
 
-## Step 2: `package.json` + capability face
+## Step 2：`package.json` + 能力面
 
-Follow the template in `references/entry-contract.md`. Key decisions:
+按 `references/entry-contract.md` 的模板。关键决策：
 
-- `dsh` field: `skills` / `mcpServers` / `entry` (strict, official schema).
-  No `contributes` — tools register inside the entry via `defineTool`.
-- `scripts.prepack` **must** call `dsh-plugin-prepare` (devDep
-  `@deepseek-ai/dsh-repository-plugin`) — never hand-write generated
-  `dsh-plugin.mjs` / `dsh-plugin-assets/`.
+- `dsh` 字段：`skills` / `mcpServers` / `entry`（strict，官方 schema）。无
+  `contributes`——工具在 entry 内经 `defineTool` 注册。
+- `scripts.prepack` **必须**调用 `dsh-plugin-prepare`（devDep
+  `@deepseek-ai/dsh-repository-plugin`）——不要手写生成的
+  `dsh-plugin.mjs` / `dsh-plugin-assets/`。
 
-### Skill pack (`dsh.skills`)
+### Skill 包（`dsh.skills`）
 
-Put `SKILL.md` files under `.dsh-plugin/skills/<name>/` and declare the list
-in `dsh.skills` (paths relative to `.dsh-plugin/`):
+`SKILL.md` 放 `.dsh-plugin/skills/<name>/`，在 `dsh.skills` 声明列表（相对
+`.dsh-plugin/` 路径）：
 
 ```json
 "dsh": { "skills": ["./skills/foo/SKILL.md", "./skills/bar/SKILL.md"] }
 ```
 
-**Writing the SKILL.md** — follow the make-skill spec (authoritative
-template): frontmatter (`name` 1-64 lowercase-hyphen, `description` imperative
-"Use this skill when...", optional `metadata`/`requires`) + body structure
-(Tool Wrapper / Generator / Reviewer / Inversion / Pipeline patterns), keep
-under 500 lines, progressive disclosure to `references/` for detail. Each
-skill has one `SKILL.md`; the repo README lists them in a table (Step 6).
-`make-skill` is the reference for how to author agent skills — do not invent
-a competing format.
+**SKILL.md 写法**——遵循 make-skill 规范（权威模板）：frontmatter（`name`
+1-64 小写连字符、`description` 祈使句「Use this skill when...」、可选
+`metadata`/`requires`）+ 正文结构（Tool Wrapper / Generator / Reviewer /
+Inversion / Pipeline 模式），<500 行，细节 progressive disclosure 到
+`references/`。每个 skill 一个 `SKILL.md`；仓库 README 用表格列（Step 6）。
+`make-skill` 是编写 agent skill 的参考——不要发明竞争格式。
 
-### MCP server (`dsh.mcpServers`)
+### MCP server（`dsh.mcpServers`）
 
-Declare MCP servers in `dsh.mcpServers` (official schema). The standard MCP
-shape is a map of server id → launch config:
+在 `dsh.mcpServers` 声明 MCP server（官方 schema）。标准 MCP 形态是
+server id → 启动配置的映射：
 
 ```json
 "dsh": { "mcpServers": {
@@ -114,152 +106,132 @@ shape is a map of server id → launch config:
 } }
 ```
 
-The server is a stdio MCP server (JSON-RPC over stdin/stdout). Exact schema
-fields (`command`/`args`/`env`, allowed transports) are official-format
-details — verify against the current official spec before shipping; the
-server-side logic lives in `.dsh-plugin/mcp/`. The repo README lists MCP
-servers in a table (Step 6).
+server 是 stdio MCP server（stdin/stdout 上的 JSON-RPC）。确切 schema 字段
+（`command`/`args`/`env`、允许的 transport）是官方格式细节——发布前对照
+当前官方 spec 验证；server 侧逻辑在 `.dsh-plugin/mcp/`。仓库 README 用表格
+列 MCP server（Step 6）。
 
-**Read `references/entry-contract.md`** for the full `dsh.entry` contract when
-you reach Step 3/4.
+**到达 Step 3/4 时读 `references/entry-contract.md`** 获取完整 `dsh.entry`
+契约。
 
-## Step 3: Node half — Cordis entry
+## Step 3：Node half——Cordis entry
 
-`index.mjs` exports a full Cordis plugin (`name`/`inject`/`apply`). Register
-tools with `defineTool`; services/events/commands/prompts are full Cordis, no
-declaration. Dependency resolution is the official runtime's concern
-(`@deepseek-ai/*`, `cordis`). Register within `ctx.effect()`/`ctx.on()` so
-disable cleans up.
+`index.mjs` 导出完整 Cordis 插件（`name`/`inject`/`apply`）。用 `defineTool`
+注册工具；服务/事件/命令/prompt 是完整 Cordis，无需声明。依赖解析是官方
+运行时的职责（`@deepseek-ai/*`、`cordis`）。在 `ctx.effect()`/`ctx.on()` 内
+注册，disable 时清理。
 
-**Checkpoint**: entry parses; tools are registered; no undeclared deps.
+**检查点**：entry 可解析；工具已注册；无未声明依赖。
 
-## Step 4: Client half (optional) — self-rendering
+## Step 4：Client half（可选）——自渲染
 
-No dynamic client-half mechanism exists. A UI plugin:
-1. registers an httpServer route for the client script (`GET /my-plugin/ui.js`);
-2. the client script is self-executing DOM rendering (no `__ModuleLoader__`);
-3. page injection is the plugin's own concern (host-page `<script>` injection
-   or a configured injection point).
+无动态 client-half 机制。带 UI 的插件：
+1. entry 注册 httpServer 路由服务 client 脚本（`GET /my-plugin/ui.js`）；
+2. client 脚本自执行 DOM 渲染（无 `__ModuleLoader__`）；
+3. 页面注入是插件自己的事（宿主页 `<script>` 注入或配置注入点）。
 
-See `whale-girl` for the complete pattern (ui/state/assets routes, tapIndex
-injection).
+完整模式见 `whale-girl`（ui/state/assets 路由、tapIndex 注入）。
 
-**Checkpoint**: browser smoke passes — headless Chrome dump-dom shows the
-plugin's DOM marker and no "Failed to load plugins".
+**检查点**：浏览器冒烟通过——headless Chrome dump-dom 显示插件的 DOM
+marker 且无 "Failed to load plugins"。
 
-## Step 5: Install & verify
+## Step 5：安装与验证
 
-Install via `$DSH_HOME/config.yaml` `repository-plugins.repositories`
-(`github:owner/repo#<ref>&path:/.dsh-plugin`). Distribution = the repo itself
-(clone + pnpm prepare + prepack), no publish flow.
+经 `$DSH_HOME/config.yaml` 的 `repository-plugins.repositories` 安装
+（`github:owner/repo#<ref>&path:/.dsh-plugin`）。分发 = 仓库本身（clone +
+pnpm prepare + prepack），无发布流程。
 
-**Read `references/install-and-verify.md`** for per-change-surface verification
-(which changes need a web restart vs. refresh only) and mount-failure
-troubleshooting.
+**读 `references/install-and-verify.md`** 获取按改动面的验证（哪些改动需
+重启 web vs 只刷新）与挂载失败排查。
 
-## Step 5b: Publish to GitHub
+## Step 5b：发布到 GitHub
 
-The repo itself is the distribution unit — set it up so users can find and
-install it.
+仓库本身就是分发单元——设置好让用户能找到并安装。
 
-**Repo description** (one line, what it is + how to install): a concrete
-template:
+**仓库 description**（一行：是什么 + 怎么装），具体模板：
 
 ```
 DSH 插件：<一句话功能>。官方 repository-plugin（.dsh-plugin 格式），config.yaml 安装：github:owner/repo#<ref>&path:/.dsh-plugin
 ```
 
-Follow the shape "DSH plugin: <what it does>; official repository-plugin
-format, install via config.yaml `<repo-ref>`". Bilingual optional (English
-first helps international discovery).
+遵循形态 "DSH plugin: <what it does>; official repository-plugin format,
+install via config.yaml `<repo-ref>`"。双语可选（英文在前利于国际发现）。
 
-**Repo topics (GitHub tags)**: tag the repo so `gh`/search/discovery works.
-Suggested set (apply all that fit):
+**仓库 topics（GitHub 标签）**：打标签便于 `gh`/搜索/发现。建议集合（适用
+都打）：
 
-- `dsh` / `dsh-plugin` / `dsh-repository-plugin` — ecosystem discovery
-- `deepseek-harness` — the host product
-- capability tags: `plugin`, `skill`, `mcp` (or a domain tag like `pet`,
-  `tool`)
-- `agent` / `agents` — agentic context
+- `dsh` / `dsh-plugin` / `dsh-repository-plugin` — 生态发现
+- `deepseek-harness` — 宿主产品
+- 能力标签：`plugin`、`skill`、`mcp`（或领域标签如 `pet`、`tool`）
+- `agent` / `agents` — agentic 上下文
 
-Apply with: `gh repo edit <owner>/<repo> --add-topic dsh --add-topic
-dsh-plugin ...`
+用 `gh repo edit <owner>/<repo> --add-topic dsh --add-topic dsh-plugin ...`
+打标签。
 
-**Publish checklist** (before sharing the repo):
-- [ ] `package.json#dsh.entry` points inside `.dsh-plugin/`; prepack runs
+**发布检查清单**（分享仓库前）：
+- [ ] `package.json#dsh.entry` 指向 `.dsh-plugin/` 内；prepack 运行
   `dsh-plugin-prepare`
-- [ ] Gates pass (`scripts/gates/run.mjs`) — the repo ships its own gates
-- [ ] README has install (config.yaml line with a concrete ref), usage, and
-  the skill table (Step 6 convention)
-- [ ] Repo description + topics set (above)
-- [ ] Install smoke: fresh `config.yaml` line → mount → boot log clean
+- [ ] 门禁通过（`scripts/gates/run.mjs`）——仓库自带门禁
+- [ ] README 有安装（config.yaml 行含具体 ref）、使用、skill 表（Step 6
+  规范）
+- [ ] 仓库 description + topics 已设置（见上）
+- [ ] 安装冒烟：新 `config.yaml` 行 → 挂载 → boot log 干净
 
-No release assets needed — the repo is the plugin (clone + prepare +
-prepack). If a versioned ref is desired, tag commits and point the README
-config line at the tag's commit hash.
+无需 release 资产——仓库即插件（clone + prepare + prepack）。若要版本化
+ref，给提交打 tag 并把 README 的 config 行指向该 tag 的 commit 哈希。
 
-## Step 6: Development conventions
+## Step 6：开发规范
 
-A maintainable plugin follows the discipline in
-`references/dev-conventions.md`: gates with self-proof tests, decision records
-for every non-trivial change, generated artifacts never hand-edited,
-first-time host behaviors recorded as environment facts.
+可维护的插件遵循 `references/dev-conventions.md` 的纪律：门禁（自证测试）、
+每个非平凡改动的决策记录、生成物不手改、首次环境行为沉淀为环境事实。
 
-**README conventions** (make-skill spec): the repo README lists its
-capability surfaces in tables — one table per surface, one row per item with
-a one-line description; human readers scan the tables to decide what to use;
-details stay in each item's own file.
+**README 规范**（make-skill spec）：仓库 README 用表格列能力面——每个能力
+面一个表、每项一行一句话描述；人读扫描表格决定用什么；细节留在各项自身
+文件。
 
-- **Skills** (always): `| Skill | 作用 |` — one row per SKILL.md.
-- **MCP servers** (if the plugin ships `dsh.mcpServers`):
-  `| MCP | 说明 |` — one row per server (name + what it exposes).
-- **Tools** (if the plugin registers tools): `| 工具 | 说明 |` — one row
-  per `defineTool` registration.
+- **Skills**（恒有）：`| Skill | 作用 |`——每个 SKILL.md 一行。
+- **MCP servers**（若含 `dsh.mcpServers`）：`| MCP | 说明 |`——每个
+  server 一行（名称 + 暴露什么）。
+- **Tools**（若注册工具）：`| 工具 | 说明 |`——每个 `defineTool` 注册一行。
 
-Apply this to any repo that ships skills/MCP/tools.
+适用于任何带 skills/MCP/tools 的仓库。
 
-**Read `references/dev-conventions.md`** when the project enters iteration.
+**进入迭代期时读 `references/dev-conventions.md`**。
 
-## Recommended management
+## 推荐管理
 
-The thin console `packages/plugin/console` manages official repository
-plugins via `$DSH_HOME/cordis.patch.yml` — the plugin-management UI for
-installed `.dsh-plugin` packages.
+薄控制台 `packages/plugin/console` 经 `$DSH_HOME/cordis.patch.yml` 管理官方
+repository 插件——已装 `.dsh-plugin` 包的插件管理 UI。
 
-## Gotchas
+## 坑（Gotchas）
 
-- **Official packages are not on public npm**: `@deepseek-ai/dsh-tools` etc.
-  are unpublished — `npm install` fails locally. Distribution resolves them
-  in the official environment (github: source); local verification needs
-  symlinks to the monorepo build or a mock registry. Don't change deps.
-  Bundle plugins (dshClient) have the same constraint but declare no deps —
-  the profile's pnpm closure injects them at mount; declaring them fails.
-- **Install is separate from enable** — the plugin never executes until it is
-  in the config and mounted; don't claim verified until the boot log is clean.
-- **Entry contract failures surface at mount**: `dsh.entry` pointing outside
-  `.dsh-plugin/`, missing prepack, or undeclared deps fail at install/mount,
-  not at authoring time.
-- **ESM cache**: editing `index.mjs` of an already-mounted plugin requires a
-  web restart to take effect (verified repeatedly on whale-girl).
-- **Host overrides injected CSS**: key UI styles must be JS-inline (host
-  global CSS can wipe injected `<style>`), not CSS-class-dependent.
-- **Shape-first**: pick the capability face before writing code — a pure skill
-  pack needs no entry; a UI plugin needs entry + httpServer, not a client-half
-  mechanism that no longer exists.
+- **官方包未发布到公共 npm**：`@deepseek-ai/dsh-tools` 等未发布——本地
+  `npm install` 失败。分发由官方环境解析（github: 源）；本地验证需
+  symlink 至 monorepo 构建产物或 mock registry。不要改依赖。bundle 插件
+  （dshClient）同坑但**不声明依赖**——profile 的 pnpm 闭包挂载时注入；
+  声明了反而失败。
+- **安装与启用分离**——插件进入 config 并挂载才执行；boot log 干净才算
+  验证。
+- **entry 契约失败在挂载时暴露**：`dsh.entry` 指向 `.dsh-plugin/` 外、
+  缺 prepack、未声明依赖——在安装/挂载失败，而非编写时。
+- **ESM 缓存**：改已挂载插件的 `index.mjs` 需重启 web 才生效（whale-girl
+  反复验证）。
+- **宿主覆盖注入的 CSS**：关键 UI 样式必须 JS 内联（宿主全局 CSS 可能清掉
+  注入的 `<style>`），勿依赖 CSS class。
+- **先选形态**：写代码前先定能力面——纯 skill 包无需 entry；UI 插件需要
+  entry + httpServer，而不是已不存在的 client-half 机制。
 
-**Read `references/gotchas.md`** for the full list (mount troubleshooting
-order, schema-DSL timing, environment facts).
+**读 `references/gotchas.md`** 获取完整清单（挂载排查顺序、schema-DSL
+时机、环境事实）。
 
-## Reference
+## 参考
 
-- Self-contained contracts in this skill:
-  - `references/entry-contract.md` — repository plugin: layout, dsh field
-    (entry/skills/mcpServers), Cordis entry, self-rendering client, install,
-    dev conventions
-  - `references/bundle-plugins.md` — bundle plugin (dshClient) development
-  - `references/install-and-verify.md` — per-change-surface verification
-  - `references/gotchas.md` — pitfalls (unpublished official packages, ESM
-    cache, host CSS override)
-  - `references/dev-conventions.md` — gates, decision records
-- Reference implementation: `whale-girl` (repository plugin with UI)
-- Bundle references: `dsh-loop`, `dsh-task-status`, `packages/plugin/console`
+- 本 skill 内嵌契约：
+  - `references/entry-contract.md` — repository 插件：布局、dsh 字段
+    （entry/skills/mcpServers）、Cordis entry、自渲染 client、安装、开发规范
+  - `references/bundle-plugins.md` — bundle 插件（dshClient）开发
+  - `references/install-and-verify.md` — 按改动面验证
+  - `references/gotchas.md` — 坑（官方包未发布、ESM 缓存、宿主 CSS 覆盖）
+  - `references/dev-conventions.md` — 门禁、决策记录
+- 参考实现：`whale-girl`（带 UI 的 repository 插件）
+- Bundle 参考：`dsh-loop`、`dsh-task-status`、`packages/plugin/console`

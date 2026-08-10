@@ -16,6 +16,7 @@
 - ✅ **skill 补 GitHub 发布规范**：make-dsh-plugin 加 Step 5b——仓库 description 写法模板（DSH plugin: <功能>; install via config.yaml <ref>）、仓库标签建议（dsh/dsh-plugin/dsh-repository-plugin/deepseek-harness + 能力/领域标签）、发布检查清单（entry/prepack/门禁/README/安装冒烟）；按规范补齐 whale-girl 与 plugin-registry 的 GitHub description/topics
 - ✅ **skill README 规范扩展**：make-dsh-plugin 的 README conventions 从「列 skill」扩展为「列全部能力面用表格」——Skills（`| Skill | 作用 |`）+ MCP servers（`| MCP | 说明 |`，若含 `dsh.mcpServers`）+ Tools（`| 工具 | 说明 |`，若注册工具）
 - ✅ **skill 自包含化**：make-dsh-plugin 不再依赖仓库 docs——cookbook 内容并入 references/entry-contract.md（布局/dsh 字段/entry/skills/mcpServers/Cordis/自渲染/安装/开发规范），新增 references/bundle-plugins.md（bundle 插件开发详情：dsh.bundle/dshClient/cordis.patch.yml/依赖解析/安装管理），3 个旧 references 去掉 cookbook 依赖；Step 0 形态表补 bundle 行；用户只装 skill 即可完整开发两类插件
+- ✅ **make-dsh-plugin SKILL.md 中文化**：正文散文转中文（专有/特殊名词保留英文：repository-plugin/Cordis/defineTool/dsh.*/prepack/ESM/MCP/frontmatter/references 文件名等）；references 本就是中文（entry-contract 标题同步）。SKILL 265→237 行
 - ⏳ **冻结中（独立一步移除）**：patch 加载（0808）、`dsh registry` CLI、`ctx.plugins`、`ui-plugin-manager` 旧面板
 - 澄清：官方用户配置层为 `$DSH_HOME/cordis.patch.yml`（08-05 取代 `config.yaml`）
 
