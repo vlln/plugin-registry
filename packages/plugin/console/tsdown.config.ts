@@ -14,14 +14,23 @@ export default [
     clean: true,
   },
   {
-    entry: ['src/client/index.ts'],
-    format: 'esm',
+    name: '@dsh-external/plugin-console/client',
+    entry: { client: 'src/client/index.ts' },
+    format: 'cjs',
     platform: 'browser',
     target: 'es2022',
     outDir: 'lib',
-    // 官方 client 契约：bundle 调用 window.__ModuleLoader__.load({id, factory})
+    dts: false,
+    clean: false,
+    // 官方 client 契约：bundle 调用 window.__ModuleLoader__.load({id, factory})。
+    // CJS（ESM 输出与顶层 return 不兼容，已实证浏览器解析失败）。
+    // module/exports 定义放 banner（intro 会被 esbuild 折叠内联，footer 引
+    // module 会 ReferenceError——实证）；footer 返回 exports。
     external: [/@deepseek-ai\/dsh-client-/, 'react'],
-    banner: 'window.__ModuleLoader__.load({ id: "@dsh-external/plugin-console", factory: (require) => {',
-    footer: 'return module.exports; } });',
+    outputOptions: {
+      entryFileNames: 'index.js',
+      banner: 'window.__ModuleLoader__.load({ id: "@dsh-external/plugin-console", factory: (require) => { var module = { exports: {} }; var exports = module.exports;',
+      footer: 'return exports; } });',
+    },
   },
 ]
