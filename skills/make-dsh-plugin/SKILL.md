@@ -191,6 +191,21 @@ ref，给提交打 tag 并把 README 的 config 行指向该 tag 的 commit 哈�
 面一个表、每项一行一句话描述；人读扫描表格决定用什么；细节留在各项自身
 文件。
 
+**标题格式**（强制）：
+- `<h1 align="center">插件名</h1>`——**居中**；用仓库/插件名（如
+  `whale-girl`、`loop`），**不加 npm 前缀**（不要写 `@dsh-external/dsh-loop`
+  或 `@scope/name` 作为标题）。
+- 标题下加 `<p align="center">` 一句话价值主张（是什么 + 主要收益）+ 可选
+  徽章（badgen：license/format）。
+
+**图片要求**（若有 UI 或可演示的行为）：README 应含至少一张功能图片——
+状态/界面/效果截图或 gif。Agent 在验证环境截取（headless Chrome
+screenshot）或提示人工截取后放入 `docs/` 并引用；图片路径相对仓库内（如
+`docs/preview/*.gif`），md-links 可解析。纯 CLI 工具无 UI 可豁免，但
+README 应有可演示的示例输出。
+
+**能力面表格**：
+
 - **Skills**（恒有）：`| Skill | 作用 |`——每个 SKILL.md 一行。
 - **MCP servers**（若含 `dsh.mcpServers`）：`| MCP | 说明 |`——每个
   server 一行（名称 + 暴露什么）。
