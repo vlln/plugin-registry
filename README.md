@@ -1,5 +1,7 @@
 # dsh 插件注册表（Plugin Registry）
 
+> **转向（2026-08）**：官方 0809 仓库插件机制（`.dsh-plugin` + config）覆盖本仓库独立机制的 ~95%。当前交付 **0 patch 薄控制台**（`packages/plugin/console`，管理官方 repository 插件）；旧机制（patch/CLI/`ctx.plugins`/旧面板）冻结待移除。依据见 [官方 0809 覆盖度](docs/official-0809-coverage.md)。
+
 DeepSeek Harness 的本地插件系统：清单协议、安装/启停、Web 管理面板、声明校验、脚手架与 tarball 分发，兼容官方格式插件（增量清单，bundle 零重构建）。
 
 ## 为什么需要（Why）

@@ -2,6 +2,15 @@
 
 本仓库（plugin-registry 示例 + 文档）的变更记录。机制件改动在官方 snapshot 宿主仓库的机制分支按提交记录，本表汇总与示例/文档对应的交付。
 
+## 2026-08（转向薄控制台——阶段 2/3 交付）
+
+官方 0809 覆盖度评估（[official-0809-coverage](docs/official-0809-coverage.md)）结论：官方仓库插件机制（`.dsh-plugin` + config + 事务性换代）覆盖 plugin-registry 独立机制的 ~95%，进入转向期。**当前状态：新控制台已交付，旧机制冻结待移除。**
+
+- ✅ **薄控制台**（`packages/plugin/console`）：0 patch 管理官方 repository-plugins——bundle 挂载 + Node half 读写 `$DSH_HOME/cordis.patch.yml` + client half 设置页面板。端到端验证（纯净 0809）：挂载 → boot graph 含面板 → 读写路由 → 写后官方消费
+- ✅ **spike 实证**：写 config 触发官方换代 0 patch 可行；web 默认无运行中 HMR（官方 TODO），写后提示重启
+- ⏳ **冻结中（独立一步移除）**：patch 加载（0808）、`dsh registry` CLI、`ctx.plugins`、`ui-plugin-manager` 旧面板
+- 澄清：官方用户配置层为 `$DSH_HOME/cordis.patch.yml`（08-05 取代 `config.yaml`）
+
 ## 基线
 
 本仓库是「官方基线 + patch + package」构建式仓库（见 [AGENTS.md](AGENTS.md)），交付时需标明基线：
