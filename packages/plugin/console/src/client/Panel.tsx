@@ -350,13 +350,7 @@ export function ConsolePanel(): React.ReactNode {
             const version = versionText(plugin, latest, versionChecked[plugin.name] === true)
             return (
               <div key={plugin.id} style={rowCardStyle}>
-                <div style={rowHeadStyle}>
-                  <span style={identityStyle}>
-                    <span style={nameStyle}>{plugin.name}</span>
-                    {official.includes(plugin) ? <Pill>内置</Pill> : null}
-                    <Pill active={!plugin.disabled}>{plugin.disabled ? '已停用' : '运行中'}</Pill>
-                  </span>
-                  <span style={actionsStyle}>
+
                     {!official.includes(plugin) && version.canUpdate ? (
                       <Button size="sm" variant="outline" disabled={busy || bundleBusy} onClick={() => { void updateBundle(plugin.name) }}>更新</Button>
                     ) : null}
