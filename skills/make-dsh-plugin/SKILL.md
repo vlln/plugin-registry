@@ -199,10 +199,32 @@ ref，给提交打 tag 并把 README 的 config 行指向该 tag 的 commit 哈�
   徽章（badgen：license/format）。
 
 **图片要求**（若有 UI 或可演示的行为）：README 应含至少一张功能图片——
-状态/界面/效果截图或 gif。Agent 在验证环境截取（headless Chrome
-screenshot）或提示人工截取后放入 `docs/` 并引用；图片路径相对仓库内（如
-`docs/preview/*.gif`），md-links 可解析。纯 CLI 工具无 UI 可豁免，但
-README 应有可演示的示例输出。
+状态/界面/效果截图或 gif。Agent 在验证环境截取或提示人工截取后放入
+`docs/` 并引用；图片路径相对仓库内（如 `docs/preview/*.gif`），md-links
+可解析。纯 CLI 工具无 UI 可豁免，但 README 应有可演示的示例输出。
+
+**截取方式**（按需要选）：
+- **方式一：静态示意**（快、视觉近似）——手工构造 mock HTML（样式从插件
+  源码复制 token/圆角/间距），headless Chrome 截图：
+  ```sh
+  "/Applications/Google Chrome.app/.../Google Chrome" --headless \
+    --screenshot=out.png --window-size=980,280 file:///tmp/mock.html
+  ```
+  适用：布局/样式示意；**局限**：不运行 React 组件/官方槽，布局易错（缺
+  锚点会错位——用像素检查确认）。
+- **方式二：真实运行截图**（真、成本高）——官方 dsh web 真实运行，CDP
+  驱动 + 数据桩，官方槽渲染真实插件组件后截图。关键链路：
+  1. **会话显示**：workspace 与启动 cwd 绑定——用匹配 cwd 重启 web，侧栏
+     出现会话；
+  2. **对话页**：前端路由 `#/c/<id>` 导航 + CDP 点击侧栏会话 → 真实
+     chatFlow；
+  3. **数据**：CDP 注入 fetch 桩（`Runtime.evaluate` 包装 `window.fetch`
+     拦截 `/plugins/<id>/...` 返回演示数据）→ 官方组件轮询拿到数据 → 真实
+     渲染；
+  4. **精确截图**：`Page.captureScreenshot { clip: 元素 rect }`。
+  适用：README 主图/效果展示；**唯一桩**是插件数据（真实任务需模型在 GUI
+  运行，headless 无法驱动）。成本高（环境逆向 + CDP 脚本），README 主图
+  值得，示意足够时用方式一。
 
 **能力面表格**：
 
