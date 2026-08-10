@@ -135,6 +135,10 @@ installed `.dsh-plugin` packages.
 
 ## Gotchas
 
+- **Official packages are not on public npm**: `@deepseek-ai/dsh-tools` etc.
+  are unpublished — `npm install` fails locally. Distribution resolves them
+  in the official environment (github: source); local verification needs
+  symlinks to the monorepo build or a mock registry. Don't change deps.
 - **Install is separate from enable** — the plugin never executes until it is
   in the config and mounted; don't claim verified until the boot log is clean.
 - **Entry contract failures surface at mount**: `dsh.entry` pointing outside
@@ -142,9 +146,14 @@ installed `.dsh-plugin` packages.
   not at authoring time.
 - **ESM cache**: editing `index.mjs` of an already-mounted plugin requires a
   web restart to take effect (verified repeatedly on whale-girl).
+- **Host overrides injected CSS**: key UI styles must be JS-inline (host
+  global CSS can wipe injected `<style>`), not CSS-class-dependent.
 - **Shape-first**: pick the capability face before writing code — a pure skill
   pack needs no entry; a UI plugin needs entry + httpServer, not a client-half
   mechanism that no longer exists.
+
+**Read `references/gotchas.md`** for the full list (mount troubleshooting
+order, schema-DSL timing, environment facts).
 
 ## Reference
 

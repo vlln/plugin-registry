@@ -25,7 +25,15 @@ dsh plugin --profile web add <本仓库>/packages/plugin/console
 
 ## Agent Skill
 
-仓库自带 `plugin-registry-create` Skill（`skills/plugin-registry-create/SKILL.md`），指导 agent 创建官方 repository-plugin（0809 格式）：**先选形态**（skill 包 / MCP / Node 工具 / 带 UI）→ 按对应路径搭建 `.dsh-plugin/` → prepack → `config.yaml` 安装 → 验证纪律。详情分置 `references/`（entry 契约 / 安装验证 / 开发规范）；完整契约见 [cookbook](docs/cookbook/creating-a-repository-plugin.md)，参考实现 `whale-girl`。
+仓库自带 `plugin-registry-create` Skill（`skills/plugin-registry-create/SKILL.md`），指导 agent 创建官方 repository-plugin（0809 格式）：**先选形态**（skill 包 / MCP / Node 工具 / 带 UI）→ 按对应路径搭建 `.dsh-plugin/` → prepack → `config.yaml` 安装 → 验证纪律。详情分置 `references/`（entry 契约 / 安装验证 / 开发规范 / 踩坑清单）；完整契约见 [cookbook](docs/cookbook/creating-a-repository-plugin.md)，参考实现 `whale-girl`。
+
+## 开发前须知（踩过的坑）
+
+- **官方包未发布到公共 npm**：`@deepseek-ai/dsh-tools` 等 `npm install` 会失败——正式分发由官方环境经 github: 源解析，本地验证需 symlink 至 monorepo 产物或 mock registry。**不要改依赖声明**。
+- **改已挂载插件的 Node half 需重启 web**：ESM 缓存按 URL 永久缓存，disable/enable 不生效，只能重启。
+- **宿主可能覆盖注入的 CSS**：关键 UI 样式用 JS 内联，勿依赖 CSS class。
+
+完整坑清单见 [skill references/gotchas](skills/plugin-registry-create/references/gotchas.md)。
 
 ## 文档
 
