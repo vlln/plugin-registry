@@ -30,10 +30,13 @@
 
 ## 安装
 
-本地目录安装（构建产物需在库——先 `pnpm exec tsdown` 产出 `lib/`）：
+本地目录安装（bundle 子目录，构建产物在库）：
 
 ```sh
-dsh plugin --profile web add <plugin-registry 仓库>/packages/plugin/console
+git clone https://github.com/dsh-external/plugin-registry.git
+cd plugin-registry/packages/plugin/console
+pnpm install && pnpm run build   # 构建 lib/（产物不入库，clone 后需自建）
+dsh plugin --profile web add <plugin-registry 绝对路径>/packages/plugin/console
 ```
 
 挂载后刷新 Web 页面，设置页出现「插件」面板（`settings.section` 插槽）。

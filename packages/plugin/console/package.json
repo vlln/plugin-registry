@@ -6,6 +6,9 @@
   "license": "BSD-3-Clause",
   "type": "module",
   "main": "lib/index.mjs",
+  "scripts": {
+    "build": "tsdown --config tsdown.config.ts"
+  },
   "exports": {
     ".": {
       "default": "./lib/index.mjs"
@@ -27,13 +30,12 @@
     }
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-client-runtime": "^0.0.1",
-    "@deepseek-ai/dsh-client-ui-slots": "^0.0.1",
     "cordis": "^4.0.0-rc.7",
     "react": "^18.2.0"
   },
   "devDependencies": {
     "@types/react": "~18.3.1",
-    "react": "^18.2.0"
+    "react": "^18.2.0",
+    "tsdown": "^0.22.2"
   }
 }

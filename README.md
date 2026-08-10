@@ -47,7 +47,10 @@ DeepSeek Harness 官方机制管「插件是什么、怎么跑」；本仓库补
 ## 安装
 
 ```sh
-dsh plugin --profile web add <本仓库>/packages/plugin/console
+git clone https://github.com/dsh-external/plugin-registry.git
+cd plugin-registry/packages/plugin/console
+pnpm install && pnpm run build   # 构建 lib/（产物不入库，clone 后需自建）
+dsh plugin --profile web add <plugin-registry 绝对路径>/packages/plugin/console
 ```
 
 挂载后刷新 Web 页面，设置页出现「插件」面板。
