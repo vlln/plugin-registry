@@ -13,14 +13,14 @@ export const name = 'plugin-console-client'
 export const inject = ['slots']
 
 /**
- * 自绘拼图块图标（插件语义，官方 outline 风格：16px、fill currentColor、
- * 圆角主体 + 顶部凹槽 + 右侧圆凸）——设置页导航的 tab 图标是官方硬编码
- * （仅 models 特例，其余统一齿轮，零扩展点），0 patch 下用
- * MutationObserver 找到「插件」tab 行替换其 svg 内容。
+ * 官方 IconCodeOutline16（`</>` 代码符号，插件/扩展语义）——设置页导航
+ * 的 tab 图标是官方硬编码（仅 models 特例，其余统一齿轮，零扩展点），
+ * 0 patch 下用 MutationObserver 找到「插件」tab 行替换其 svg 内容。
+ * 使用官方 path（含 fill-rule/clip-rule），尺寸外观与官方图标 100% 一致。
  */
-const PLUGIN_TAB_ICON_SVG = '<path d="M5 4 H7 A1 1 0 0 0 9 4 H11 A1 1 0 0 0 12 5 V11 A1 1 0 0 0 11 12 H5 A1 1 0 0 0 4 11 V5 A1 1 0 0 0 5 4 Z" fill="currentColor"/><circle cx="12" cy="7.5" r="1.5" fill="currentColor"/>'
+const PLUGIN_TAB_ICON_SVG = '<path fill-rule="evenodd" clip-rule="evenodd" d="M12.3368 1.53569L11.931 4.43172H14.8086V5.79673H11.7404L11.1962 9.67859H14.2839V11.0436H11.0056L10.4994 14.6529L9.14873 14.4643L9.62731 11.0436H5.75876L5.25252 14.6529L3.90186 14.4643L4.38043 11.0436H1.69141V9.67859H4.57104L5.11417 5.79673H2.21609V4.43172H5.30581L5.73724 1.34713L7.08995 1.53569L6.68414 4.43172H10.5527L10.9841 1.34713L12.3368 1.53569ZM5.94937 9.67859H9.81791L10.361 5.79673H6.49353L5.94937 9.67859Z" fill="currentColor"/>'
 
-/** 替换设置页导航里「插件」tab 的默认齿轮图标为拼图块图标（幂等）。 */
+/** 替换设置页导航里「插件」tab 的默认齿轮图标为代码图标（幂等）。 */
 function patchPluginTabIcon(): void {
   for (const btn of document.querySelectorAll('button')) {
     const host = btn as HTMLButtonElement & { dataset: { dshConsoleIcon?: string } }
