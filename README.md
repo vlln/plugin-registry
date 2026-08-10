@@ -1,14 +1,27 @@
-# dsh 插件注册表（Plugin Registry）
+<h1 align="center">plugin-registry</h1>
 
-> **转向（2026-08）**：官方 0809 推出仓库插件机制（`.dsh-plugin` 格式 + config 声明 + 事务性换代），覆盖了本仓库旧独立机制的 ~95% 能力（打包/安装/分发/启停/HMR），并实证「带 UI 的插件经 entry 自渲染，不需要 client half 机制」——自造一套插件机制已无价值。
->
-> **重构结果**：放弃独立插件机制（patch 注入 / `dsh registry` CLI / `ctx.plugins` / 旧面板，已移除），收敛为 **薄控制台 + 插件开发规范和引导**——薄控制台管理官方 repository 插件，skill/cookbook 引导开发者按官方格式写插件。完整评估见 [官方 0809 覆盖度](docs/official-0809-coverage.md)。
+<p align="center">
+  <strong>DSH 插件生态基建：薄控制台 + 官方插件开发引导</strong><br/>
+  浏览器面板管理官方 repository 插件与 UI 插件（读写作 `$DSH_HOME/cordis.patch.yml`，
+  0 patch）；`make-dsh-plugin` skill 引导开发者按官方格式（`.dsh-plugin`）写插件。
+</p>
+
+<p align="center">
+  <img src="https://badgen.net/badge/license/BSD-3-Clause/blue" alt="license" />
+  <img src="https://badgen.net/badge/format/official%20plugin/8257D0" alt="official plugin" />
+</p>
+
+---
+
+> **转向（2026-08）**：官方 0809 推出仓库插件机制（`.dsh-plugin`）覆盖旧独立机制 ~95%；
+> 旧机制（patch 注入 / `dsh registry` / `ctx.plugins` / 旧面板）已移除，本仓库收敛为
+> **薄控制台 + 插件开发规范和引导**。完整评估见 [官方 0809 覆盖度](docs/official-0809-coverage.md)。
 
 ## 定位
 
 DeepSeek Harness 官方机制管「插件是什么、怎么跑」；本仓库补两件事：
 
-1. **薄控制台**（`packages/plugin/console`）——管理已装的官方 repository 插件与 UI 插件的浏览器面板（读写作 `$DSH_HOME/cordis.patch.yml`）
+1. **薄控制台**（`packages/plugin/console`）——管理已装官方 repository 插件与 UI 插件的浏览器面板（读写作 `$DSH_HOME/cordis.patch.yml`）
 2. **开发规范和引导**——`make-dsh-plugin` skill + cookbook，指导创建官方 repository-plugin（0809 格式）
 
 ## 生态关系（谁能干什么）
@@ -25,13 +38,17 @@ DeepSeek Harness 官方机制管「插件是什么、怎么跑」；本仓库补
 
 两类插件的完整区别（开发/分发/安装/管理四维 + 选型）见 [插件类型对比](docs/plugin-types.md)；现有插件的安装示例（loop/task-status/whale-girl 等）见 [examples](examples/README.md)。
 
-## 安装薄控制台
+## 薄控制台
+
+![插件管理面板](screenshots/console-panel.png)
+
+设置页「插件」面板管理两类插件：repository 插件区（增删 `repositories` 列表 + 检查更新）+ UI 插件区（`disabled` 启停标记）。
 
 ```sh
 dsh plugin --profile web add <本仓库>/packages/plugin/console
 ```
 
-挂载后设置页出现「插件」面板：repository 插件区（增删 `repositories` 列表）+ UI 插件区（`disabled` 启停标记）。
+挂载后刷新 Web 页面，设置页出现「插件」面板。
 
 ## Agent Skills
 
@@ -41,7 +58,7 @@ dsh plugin --profile web add <本仓库>/packages/plugin/console
 
 ## 开发前须知（踩过的坑）
 
-- **官方包未发布到公共 npm**：`@deepseek-ai/dsh-tools` 等 `npm install` 会失败——正式分发由官方环境经 github: 源解析，本地验证需 symlink 至 monorepo 产物或 mock registry。**不要改依赖声明**。bundle 插件（loop/task-status）同坑但更隐蔽：`dependencies` 为空是设计，依赖由 profile 的 pnpm 闭包挂载时注入。
+- **官方包未发布到公共 npm**：`@deepseek-ai/dsh-tools` 等 `npm install` 会失败——正式分发由官方环境经 github: 源解析，本地验证需 symlink 至 monorepo 产物或 mock registry。**不要改依赖声明**。bundle 插件同坑但更隐蔽：`dependencies` 为空是设计，依赖由 profile 的 pnpm 闭包挂载时注入。
 - **改已挂载插件的 Node half 需重启 web**：ESM 缓存按 URL 永久缓存，disable/enable 不生效，只能重启。
 - **宿主可能覆盖注入的 CSS**：关键 UI 样式用 JS 内联，勿依赖 CSS class。
 
