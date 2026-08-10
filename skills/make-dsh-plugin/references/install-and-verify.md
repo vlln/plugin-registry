@@ -28,4 +28,4 @@ repository-plugins:
 
 ## 参考实现
 
-`whale-girl` 的验证链路（`/whale-girl/ui.js` + `/whale-girl/state` + `/whale-girl/assets/*` 路由、tapIndex 注入、headless 冒烟）。
+验证链路：`/<plugin-id>/ui.js` + `/state` + `/assets/*` 路由、tapIndex 注入、headless 冒烟。

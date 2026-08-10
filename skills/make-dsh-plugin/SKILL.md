@@ -25,8 +25,7 @@ requires:
 **权威契约内嵌在本 skill 的 `references/`**（entry + skill + MCP 在
 `entry-contract.md`、bundle 在 `bundle-plugins.md`、验证在
 `install-and-verify.md`、规范在 `dev-conventions.md`、坑在
-`gotchas.md`）——开发不需要任何仓库文档。参考实现：`whale-girl`（GUI
-宠物插件）。到达对应阶段时读对应 reference。
+`gotchas.md`）——开发不需要任何仓库文档。到达对应阶段时读对应 reference。
 
 ## 何时使用
 
@@ -54,7 +53,7 @@ requires:
 
 ## Step 1：仓库布局
 
-`my-plugin/` 根保留 docs/decisions/originals（不分发）；分发路径全部在
+`my-plugin/` 根保留元资产（文档/决策等，不分发）；分发路径全部在
 `.dsh-plugin/` 内（官方 containment 契约）：
 
 ```
@@ -65,8 +64,7 @@ my-plugin/
 │   ├── client/  client.js      # 自渲染 client 源码 / 构建产物
 │   ├── assets/                 # entry 路由静态服务的文件
 │   └── src/                    # 纯逻辑（零宿主依赖，可单测）
-├── docs/  decisions/
-└── scripts/                    # 门禁 + 生成器
+└── scripts/                    # 门禁 + 生成器（可选）
 ```
 
 ## Step 2：`package.json` + 能力面
@@ -130,7 +128,7 @@ server 是 stdio MCP server（stdin/stdout 上的 JSON-RPC）。确切 schema �
 2. client 脚本自执行 DOM 渲染（无 `__ModuleLoader__`）；
 3. 页面注入是插件自己的事（宿主页 `<script>` 注入或配置注入点）。
 
-完整模式见 `whale-girl`（ui/state/assets 路由、tapIndex 注入）。
+完整模式：entry 注册 `ui.js`/`state`/`assets` 路由，宿主页注入 `<script>`（tapIndex 注入）。
 
 **检查点**：浏览器冒烟通过——headless Chrome dump-dom 显示插件的 DOM
 marker 且无 "Failed to load plugins"。
@@ -214,8 +212,7 @@ repository 插件——已装 `.dsh-plugin` 包的插件管理 UI。
   验证。
 - **entry 契约失败在挂载时暴露**：`dsh.entry` 指向 `.dsh-plugin/` 外、
   缺 prepack、未声明依赖——在安装/挂载失败，而非编写时。
-- **ESM 缓存**：改已挂载插件的 `index.mjs` 需重启 web 才生效（whale-girl
-  反复验证）。
+- **ESM 缓存**：改已挂载插件的 `index.mjs` 需重启 web 才生效。
 - **宿主覆盖注入的 CSS**：关键 UI 样式必须 JS 内联（宿主全局 CSS 可能清掉
   注入的 `<style>`），勿依赖 CSS class。
 - **先选形态**：写代码前先定能力面——纯 skill 包无需 entry；UI 插件需要
@@ -233,5 +230,5 @@ repository 插件——已装 `.dsh-plugin` 包的插件管理 UI。
   - `references/install-and-verify.md` — 按改动面验证
   - `references/gotchas.md` — 坑（官方包未发布、ESM 缓存、宿主 CSS 覆盖）
   - `references/dev-conventions.md` — 门禁、决策记录
-- 参考实现：`whale-girl`（带 UI 的 repository 插件）
+- 参考实现：任一已发布的 repository 插件（带 UI 的自渲染模式）
 - Bundle 参考：`dsh-loop`、`dsh-task-status`、`packages/plugin/console`

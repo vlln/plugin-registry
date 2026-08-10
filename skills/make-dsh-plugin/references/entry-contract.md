@@ -1,6 +1,6 @@
 # Entry 契约详情（dsh.entry + skill + MCP）
 
-本文件是 make-dsh-plugin 的**自带权威契约**（skill 独立分发，不依赖仓库文档）。完整参考实现：`whale-girl`（GUI 宠物插件，门禁/决策/素材契约/自渲染 client）。
+本文件是 make-dsh-plugin 的**自带权威契约**（skill 独立分发，不依赖仓库文档）。
 
 ## 仓库布局
 
@@ -17,8 +17,7 @@ my-plugin/
 │   ├── mcp/           # MCP server 逻辑（stdio）
 │   ├── assets/        # entry 路由静态服务的文件
 │   └── src/           # 纯逻辑（零宿主依赖，可单测）
-├── docs/  decisions/  # 仓库元资产（不进插件包）
-└── scripts/           # 门禁与生成器（不进插件包）
+└── scripts/           # 门禁与生成器（可选）
 ```
 
 分发路径全部留在 `.dsh-plugin/` 内（官方 containment 契约）。
@@ -95,7 +94,7 @@ export default {
 2. client 脚本自执行 DOM 渲染（无 `__ModuleLoader__` 契约），fetch entry 状态路由渲染进页面
 3. 页面注入是插件自己的事（entry 向宿主页注入 `<script src="/my-plugin/ui.js">`，或宿主提供配置注入点）
 
-完整模式见 `whale-girl`（`/whale-girl/ui.js` + `/whale-girl/state` + `/whale-girl/assets/*` 路由、tapIndex 注入）。
+完整模式：entry 注册 `/<plugin-id>/ui.js` + `/state` + `/assets/*` 路由，宿主页注入 `<script>`（tapIndex 注入）。
 
 ## 安装与验证
 
