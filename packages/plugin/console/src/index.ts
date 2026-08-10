@@ -7,6 +7,7 @@
  * HMR-watched 的 home 级用户 patch 层。
  */
 import { readFileSync, writeFileSync } from 'node:fs'
+import { execFile } from 'node:child_process'
 import { join } from 'node:path'
 import type { Context } from 'cordis'
 
@@ -180,11 +181,90 @@ function writeUiPluginDisabled(id: string, disabled: boolean): void {
   console.log(`[plugin-console] set ${id} disabled=${String(disabled)} in ${file}`)
 }
 
+/** 解析 `github:owner/repo#ref&path:...` 源为 {owner, repo, ref, tail}。 */
+function parseSource(source: string): { owner: string; repo: string; ref: string; tail: string } | null {
+  const match = /^github:([^/\s#&]+)\/([^/\s#&]+)#([^\s#&]+)/.exec(source)
+  if (match === null) return null
+  return { owner: match[1]!, repo: match[2]!, ref: match[3]!, tail: source.slice(match[0].length) }
+}
+
+/** 40-hex commit（固定引用可对比）；分支/标签名则只能报告远端最新。 */
+function isCommitSha(value: string): boolean {
+  return /^[0-9a-f]{40}$/.test(value)
+}
+
+/** git ls-remote 结果：missing=true 表示远端无此 ref（未推送/已删除），sha=null 且 missing=false 表示网络/认证失败。 */
+interface GitRemoteResult {
+  sha: string | null
+  missing: boolean
+}
+
+/** git ls-remote 取远端 ref 指向的 commit；区分网络失败与远端无此 ref。 */
+function gitRemoteCommit(owner: string, repo: string, ref: string): Promise<GitRemoteResult> {
+  return new Promise((resolve) => {
+    execFile(
+      'git',
+      ['ls-remote', `https://github.com/${owner}/${repo}.git`, ref],
+      { timeout: 15_000 },
+      (error, stdout) => {
+        if (error) {
+          resolve({ sha: null, missing: false })
+          return
+        }
+        const sha = stdout.split('\n')[0]?.split('\t')[0] ?? ''
+        resolve(isCommitSha(sha) ? { sha, missing: false } : { sha: null, missing: true })
+      },
+    )
+  })
+}
+
+/** 一个 repository 源的更新检查结果。 */
+interface UpdateCheckRow {
+  source: string
+  ref: string
+  refKind: 'sha' | 'branch'
+  latestSha: string | null
+  hasUpdate: boolean
+  error?: string
+}
+
+/** 检查全部已配置源的远端状态。 */
+async function checkUpdates(sources: string[]): Promise<UpdateCheckRow[]> {
+  const rows: UpdateCheckRow[] = []
+  for (const source of sources) {
+    const parsed = parseSource(source)
+    if (parsed === null) {
+      rows.push({ source, ref: '', refKind: 'sha', latestSha: null, hasUpdate: false, error: 'unsupported source (expected github:owner/repo#ref)' })
+      continue
+    }
+    const result = await gitRemoteCommit(parsed.owner, parsed.repo, parsed.ref)
+    if (result.sha === null) {
+      rows.push({
+        source,
+        ref: parsed.ref,
+        refKind: isCommitSha(parsed.ref) ? 'sha' : 'branch',
+        latestSha: null,
+        hasUpdate: false,
+        error: result.missing ? 'remote has no such ref（未推送或已删除）' : 'cannot reach remote (network/credentials)',
+      })
+      continue
+    }
+    rows.push({
+      source,
+      ref: parsed.ref,
+      refKind: isCommitSha(parsed.ref) ? 'sha' : 'branch',
+      latestSha: result.sha,
+      hasUpdate: parsed.ref !== result.sha,
+    })
+  }
+  return rows
+}
+
 interface WebServerLike {
   register(route: {
     kind: 'exact' | 'prefix'
     path: string
-    handler: (req: unknown, res: { statusCode: number; setHeader(k: string, v: string): void; end(body: string): void }) => void
+    handler: (req: unknown, res: { statusCode: number; setHeader(k: string, v: string): void; end(body: string): void }) => void | Promise<void>
   }): () => void
 }
 
@@ -206,7 +286,7 @@ export function apply(ctx: ConsoleCtx): void {
     return httpServer.register({
       kind: 'prefix',
       path: '/api/plugin-console',
-      handler: (req, res) => {
+      handler: async (req, res) => {
         const json = (status: number, body: unknown): void => {
           res.statusCode = status
           res.setHeader('content-type', 'application/json')
@@ -227,6 +307,59 @@ export function apply(ctx: ConsoleCtx): void {
               const parsed = JSON.parse(body) as { repositories?: string[] }
               writeRepositories(parsed.repositories ?? [])
               json(200, { ok: true })
+            })
+            return
+          }
+          // 更新检查：对每个已配置源查远端最新 commit
+          if (method === 'GET' && (path === '/api/plugin-console/updates' || path === '/api/plugin-console/updates/')) {
+            void (async () => {
+              try {
+                const rows = await checkUpdates(readRepositories().repositories)
+                json(200, { ok: true, updates: rows })
+              } catch (error) {
+                json(500, { ok: false, message: error instanceof Error ? error.message : String(error) })
+              }
+            })()
+            return
+          }
+          // 更新执行：把指定源的 ref 更新为远端最新 commit（写配置，官方换代在下次启动）
+          if (method === 'POST' && (path === '/api/plugin-console/updates' || path === '/api/plugin-console/updates/')) {
+            let body = ''
+            ;(req as { on?: (e: string, cb: (c: Buffer) => void) => void })?.on?.('data', (c: Buffer) => { body += c.toString('utf8') })
+            ;(req as { on?: (e: string, cb: () => void) => void })?.on?.('end', () => {
+              void (async () => {
+                try {
+                  const parsed = JSON.parse(body) as { source?: string }
+                  const source = parsed.source ?? ''
+                  const current = readRepositories().repositories
+                  if (!current.includes(source)) {
+                    json(404, { ok: false, message: `source not configured: ${source}` })
+                    return
+                  }
+                  const parsedSource = parseSource(source)
+                  if (parsedSource === null) {
+                    json(400, { ok: false, message: 'unsupported source (expected github:owner/repo#ref)' })
+                    return
+                  }
+                  const result = await gitRemoteCommit(parsedSource.owner, parsedSource.repo, parsedSource.ref)
+                  if (result.sha === null) {
+                    json(result.missing ? 400 : 502, {
+                      ok: false,
+                      message: result.missing ? 'remote has no such ref（未推送或已删除）' : 'cannot reach remote (network/credentials)',
+                    })
+                    return
+                  }
+                  if (result.sha === parsedSource.ref) {
+                    json(200, { ok: true, updated: false, source, latestSha: result.sha })
+                    return
+                  }
+                  const updated = `github:${parsedSource.owner}/${parsedSource.repo}#${result.sha}${parsedSource.tail}`
+                  writeRepositories(current.map(item => item === source ? updated : item))
+                  json(200, { ok: true, updated: true, source, from: parsedSource.ref, to: latest })
+                } catch (error) {
+                  json(500, { ok: false, message: error instanceof Error ? error.message : String(error) })
+                }
+              })()
             })
             return
           }
