@@ -7,7 +7,7 @@
   "type": "module",
   "main": "lib/index.mjs",
   "scripts": {
-    "prepare": "pnpm run build",
+    "prepare": "tsdown --config tsdown.config.ts",
     "build": "tsdown --config tsdown.config.ts",
     "test": "TSX_TSCONFIG_PATH=tests/tsconfig.json node --import tsx --test tests/discovery/*.spec.ts"
   },
