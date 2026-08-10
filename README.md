@@ -2,8 +2,8 @@
 
 <p align="center">
   <strong>DSH 插件生态基建：薄控制台 + 官方插件开发引导</strong><br/>
-  浏览器面板管理官方 repository 插件与 UI 插件（读写作 `$DSH_HOME/cordis.patch.yml`，
-  0 patch）；`make-dsh-plugin` skill 引导开发者按官方格式（`.dsh-plugin`）写插件。
+  浏览器面板管理官方 repository 插件与 UI 插件，零补丁；
+  `make-dsh-plugin` skill 引导开发者按官方格式写插件。
 </p>
 
 <p align="center">
@@ -43,6 +43,8 @@ DeepSeek Harness 官方机制管「插件是什么、怎么跑」；本仓库补
 ![插件管理面板](screenshots/console-panel.png)
 
 设置页「插件」面板管理两类插件：repository 插件区（增删 `repositories` 列表 + 检查更新）+ UI 插件区（`disabled` 启停标记）。
+
+## 安装
 
 ```sh
 dsh plugin --profile web add <本仓库>/packages/plugin/console
