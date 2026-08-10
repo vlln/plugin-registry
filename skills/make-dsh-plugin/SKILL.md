@@ -166,10 +166,18 @@ A maintainable plugin follows the discipline in
 for every non-trivial change, generated artifacts never hand-edited,
 first-time host behaviors recorded as environment facts.
 
-**README conventions** (make-skill spec): the repo README lists its skills in
-a table (`| Skill | 作用 |`), one row per skill with a one-line description —
-human readers scan the table to decide what to use; details stay in each
-SKILL.md. Apply this to any repo that ships skills.
+**README conventions** (make-skill spec): the repo README lists its
+capability surfaces in tables — one table per surface, one row per item with
+a one-line description; human readers scan the tables to decide what to use;
+details stay in each item's own file.
+
+- **Skills** (always): `| Skill | 作用 |` — one row per SKILL.md.
+- **MCP servers** (if the plugin ships `dsh.mcpServers`):
+  `| MCP | 说明 |` — one row per server (name + what it exposes).
+- **Tools** (if the plugin registers tools): `| 工具 | 说明 |` — one row
+  per `defineTool` registration.
+
+Apply this to any repo that ships skills/MCP/tools.
 
 **Read `references/dev-conventions.md`** when the project enters iteration.
 

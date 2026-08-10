@@ -14,6 +14,7 @@
 - ✅ **README 整理 + release 清理**：删除 v0.1.0 release（旧机制 patch 分发，转向后失效）；console 安装命令改指 `packages/plugin/console` 子目录；删「安装其他插件」章节（生态关系段保留 examples 链接）；Agent Skill 段落改表格（make-skill 规范）；skill 补「README 用表格列 skill」约定
 - ✅ **旧用户迁移引导**：README 加「旧机制插件迁移」章节（方向判断表 + 链接权威指南）；新增 [cookbook/migrating-legacy-plugins](docs/cookbook/migrating-legacy-plugins.md)——旧插件按现状分两条路径迁移（官方包+增量清单→bundle；纯旧机制→repository，whale-girl 范本），含分面迁移表 + 执行步骤 + 迁移后注意
 - ✅ **skill 补 GitHub 发布规范**：make-dsh-plugin 加 Step 5b——仓库 description 写法模板（DSH plugin: <功能>; install via config.yaml <ref>）、仓库标签建议（dsh/dsh-plugin/dsh-repository-plugin/deepseek-harness + 能力/领域标签）、发布检查清单（entry/prepack/门禁/README/安装冒烟）；按规范补齐 whale-girl 与 plugin-registry 的 GitHub description/topics
+- ✅ **skill README 规范扩展**：make-dsh-plugin 的 README conventions 从「列 skill」扩展为「列全部能力面用表格」——Skills（`| Skill | 作用 |`）+ MCP servers（`| MCP | 说明 |`，若含 `dsh.mcpServers`）+ Tools（`| 工具 | 说明 |`，若注册工具）
 - ⏳ **冻结中（独立一步移除）**：patch 加载（0808）、`dsh registry` CLI、`ctx.plugins`、`ui-plugin-manager` 旧面板
 - 澄清：官方用户配置层为 `$DSH_HOME/cordis.patch.yml`（08-05 取代 `config.yaml`）
 
