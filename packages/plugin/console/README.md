@@ -36,7 +36,7 @@
 git clone https://github.com/dsh-external/plugin-registry.git
 cd plugin-registry/packages/plugin/console
 pnpm install && pnpm run build   # 构建 lib/（产物不入库，clone 后需自建）
-dsh plugin --profile web add <plugin-registry 绝对路径>/packages/plugin/console
+dsh plugin --profile web add .   # 当前目录即 bundle 包子目录（dsh 锚定 . 为绝对路径）
 ```
 
 挂载后刷新 Web 页面，设置页出现「插件」面板（`settings.section` 插槽）。
