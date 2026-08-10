@@ -145,25 +145,28 @@ function writeUiPluginDisabled(id: string, disabled: boolean): void {
     content = ''
   }
   const lines = content.split('\n')
+  // 丢弃空数组文档行（`[]`）与纯注释/空行，保证输出是单一 patch 列表文档
+  // （`[]` + 追加列表会拼成双文档 YAML，启动解析失败——已实证）。
+  const significant = lines.filter(l => l.trim() !== '[]')
   let targetLine = -1
   let targetIndent = ''
-  for (let i = 0; i < lines.length; i += 1) {
-    const match = /^- id:\s*([^\s]+)/.exec(lines[i]!.trim())
+  for (let i = 0; i < significant.length; i += 1) {
+    const match = /^- id:\s*([^\s]+)/.exec(significant[i]!.trim())
     if (match !== null && match[1] === id) {
       targetLine = i
-      targetIndent = /^(\s*)-/.exec(lines[i]!)?.[1] ?? ''
+      targetIndent = /^(\s*)-/.exec(significant[i]!)?.[1] ?? ''
       break
     }
   }
   if (targetLine === -1) {
     // 目标行不存在：追加一个新的挂载行 + disabled 标记
-    lines.push(`${targetIndent}- id: ${id}`)
-    lines.push(`${targetIndent}  disabled: ${String(disabled)}`)
+    significant.push(`${targetIndent}- id: ${id}`)
+    significant.push(`${targetIndent}  disabled: ${String(disabled)}`)
   } else {
     // 找到该行子树内的 disabled 行
     let disabledLine = -1
-    for (let j = targetLine + 1; j < lines.length; j += 1) {
-      const next = lines[j]!
+    for (let j = targetLine + 1; j < significant.length; j += 1) {
+      const next = significant[j]!
       if (next.trimStart().startsWith('- id:')) break
       if (/disabled:\s*(true|false)/.test(next.trim())) {
         disabledLine = j
@@ -172,12 +175,12 @@ function writeUiPluginDisabled(id: string, disabled: boolean): void {
     }
     if (disabledLine === -1) {
       // 无 disabled 行：在 id 行后插入
-      lines.splice(targetLine + 1, 0, `${targetIndent}  disabled: ${String(disabled)}`)
+      significant.splice(targetLine + 1, 0, `${targetIndent}  disabled: ${String(disabled)}`)
     } else {
-      lines[disabledLine] = `${targetIndent}  disabled: ${String(disabled)}`
+      significant[disabledLine] = `${targetIndent}  disabled: ${String(disabled)}`
     }
   }
-  writeFileSync(file, lines.join('\n'))
+  writeFileSync(file, significant.join('\n'))
   console.log(`[plugin-console] set ${id} disabled=${String(disabled)} in ${file}`)
 }
 
@@ -271,8 +274,40 @@ interface WebServerLike {
 /** Cordis 插件名。 */
 export const name = 'plugin-console'
 
-/** 需要宿主 web server（web 组合）。 */
-export const inject = ['httpServer']
+/** 需要宿主 web server（web 组合）+ loader（读/改 loader 树条目）。 */
+export const inject = ['httpServer', 'loader']
+
+/** loader 树条目投影（条目短 id + 包名 + 当前 disabled）。 */
+interface LoadedEntryRow {
+  /**
+   * 条目短 id（EntryOptions.id，如 dsh-loop）——profile patch 的
+   * `- id:` 匹配这个（含父前缀的完整 id `include:dsh-loop` 匹配不上，
+   * 已实证重启不生效）。
+   */
+  id: string
+  /** 包名（@dsh-external/dsh-loop 等；@deepseek-ai/* = 官方内置）。 */
+  name: string
+  /** 当前是否被禁用（含父条目禁用继承）。 */
+  disabled: boolean
+}
+
+/** 遍历 loader 树收集全部条目（含嵌套子树），id 取短 id（options.id）。 */
+function collectLoaderEntries(ctx: ConsoleCtx): LoadedEntryRow[] {
+  const loader = (ctx as unknown as { loader?: { entries?(): Generator<unknown> } }).loader
+  if (loader?.entries === undefined) return []
+  const rows: LoadedEntryRow[] = []
+  for (const raw of loader.entries()) {
+    const entry = raw as { id?: string; options?: { id?: string; name?: string }; disabled?: boolean }
+    const id = entry.options?.id ?? entry.id
+    if (typeof id !== 'string' || id.length === 0) continue
+    rows.push({
+      id,
+      name: entry.options?.name ?? id,
+      disabled: entry.disabled === true,
+    })
+  }
+  return rows
+}
 
 interface ConsoleCtx extends Context {
   httpServer?: WebServerLike
@@ -363,21 +398,50 @@ export function apply(ctx: ConsoleCtx): void {
             })
             return
           }
-          // UI 插件管理：读 Loader 树插件的 disabled 状态
-          if (method === 'GET' && (path === '/api/plugin-console/ui-plugins' || path === '/api/plugin-console/ui-plugins/')) {
-            json(200, { ok: true, plugins: readUiPlugins() })
+          // 已加载插件：读 loader 树（实时，含运行时启停后的状态）
+          if (method === 'GET' && (path === '/api/plugin-console/installed' || path === '/api/plugin-console/installed/')) {
+            json(200, { ok: true, plugins: collectLoaderEntries(ctx) })
             return
           }
-          // UI 插件管理：设置一个插件的 disabled 状态（POST /ui-plugins/<id>，body {disabled: bool}）
-          const uiMatch = /^\/api\/plugin-console\/ui-plugins\/([^/]+)$/.exec(path)
-          if (method === 'POST' && uiMatch !== null) {
-            const id = decodeURIComponent(uiMatch[1]!)
+          // 已加载插件：运行时启停 + 写 profile patch 持久化
+          // （POST /installed/<id>，body {disabled: bool}）
+          const installedMatch = /^\/api\/plugin-console\/installed\/([^/]+)$/.exec(path)
+          if (method === 'POST' && installedMatch !== null) {
+            const id = decodeURIComponent(installedMatch[1]!)
             let body = ''
             ;(req as { on?: (e: string, cb: (c: Buffer) => void) => void })?.on?.('data', (c: Buffer) => { body += c.toString('utf8') })
             ;(req as { on?: (e: string, cb: () => void) => void })?.on?.('end', () => {
-              const parsed = JSON.parse(body) as { disabled?: boolean }
-              writeUiPluginDisabled(id, parsed.disabled === true)
-              json(200, { ok: true, id, disabled: parsed.disabled === true })
+              void (async () => {
+                try {
+                  const parsed = JSON.parse(body) as { disabled?: boolean }
+                  const disabled = parsed.disabled === true
+                  // 运行时启停：用与 GET /installed 相同的 entries() 遍历匹配条目
+                  // （resolve 可能命中不同的 Entry 对象——已实证状态不生效）。
+                  // 匹配短 id（options.id），与 patch 的 `- id:` 一致。
+                  const loader = (ctx as unknown as { loader?: { entries?(): Generator<unknown> } }).loader
+                  let target: { update?(options: { disabled: boolean }): Promise<unknown> } | undefined
+                  if (loader?.entries !== undefined) {
+                    for (const raw of loader.entries()) {
+                      const candidate = raw as { options?: { id?: string }; id?: string }
+                      if ((candidate.options?.id ?? candidate.id) === id) {
+                        target = raw as { update?(options: { disabled: boolean }): Promise<unknown> }
+                        break
+                      }
+                    }
+                  }
+                  if (target?.update === undefined) {
+                    json(404, { ok: false, message: `loader entry not found: ${id}` })
+                    return
+                  }
+                  // 运行时生效：entry.update({disabled}) 会 dispose/恢复插件 fiber。
+                  await target.update({ disabled })
+                  // 持久化：写 profile patch（重启后仍保持）。
+                  writeUiPluginDisabled(id, disabled)
+                  json(200, { ok: true, id, disabled, runtime: true, persisted: true })
+                } catch (error) {
+                  json(500, { ok: false, message: error instanceof Error ? error.message : String(error) })
+                }
+              })()
             })
             return
           }

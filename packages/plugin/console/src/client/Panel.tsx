@@ -14,11 +14,6 @@ interface RepositoryState {
   present: boolean
 }
 
-interface UiPluginRow {
-  id: string
-  disabled: boolean
-}
-
 /** 一个 repository 源的更新检查结果（Node half /api/plugin-console/updates）。 */
 interface UpdateRow {
   source: string
@@ -29,10 +24,11 @@ interface UpdateRow {
   error?: string
 }
 
-/** boot 图里已加载的插件（官方 __DSH_BOOT__.entries）。 */
-interface BootEntry {
+/** loader 树已加载插件（Node half /installed，实时）。 */
+interface LoadedPluginRow {
   id: string
-  url: string
+  name: string
+  disabled: boolean
 }
 
 const rowStyle: React.CSSProperties = {
@@ -83,7 +79,8 @@ function updateText(row: UpdateRow): string {
 /** 设置页面板主体。 */
 export function ConsolePanel(): React.ReactNode {
   const [state, setState] = useState<RepositoryState>({ repositories: [], present: false })
-  const [uiPlugins, setUiPlugins] = useState<UiPluginRow[]>([])
+  const [installed, setInstalled] = useState<LoadedPluginRow[]>([])
+  const [showAll, setShowAll] = useState(false)
   const [input, setInput] = useState('')
   const [error, setError] = useState<string | undefined>(undefined)
   const [busy, setBusy] = useState(false)
@@ -93,14 +90,14 @@ export function ConsolePanel(): React.ReactNode {
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
-      const [repoRes, uiRes] = await Promise.all([
+      const [repoRes, installedRes] = await Promise.all([
         fetch('/api/plugin-console/repositories', { headers: { accept: 'application/json' } }),
-        fetch('/api/plugin-console/ui-plugins', { headers: { accept: 'application/json' } }),
+        fetch('/api/plugin-console/installed', { headers: { accept: 'application/json' } }),
       ])
       const repoBody = (await repoRes.json()) as RepositoryState & { ok?: boolean }
-      const uiBody = (await uiRes.json()) as { plugins?: UiPluginRow[]; ok?: boolean }
+      const installedBody = (await installedRes.json()) as { plugins?: LoadedPluginRow[]; ok?: boolean }
       setState({ repositories: repoBody.repositories ?? [], present: repoBody.present ?? false })
-      setUiPlugins(uiBody.plugins ?? [])
+      setInstalled(installedBody.plugins ?? [])
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught))
     } finally {
@@ -127,11 +124,12 @@ export function ConsolePanel(): React.ReactNode {
     }
   }, [refresh])
 
-  const toggleUiPlugin = useCallback(async (id: string, disabled: boolean): Promise<void> => {
+  /** 运行时启停（loader 树立即生效）+ 写 profile patch 持久化。 */
+  const togglePlugin = useCallback(async (id: string, disabled: boolean): Promise<void> => {
     setBusy(true)
     setError(undefined)
     try {
-      const response = await fetch(`/api/plugin-console/ui-plugins/${encodeURIComponent(id)}`, {
+      const response = await fetch(`/api/plugin-console/installed/${encodeURIComponent(id)}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ disabled }),
@@ -201,25 +199,35 @@ export function ConsolePanel(): React.ReactNode {
 
   if (loading) return <p style={{ color: 'var(--dsw-alias-label-tertiary)' }}>加载中…</p>
 
-  // 已加载插件 = boot 图 entries（官方 __DSH_BOOT__），合并 profile 配置的 disabled。
-  const boot = (window as { __DSH_BOOT__?: { entries?: BootEntry[] } }).__DSH_BOOT__
-  const loaded = (boot?.entries ?? []).map(entry => ({
-    id: entry.id,
-    disabled: uiPlugins.find(u => u.id === entry.id)?.disabled ?? false,
-  }))
+  // 区分产品内置（@deepseek-ai/*、@cordisjs/*、cordis: 组合）与用户添加。
+  const isOfficial = (p: LoadedPluginRow): boolean =>
+    p.name.startsWith('@deepseek-ai/') || p.name.startsWith('@cordisjs/') || p.name.startsWith('cordis:')
+  const official = installed.filter(isOfficial)
+  const user = installed.filter(p => !isOfficial(p))
+  const shown = showAll ? installed : user
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 720, color: 'var(--dsw-alias-label-primary)' }}>
       {error !== undefined ? <p role="alert" style={{ color: 'var(--dsw-alias-danger, #d93026)' }}>{error}</p> : null}
 
       <section>
-        <h3 style={sectionTitleStyle}>已加载插件（{loaded.length}）</h3>
-        <p style={hintStyle}>boot 图中的插件；bundle 插件的启停写 profile 级配置，重启生效。</p>
-        {loaded.map(plugin => (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div>
+            <h3 style={sectionTitleStyle}>已加载插件（{user.length} 用户 / {official.length} 内置）</h3>
+            <p style={hintStyle}>启停立即生效（loader 树运行时应用）并写入 profile 配置持久化。</p>
+          </div>
+          {official.length > 0 ? (
+            <Button size="sm" variant="ghost" onClick={() => { setShowAll(v => !v) }}>
+              {showAll ? '只看用户插件' : `查看所有（${installed.length}）`}
+            </Button>
+          ) : null}
+        </div>
+        {shown.map(plugin => (
           <div key={plugin.id} style={rowStyle}>
-            <span style={rowTitleStyle}>{plugin.id}</span>
+            <span style={rowTitleStyle}>{plugin.name}</span>
+            {official.includes(plugin) ? <Pill>内置</Pill> : null}
             <Pill active={!plugin.disabled}>{plugin.disabled ? '已停用' : '运行中'}</Pill>
-            <Button size="sm" disabled={busy} onClick={() => { void toggleUiPlugin(plugin.id, !plugin.disabled) }}>
+            <Button size="sm" disabled={busy} onClick={() => { void togglePlugin(plugin.id, !plugin.disabled) }}>
               {plugin.disabled ? '启用' : '停用'}
             </Button>
           </div>
