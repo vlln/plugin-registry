@@ -1,6 +1,8 @@
 # dsh 插件注册表（Plugin Registry）
 
-> **转向（2026-08）**：官方 0809 仓库插件机制（`.dsh-plugin` + config）覆盖本仓库旧独立机制 ~95%。当前定位 = **薄控制台 + 插件开发规范和引导**。旧机制（patch/CLI/`ctx.plugins`/旧面板）已移除，依据见 [官方 0809 覆盖度](docs/official-0809-coverage.md)。
+> **转向（2026-08）**：官方 0809 推出仓库插件机制（`.dsh-plugin` 格式 + config 声明 + 事务性换代），覆盖了本仓库旧独立机制的 ~95% 能力（打包/安装/分发/启停/HMR），并实证「带 UI 的插件经 entry 自渲染，不需要 client half 机制」——自造一套插件机制已无价值。
+>
+> **重构结果**：放弃独立插件机制（patch 注入 / `dsh registry` CLI / `ctx.plugins` / 旧面板，已移除），收敛为 **薄控制台 + 插件开发规范和引导**——薄控制台管理官方 repository 插件，skill/cookbook 引导开发者按官方格式写插件。完整评估见 [官方 0809 覆盖度](docs/official-0809-coverage.md)。
 
 ## 定位
 
