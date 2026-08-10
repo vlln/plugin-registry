@@ -118,6 +118,47 @@ Install via `$DSH_HOME/config.yaml` `repository-plugins.repositories`
 (which changes need a web restart vs. refresh only) and mount-failure
 troubleshooting.
 
+## Step 5b: Publish to GitHub
+
+The repo itself is the distribution unit — set it up so users can find and
+install it.
+
+**Repo description** (one line, what it is + how to install): a concrete
+template:
+
+```
+DSH 插件：<一句话功能>。官方 repository-plugin（.dsh-plugin 格式），config.yaml 安装：github:owner/repo#<ref>&path:/.dsh-plugin
+```
+
+Follow the shape "DSH plugin: <what it does>; official repository-plugin
+format, install via config.yaml `<repo-ref>`". Bilingual optional (English
+first helps international discovery).
+
+**Repo topics (GitHub tags)**: tag the repo so `gh`/search/discovery works.
+Suggested set (apply all that fit):
+
+- `dsh` / `dsh-plugin` / `dsh-repository-plugin` — ecosystem discovery
+- `deepseek-harness` — the host product
+- capability tags: `plugin`, `skill`, `mcp` (or a domain tag like `pet`,
+  `tool`)
+- `agent` / `agents` — agentic context
+
+Apply with: `gh repo edit <owner>/<repo> --add-topic dsh --add-topic
+dsh-plugin ...`
+
+**Publish checklist** (before sharing the repo):
+- [ ] `package.json#dsh.entry` points inside `.dsh-plugin/`; prepack runs
+  `dsh-plugin-prepare`
+- [ ] Gates pass (`scripts/gates/run.mjs`) — the repo ships its own gates
+- [ ] README has install (config.yaml line with a concrete ref), usage, and
+  the skill table (Step 6 convention)
+- [ ] Repo description + topics set (above)
+- [ ] Install smoke: fresh `config.yaml` line → mount → boot log clean
+
+No release assets needed — the repo is the plugin (clone + prepare +
+prepack). If a versioned ref is desired, tag commits and point the README
+config line at the tag's commit hash.
+
 ## Step 6: Development conventions
 
 A maintainable plugin follows the discipline in
