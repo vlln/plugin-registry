@@ -10,7 +10,16 @@
 - **本地验证**：symlink 至官方 monorepo 构建产物（`@deepseek-ai/dsh-tools` → 0809 monorepo 产物）或 mock npm registry（21 包闭包）——预置缓存是本地验证手段，非分发形态。
 - **判断**：本地 `npm i` 失败不是你的错——不要改依赖声明，确认分发走 github: 源。
 
-**bundle 插件同坑、更隐蔽**：bundle（dshClient 包，如 loop/task-status）同样 import `@deepseek-ai/dsh-tools`/`dsh-llm`，但 **`dependencies` 声明为空**——官方包由 profile 的 pnpm 闭包（`dsh plugin --profile web add` 挂载环境）注入。**插件不该自己声明这些依赖**：声明了公共 npm 解析不到反而失败；依赖由挂载环境提供是设计。本地装 bundle 同样需官方 monorepo 构建产物 link 进 profile。
+**bundle 插件同坑、更隐蔽**：bundle（dsh.client 包，如 loop/task-status）同样 import `@deepseek-ai/dsh-tools`/`dsh-llm`，但 **`dependencies` 声明为空**——官方包由 profile 的 pnpm 闭包（`dsh plugin --profile web add` 挂载环境）注入。**插件不该自己声明这些依赖**：声明了公共 npm 解析不到反而失败；依赖由挂载环境提供是设计。本地装 bundle 同样需官方 monorepo 构建产物 link 进 profile。
+
+## 1c. git 源装 bundle：pnpm ≥10 阻止 prepare 脚本（allowBuilds）
+
+`dsh plugin --profile web add git+https://...`（或 `github:owner/repo#<ref>`）安装 git 依赖时，pnpm ≥10 默认**阻止其 prepare（build）脚本执行**——dsh 的 `plugin` 命令失败时会提示把 pnpm 打印的 key 加入 profile 的 `pnpm-workspace.yaml` 的 `allowBuilds` 后重跑。两条出路：
+
+- **构建产物已入库**（`lib/` 提交进仓库，无 prepare 或 prepare 非必需）——不受影响，git 源直接可用；
+- **prepare 现场构建**——按 dsh 提示在 `$DSH_HOME/profiles/<name>/pnpm-workspace.yaml` 的 `allowBuilds` 白名单加入该依赖后重跑。
+
+安装说明应写清产物前提（见 [bundle-plugins.md](bundle-plugins.md)「安装与管理」）。
 
 ## 1b. bundle 插件的 patch 层语义
 

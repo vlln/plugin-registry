@@ -98,7 +98,7 @@ export default {
 
 ## 安装与验证
 
-`$DSH_HOME/config.yaml` 一行：
+`$DSH_HOME/cordis.patch.yml` 一行：
 
 ```yaml
 repository-plugins:

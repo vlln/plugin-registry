@@ -1,8 +1,8 @@
 # 安装与验证详情
 
-`$DSH_HOME/config.yaml` 一行安装。本文件是 SKILL.md 的深读材料，开发安装面时读取。
+两类插件各一条安装通道：repository 走 `$DSH_HOME/cordis.patch.yml`（config 行），bundle 走 `dsh plugin --profile web add`（pnpm 依赖）。本文件是 SKILL.md 的深读材料，开发安装面时读取。
 
-## 安装
+## Repository 插件安装
 
 ```yaml
 repository-plugins:
@@ -13,6 +13,19 @@ repository-plugins:
 - 分发 = GitHub 仓库本身（clone + pnpm prepare + prepack），无发布流程、无注册表。
 - 安装与启用分离——插件进入 config 才会挂载。
 
+## Bundle 插件安装
+
+```sh
+dsh plugin --profile web add <包路径>
+```
+
+`<包路径>` 必须是**可解析的 npm 包**（`dsh plugin add` 把参数转发给 pnpm，再按已安装状态把声明 `dsh.bundle` 的依赖加进 profile 的 bundle 层栈）：
+
+- **本地目录**：指向含 `package.json#dsh.bundle` 的 bundle 包目录（非仓库根），且构建产物在库（`lib/` 等已 build）
+- **git 源**（如 `git+https://github.com/owner/my-bundle.git#<commit>`、`github:owner/repo#<commit>`）：仓库根必须是完整 npm 包（`dsh.bundle` 在包根），且**构建产物已入库**——git 源不跑 build，缺产物挂载失败；仓库若有 `prepare` 脚本，pnpm ≥10 默认阻止其执行（dsh 会提示把 pnpm 打印的 key 加入 profile 的 `pnpm-workspace.yaml` `allowBuilds` 放行）
+
+写法细则与坑见 [bundle-plugins.md](bundle-plugins.md)；bundle 插件的 `dependencies` 声明为空是设计（官方包由 profile 的 pnpm 闭包注入，见 [gotchas.md](gotchas.md) 1）。
+
 ## 验证按改动面
 
 | 改动触达 | 验证 |
@@ -20,6 +33,8 @@ repository-plugins:
 | client/ 源码或构建 | 重建（`build-client.mjs`）+ 浏览器冒烟（headless Chrome dump-dom 断言 DOM marker 存在、无 "Failed to load plugins"） |
 | assets/ | 重装 + 刷新页面即可（路由按请求读磁盘，无需重启 web） |
 | index.mjs / src（Node half） | 门禁 + **重启 web**——ESM 缓存按 URL 永久缓存，已挂载插件改源码 disable/enable 不生效（同 URL 二次 import 返回旧模块） |
+
+bundle 插件同此表；额外确认挂载后 boot graph 含 bundle id、`/plugins/<id>/client.js` 200（若带 client half）。
 
 ## 挂载失败排查
 

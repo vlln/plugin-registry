@@ -1,4 +1,4 @@
-# Bundle 插件开发详情（dshClient 包）
+# Bundle 插件开发详情（dsh.client 包）
 
 官方两类插件之一。bundle = 随组合分发的产品服务（profile 驱动），与 repository 插件（用户独立安装，config 驱动）互补。选型与完整对比见 SKILL.md Step 0 形态表。本文件是 make-dsh-plugin 的自带参考（独立分发不依赖仓库 docs）。
 
@@ -11,12 +11,12 @@ bundle 插件是**独立 npm 包**（或包目录），声明 `dsh.bundle`：
   "name": "my-bundle",
   "version": "0.1.0",
   "dsh": { "bundle": { "patch": "./cordis.patch.yml" } },
-  "exports": { "./client": "./client/index.js" }  // dshClient 通道（可选）
+  "exports": { "./client": "./client/index.js" }  // dsh.client 通道（可选）
 }
 ```
 
 - **`dsh.bundle.patch`**：指向组合行声明（`cordis.patch.yml`——定义该 bundle 挂载哪些插件 id）
-- **`exports["./client"]`**：dshClient 通道（浏览器端 bundle 进 `__DSH_BOOT__`）——官方静态 client 通道
+- **`exports["./client"]`**：`dsh.client` 通道（浏览器端 bundle 进 `__DSH_BOOT__`）——官方静态 client 通道
 
 ## cordis.patch.yml（组合行声明）
 
@@ -50,11 +50,11 @@ bundle 插件是**独立 npm 包**（或包目录），声明 `dsh.bundle`：
   dsh plugin --profile web add ./packages/my-bundle   # bundle 包子目录，已构建
   ```
   ❌ 不要写仓库根（`dsh plugin --profile web add ./`）——根不是 npm 包，无 `dsh.bundle`。
-- **git 源**：官方经 npm git 依赖语法解析，**必须满足**：① 仓库内是完整 npm 包（`package.json#dsh.bundle` 在包根）；② **构建产物已入库**（git 源不跑 build，`lib/` 必须提交）——否则挂载时缺产物失败。
+- **git 源**：官方经 npm git 依赖语法解析（`git+https://github.com/owner/my-bundle.git#<commit>`、`github:owner/repo#<commit>`、`owner/repo` 等 pnpm 语法均可用），**必须满足**：① 仓库内是完整 npm 包（`package.json#dsh.bundle` 在包根）；② **构建产物已入库**（git 源不跑 build，`lib/` 必须提交）——否则挂载时缺产物失败；③ 仓库若有 `prepare` 脚本，pnpm ≥10 默认阻止其执行——dsh 会提示把 pnpm 打印的 key 加入 profile 的 `pnpm-workspace.yaml` `allowBuilds` 放行（已入库产物的 bundle 无 prepare 则不受影响）。
   ```sh
   dsh plugin --profile web add git+https://github.com/owner/my-bundle.git#<commit>
   ```
-  ❌ 不要写 `git+file://`（本地 file 协议非分发形态）或未构建的 git 源。
+  ❌ 不要写未构建的 git 源（缺产物挂载失败）；`git+file://` 本地可达但不是分发形态（对远端用户不可用），别写进安装说明。
 
 **写安装说明时**（README/skill 输出）：给出**用户能直接复制执行**的命令——本地路径写清 bundle 子目录与构建前提；git 源写清需构建产物入库。不要给「指向仓库根」或「臆造协议」的说明。
 

@@ -4,7 +4,7 @@ description: >
   当用户要为 DeepSeek Harness 开发官方 repository-plugin（0809 格式）插件时
   使用本 skill。引导形态选择（纯 skill 包 / MCP server / Node 工具 / 浏览器
   UI），然后搭建 `.dsh-plugin/` 包：package.json#dsh.entry（或 dsh.skills /
-  dsh.mcpServers）、Cordis entry、可选自渲染 client、prepack、config.yaml
+  dsh.mcpServers）、Cordis entry、可选自渲染 client、prepack、cordis.patch.yml
   安装。也覆盖开发规范（门禁、决策记录、验证纪律）。不是已移除的旧机制
   （dsh.plugin.json / dsh registry）。
 license: BSD-3-Clause
@@ -19,7 +19,7 @@ requires:
 # 创建官方 repository-plugin
 
 本 skill 构建 **repository-plugin**（0809 官方格式）：一个仓库（或子目录）
-本身即插件，经 `$DSH_HOME/config.yaml` 安装。**没有** manifest 协议、没有
+本身即插件，经 `$DSH_HOME/cordis.patch.yml` 安装。**没有** manifest 协议、没有
 `__ModuleLoader__`、没有 `dsh registry` CLI——旧机制已于 2026-08 移除。
 
 **权威契约内嵌在本 skill 的 `references/`**（entry + skill + MCP 在
@@ -44,10 +44,10 @@ requires:
 | MCP server | `.dsh-plugin/mcp/` + 声明 | `dsh.mcpServers` | Step 2（mcp） |
 | Node 工具 / 事件 / 服务 | Cordis entry + `defineTool` | `dsh.entry` | Step 3 |
 | Node + 浏览器 UI | entry + httpServer 路由 + 自渲染 client | `dsh.entry` | Step 4 |
-| Bundle（产品服务、dshClient UI） | npm 包 + `dsh.bundle` | `dsh.bundle` | 读 `references/bundle-plugins.md` |
+| Bundle（产品服务、dsh.client UI） | npm 包 + `dsh.bundle` | `dsh.bundle` | 读 `references/bundle-plugins.md` |
 
 插件可组合多面（如一个 skill 包 + 一个工具共存于一个 `.dsh-plugin`）。前四行是
-**repository 插件**（用户经 config.yaml 安装，本 skill 主路径——下方 Step 1-6）；
+**repository 插件**（用户经 cordis.patch.yml 安装，本 skill 主路径——下方 Step 1-6）；
 最后一行是 **bundle 插件**（随 profile 分发，安装/管理不同——见
 `references/bundle-plugins.md`）。
 
@@ -135,13 +135,13 @@ marker 且无 "Failed to load plugins"。
 
 ## Step 5：安装与验证
 
-经 `$DSH_HOME/config.yaml` 的 `repository-plugins.repositories` 安装
+经 `$DSH_HOME/cordis.patch.yml` 的 `repository-plugins.repositories` 安装
 （`github:owner/repo#<ref>&path:/.dsh-plugin`）。分发 = 仓库本身（clone +
 pnpm prepare + prepack），无发布流程。
 
 **写安装说明时必须给出用户可直接复制的命令**：
-- repository 插件：`config.yaml` 的 `repositories` 行（`github:owner/repo#<ref>&path:/.dsh-plugin`）——**这是唯一安装方式**；不要写 `dsh plugin add`（那是 bundle 通道）、`dsh registry`（已移除）、`git+file://`（臆造）或「复制目录」等不可用形式。
-- bundle 插件：`dsh plugin --profile web add <bundle 包路径>`——`<包路径>` 必须是**含 `dsh.bundle` 且构建产物在库**的 npm 包目录/git 源，见 `references/bundle-plugins.md`；不要指向仓库根或源码目录。
+- repository 插件：`cordis.patch.yml` 的 `repositories` 行（`github:owner/repo#<ref>&path:/.dsh-plugin`）——**这是唯一安装方式**；不要写 `dsh plugin add`（那是 bundle 通道）、`dsh registry`（已移除）或「复制目录」等不可用形式。
+- bundle 插件：`dsh plugin --profile web add <bundle 包路径>`——`<包路径>` 必须是**含 `dsh.bundle` 且构建产物在库**的 npm 包目录/git 源，见 `references/bundle-plugins.md`；git 源需产物入库（git 源不跑 build），仓库有 prepare 脚本时 pnpm ≥10 默认阻止（dsh 会提示 `allowBuilds` 放行）；不要指向仓库根或源码目录，不要写 `git+file://`（本地可达但非分发形态）。
 
 **读 `references/install-and-verify.md`** 获取按改动面的验证（哪些改动需
 重启 web vs 只刷新）与挂载失败排查。
@@ -153,11 +153,11 @@ pnpm prepare + prepack），无发布流程。
 **仓库 description**（一行：是什么 + 怎么装），具体模板：
 
 ```
-DSH 插件：<一句话功能>。官方 repository-plugin（.dsh-plugin 格式），config.yaml 安装：github:owner/repo#<ref>&path:/.dsh-plugin
+DSH 插件：<一句话功能>。官方 repository-plugin（.dsh-plugin 格式），cordis.patch.yml 安装：github:owner/repo#<ref>&path:/.dsh-plugin
 ```
 
 遵循形态 "DSH plugin: <what it does>; official repository-plugin format,
-install via config.yaml `<repo-ref>`"。双语可选（英文在前利于国际发现）。
+install via cordis.patch.yml `<repo-ref>`"。双语可选（英文在前利于国际发现）。
 
 **仓库 topics（GitHub 标签）**：打标签便于 `gh`/搜索/发现。**标签要描述插件实际做什么，而非只贴生态通用词**。两类组合：
 
@@ -183,10 +183,10 @@ install via config.yaml `<repo-ref>`"。双语可选（英文在前利于国际�
 - [ ] `package.json#dsh.entry` 指向 `.dsh-plugin/` 内；prepack 运行
   `dsh-plugin-prepare`
 - [ ] 门禁通过（`scripts/gates/run.mjs`）——仓库自带门禁
-- [ ] README 有安装（config.yaml 行含具体 ref）、使用、skill 表（Step 6
+- [ ] README 有安装（cordis.patch.yml 行含具体 ref）、使用、skill 表（Step 6
   规范）
 - [ ] 仓库 description + topics 已设置（见上）
-- [ ] 安装冒烟：新 `config.yaml` 行 → 挂载 → boot log 干净
+- [ ] 安装冒烟：新 `cordis.patch.yml` 行 → 挂载 → boot log 干净
 
 无需 release 资产——仓库即插件（clone + prepare + prepack）。若要版本化
 ref，给提交打 tag 并把 README 的 config 行指向该 tag 的 commit 哈希。
@@ -273,7 +273,7 @@ repository 插件——已装 `.dsh-plugin` 包的插件管理 UI（README 模�
 - **官方包未发布到公共 npm**：`@deepseek-ai/dsh-tools` 等未发布——本地
   `npm install` 失败。分发由官方环境解析（github: 源）；本地验证需
   symlink 至 monorepo 构建产物或 mock registry。不要改依赖。bundle 插件
-  （dshClient）同坑但**不声明依赖**——profile 的 pnpm 闭包挂载时注入；
+  （dsh.client）同坑但**不声明依赖**——profile 的 pnpm 闭包挂载时注入；
   声明了反而失败。
 - **安装与启用分离**——插件进入 config 并挂载才执行；boot log 干净才算
   验证。
@@ -293,7 +293,7 @@ repository 插件——已装 `.dsh-plugin` 包的插件管理 UI（README 模�
 - 本 skill 内嵌契约：
   - `references/entry-contract.md` — repository 插件：布局、dsh 字段
     （entry/skills/mcpServers）、Cordis entry、自渲染 client、安装、开发规范
-  - `references/bundle-plugins.md` — bundle 插件（dshClient）开发
+  - `references/bundle-plugins.md` — bundle 插件（dsh.client）开发
   - `references/install-and-verify.md` — 按改动面验证
   - `references/gotchas.md` — 坑（官方包未发布、ESM 缓存、宿主 CSS 覆盖）
   - `references/dev-conventions.md` — 门禁、决策记录
