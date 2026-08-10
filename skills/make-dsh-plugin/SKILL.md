@@ -25,9 +25,12 @@ subdirectory) that is itself a plugin, installed via `$DSH_HOME/config.yaml`.
 There is **no** manifest protocol, no `__ModuleLoader__`, no `dsh registry`
 CLI — legacy mechanisms removed 2026-08.
 
-**Authoritative contract**: `docs/cookbook/creating-a-repository-plugin.md` in
-this repo. Reference implementation: `whale-girl` (GUI pet plugin). Read the
-references below when you reach the relevant stage.
+**Authoritative contracts are self-contained in this skill's `references/`**
+(entry + skill + MCP in `entry-contract.md`, bundle in `bundle-plugins.md`,
+verification in `install-and-verify.md`, conventions in `dev-conventions.md`,
+gotchas in `gotchas.md`) — no repo docs needed to develop. Reference
+implementation: `whale-girl` (GUI pet plugin). Read the references below when
+you reach the relevant stage.
 
 ## When to use
 
@@ -47,9 +50,13 @@ exactly one of these capability faces:
 | MCP server | `.dsh-plugin/mcp/` + declaration | `dsh.mcpServers` | Step 2 (mcp) |
 | Node tools / events / services | Cordis entry + `defineTool` | `dsh.entry` | Step 3 |
 | Node + browser UI | entry + httpServer route + self-rendering client | `dsh.entry` | Step 4 |
+| Bundle (product service, dshClient UI) | npm package + `dsh.bundle` | `dsh.bundle` | read `references/bundle-plugins.md` |
 
 Combine faces when the plugin ships several (e.g. a skill pack + a tool both
-fit one `.dsh-plugin`).
+fit one `.dsh-plugin`). The first four rows are **repository plugins** (user
+installs via config.yaml, this skill's main path — Steps 1-6 below); the last
+row is a **bundle plugin** (ships with a profile, different install/manage —
+see `references/bundle-plugins.md`).
 
 ## Step 1: Repo layout
 
@@ -70,16 +77,48 @@ my-plugin/
 
 ## Step 2: `package.json` + capability face
 
-Follow the cookbook template. Key decisions:
+Follow the template in `references/entry-contract.md`. Key decisions:
 
 - `dsh` field: `skills` / `mcpServers` / `entry` (strict, official schema).
   No `contributes` — tools register inside the entry via `defineTool`.
 - `scripts.prepack` **must** call `dsh-plugin-prepare` (devDep
   `@deepseek-ai/dsh-repository-plugin`) — never hand-write generated
   `dsh-plugin.mjs` / `dsh-plugin-assets/`.
-- **Skill pack**: put `SKILL.md` files under `.dsh-plugin/skills/` and declare
-  `dsh.skills` (paths relative to `.dsh-plugin/`).
-- **MCP server**: declare `dsh.mcpServers` with the server config.
+
+### Skill pack (`dsh.skills`)
+
+Put `SKILL.md` files under `.dsh-plugin/skills/<name>/` and declare the list
+in `dsh.skills` (paths relative to `.dsh-plugin/`):
+
+```json
+"dsh": { "skills": ["./skills/foo/SKILL.md", "./skills/bar/SKILL.md"] }
+```
+
+**Writing the SKILL.md** — follow the make-skill spec (authoritative
+template): frontmatter (`name` 1-64 lowercase-hyphen, `description` imperative
+"Use this skill when...", optional `metadata`/`requires`) + body structure
+(Tool Wrapper / Generator / Reviewer / Inversion / Pipeline patterns), keep
+under 500 lines, progressive disclosure to `references/` for detail. Each
+skill has one `SKILL.md`; the repo README lists them in a table (Step 6).
+`make-skill` is the reference for how to author agent skills — do not invent
+a competing format.
+
+### MCP server (`dsh.mcpServers`)
+
+Declare MCP servers in `dsh.mcpServers` (official schema). The standard MCP
+shape is a map of server id → launch config:
+
+```json
+"dsh": { "mcpServers": {
+  "my-server": { "command": "node", "args": ["./mcp/my-server.js"], "env": {} }
+} }
+```
+
+The server is a stdio MCP server (JSON-RPC over stdin/stdout). Exact schema
+fields (`command`/`args`/`env`, allowed transports) are official-format
+details — verify against the current official spec before shipping; the
+server-side logic lives in `.dsh-plugin/mcp/`. The repo README lists MCP
+servers in a table (Step 6).
 
 **Read `references/entry-contract.md`** for the full `dsh.entry` contract when
 you reach Step 3/4.
@@ -213,8 +252,14 @@ order, schema-DSL timing, environment facts).
 
 ## Reference
 
-- Cookbook (authoritative contract):
-  `docs/cookbook/creating-a-repository-plugin.md`
-- Official format decision & proof: `docs/official-0809-coverage.md`
-- Reference implementation: `whale-girl`
-- Console package: `packages/plugin/console`
+- Self-contained contracts in this skill:
+  - `references/entry-contract.md` — repository plugin: layout, dsh field
+    (entry/skills/mcpServers), Cordis entry, self-rendering client, install,
+    dev conventions
+  - `references/bundle-plugins.md` — bundle plugin (dshClient) development
+  - `references/install-and-verify.md` — per-change-surface verification
+  - `references/gotchas.md` — pitfalls (unpublished official packages, ESM
+    cache, host CSS override)
+  - `references/dev-conventions.md` — gates, decision records
+- Reference implementation: `whale-girl` (repository plugin with UI)
+- Bundle references: `dsh-loop`, `dsh-task-status`, `packages/plugin/console`

@@ -1,6 +1,6 @@
 # 开发踩过的坑（Gotchas）
 
-领域特定事实，违反合理假设——**先读本文再动手**。每条都是 whale-girl 等插件开发实测踩过并修复的（决策记录可溯）。权威：`docs/cookbook/creating-a-repository-plugin.md`；本文件是 SKILL.md 的深读材料。
+领域特定事实，违反合理假设——**先读本文再动手**。每条都是 whale-girl 等插件开发实测踩过并修复的（决策记录可溯）。本文件是 SKILL.md 的深读材料。
 
 ## 1. 官方包未发布到公共 npm
 

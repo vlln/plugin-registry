@@ -1,6 +1,6 @@
 # 安装与验证详情
 
-`$DSH_HOME/config.yaml` 一行安装。权威：`docs/cookbook/creating-a-repository-plugin.md`；本文件是 SKILL.md 的深读材料，开发安装面时读取。
+`$DSH_HOME/config.yaml` 一行安装。本文件是 SKILL.md 的深读材料，开发安装面时读取。
 
 ## 安装
 
