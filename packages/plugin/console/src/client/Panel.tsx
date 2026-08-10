@@ -53,7 +53,9 @@ const rowCardStyle: React.CSSProperties = {
   border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 12,
   padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10,
 }
-const rowHeadStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10 }
+// 行高统一：Pill 高 24、Button sm 高 28——用户行（有按钮）与官方行
+// （仅 Pill）高度不同导致边框不一致，minHeight 对齐最高元素。
+const rowHeadStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, minHeight: 28 }
 const identityStyle: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1,
 }
