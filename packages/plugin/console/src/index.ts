@@ -7,7 +7,7 @@
  * HMR-watched 的 home 级用户 patch 层。
  */
 import { readFileSync, writeFileSync } from 'node:fs'
-import { execFile } from 'node:child_process'
+import { execFile, spawnSync } from 'node:child_process'
 import { join } from 'node:path'
 import type { Context } from 'cordis'
 
@@ -231,6 +231,99 @@ interface UpdateCheckRow {
   error?: string
 }
 
+/** 当前 profile 目录（bundle 安装/更新的 pnpm 工作目录）。 */
+function profileWebDir(): string {
+  return join(resolveDshHome(), 'profiles', 'web')
+}
+
+/** 读 profile 清单（package.json）。 */
+function readProfileManifest(): { dependencies?: Record<string, string>; dsh?: { profile?: { bundles?: string[] } } } {
+  try {
+    return JSON.parse(readFileSync(join(profileWebDir(), 'package.json'), 'utf8')) as Record<string, unknown>
+  } catch {
+    return {}
+  }
+}
+
+/** 写回 profile 清单。 */
+function writeProfileManifest(manifest: unknown): void {
+  writeFileSync(join(profileWebDir(), 'package.json'), `${JSON.stringify(manifest, undefined, 2)}\n`)
+}
+
+/** 已安装包是否声明 dsh.bundle（profile 层候选）。 */
+function exportsBundlePatch(packageName: string): boolean {
+  try {
+    const manifest = JSON.parse(readFileSync(join(profileWebDir(), 'node_modules', packageName, 'package.json'), 'utf8')) as {
+      dsh?: { bundle?: { patch?: unknown } }
+    }
+    return manifest.dsh?.bundle?.patch !== undefined
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 复刻官方 dsh plugin 的 reconcile：按已安装状态把声明 dsh.bundle 的依赖
+ * 加入 `dsh.profile.bundles` 层栈；已从依赖移除或失去声明的包离开层栈。
+ * @returns 新增的层（调用方用于回显）。
+ */
+function reconcileBundles(added: string[]): string[] {
+  const before = readProfileManifest() as {
+    dependencies?: Record<string, string>
+    dsh?: { profile?: { bundles?: string[] } }
+  }
+  const beforeDeps = new Set(Object.keys(before.dependencies ?? {}))
+  const manifest = readProfileManifest() as {
+    dependencies?: Record<string, string>
+    dsh?: { profile?: { bundles?: string[] } }
+  }
+  const dependencies = Object.keys(manifest.dependencies ?? {})
+  const dependencySet = new Set(dependencies)
+  const bundles = manifest.dsh?.profile?.bundles ?? []
+  const joined: string[] = []
+  for (const packageName of dependencies) {
+    if (exportsBundlePatch(packageName) && !bundles.includes(packageName)) {
+      bundles.push(packageName)
+      if (!added.includes(packageName)) added.push(packageName)
+      joined.push(packageName)
+    }
+  }
+  // 移除路径（对齐官方）：只有「曾是依赖或现在是依赖」的层才可能被移除；
+  // 模板 bundle（dsh-base 等，非依赖）永不触碰——曾因漏掉该保护误删
+  // 模板层导致 web 组合缺 webserver 行（已实证）。
+  const removed: string[] = []
+  for (const packageName of [...bundles]) {
+    const wasDependency = beforeDeps.has(packageName) || dependencySet.has(packageName)
+    const stillBundle = dependencySet.has(packageName) && exportsBundlePatch(packageName)
+    if (wasDependency && !stillBundle) {
+      bundles.splice(bundles.indexOf(packageName), 1)
+      removed.push(packageName)
+    }
+  }
+  if (joined.length === 0 && removed.length === 0) return []
+  manifest.dsh = { ...manifest.dsh, profile: { ...manifest.dsh?.profile, bundles } }
+  writeProfileManifest(manifest)
+  console.log(`[plugin-console] reconciled bundles: +${joined.join(', ') || 'none'} -${removed.join(', ') || 'none'}`)
+  return joined
+}
+
+/**
+ * bundle 安装/更新：在 profile 目录跑 pnpm add/update，然后 reconcile 层栈。
+ * 与官方 `dsh plugin <sub>`（pnpm forwarder + reconcile）同机制。
+ * @param args - pnpm 子命令参数（add <source> 或 update <name>）。
+ * @returns {names, output} 新增层名与 pnpm 输出（失败时 output 为错误信息）。
+ */
+function runPnpm(args: string[]): { ok: boolean; names: string[]; output: string } {
+  const dir = profileWebDir()
+  const result = spawnSync('pnpm', args, { cwd: dir, encoding: 'utf8', timeout: 120_000 })
+  const output = (result.stdout ?? '') + (result.stderr ?? '')
+  if (result.status !== 0) {
+    return { ok: false, names: [], output: output.slice(-1000) }
+  }
+  const names = reconcileBundles([])
+  return { ok: true, names, output: output.slice(-500) }
+}
+
 /** 检查全部已配置源的远端状态。 */
 async function checkUpdates(sources: string[]): Promise<UpdateCheckRow[]> {
   const rows: UpdateCheckRow[] = []
@@ -438,6 +531,50 @@ export function apply(ctx: ConsoleCtx): void {
                   // 持久化：写 profile patch（重启后仍保持）。
                   writeUiPluginDisabled(id, disabled)
                   json(200, { ok: true, id, disabled, runtime: true, persisted: true })
+                } catch (error) {
+                  json(500, { ok: false, message: error instanceof Error ? error.message : String(error) })
+                }
+              })()
+            })
+            return
+          }
+          // bundle 插件安装/更新（POST /bundles，body {action: 'install'|'update', source?|name?}）
+          if (method === 'POST' && (path === '/api/plugin-console/bundles' || path === '/api/plugin-console/bundles/')) {
+            let body = ''
+            ;(req as { on?: (e: string, cb: (c: Buffer) => void) => void })?.on?.('data', (c: Buffer) => { body += c.toString('utf8') })
+            ;(req as { on?: (e: string, cb: () => void) => void })?.on?.('end', () => {
+              void (async () => {
+                try {
+                  const parsed = JSON.parse(body) as { action?: string; source?: string; name?: string }
+                  if (parsed.action === 'install') {
+                    const source = (parsed.source ?? '').trim()
+                    if (source.length === 0) {
+                      json(400, { ok: false, message: 'install needs a source' })
+                      return
+                    }
+                    const result = runPnpm(['add', source])
+                    if (!result.ok) {
+                      json(502, { ok: false, message: `pnpm add failed: ${result.output}` })
+                      return
+                    }
+                    json(200, { ok: true, action: 'install', names: result.names, needsRestart: true })
+                    return
+                  }
+                  if (parsed.action === 'update') {
+                    const name = (parsed.name ?? '').trim()
+                    if (name.length === 0) {
+                      json(400, { ok: false, message: 'update needs a package name' })
+                      return
+                    }
+                    const result = runPnpm(['update', name])
+                    if (!result.ok) {
+                      json(502, { ok: false, message: `pnpm update failed: ${result.output}` })
+                      return
+                    }
+                    json(200, { ok: true, action: 'update', name, names: result.names, needsRestart: true })
+                    return
+                  }
+                  json(400, { ok: false, message: 'action must be install or update' })
                 } catch (error) {
                   json(500, { ok: false, message: error instanceof Error ? error.message : String(error) })
                 }

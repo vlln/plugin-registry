@@ -87,6 +87,9 @@ export function ConsolePanel(): React.ReactNode {
   const [loading, setLoading] = useState(true)
   const [updates, setUpdates] = useState<UpdateRow[] | undefined>(undefined)
   const [checking, setChecking] = useState(false)
+  const [bundleInput, setBundleInput] = useState('')
+  const [bundleBusy, setBundleBusy] = useState(false)
+  const [bundleMsg, setBundleMsg] = useState<string | undefined>(undefined)
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -195,6 +198,51 @@ export function ConsolePanel(): React.ReactNode {
     void save(state.repositories.filter(r => r !== id))
   }, [state.repositories, save])
 
+  /** bundle 安装（profile 目录 pnpm add + reconcile 层栈）。 */
+  const installBundle = useCallback(async (): Promise<void> => {
+    const source = bundleInput.trim()
+    if (source.length === 0) return
+    setBundleBusy(true)
+    setBundleMsg(undefined)
+    setError(undefined)
+    try {
+      const response = await fetch('/api/plugin-console/bundles', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'install', source }),
+      })
+      const body = (await response.json()) as { ok?: boolean; names?: string[]; message?: string }
+      if (body.ok !== true) throw new Error(body.message ?? 'install failed')
+      setBundleMsg(`已安装并加入层栈：${(body.names ?? []).join(', ') || source}（重启 web 生效）`)
+      setBundleInput('')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught))
+    } finally {
+      setBundleBusy(false)
+    }
+  }, [bundleInput])
+
+  /** bundle 更新（pnpm update <name>，拉取最新版本）。 */
+  const updateBundle = useCallback(async (name: string): Promise<void> => {
+    setBundleBusy(true)
+    setBundleMsg(undefined)
+    setError(undefined)
+    try {
+      const response = await fetch('/api/plugin-console/bundles', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'update', name }),
+      })
+      const body = (await response.json()) as { ok?: boolean; message?: string }
+      if (body.ok !== true) throw new Error(body.message ?? 'update failed')
+      setBundleMsg(`${name} 已更新（重启 web 生效）`)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught))
+    } finally {
+      setBundleBusy(false)
+    }
+  }, [])
+
   useEffect(() => { void refresh() }, [refresh])
 
   if (loading) return <p style={{ color: 'var(--dsw-alias-label-tertiary)' }}>加载中…</p>
@@ -227,11 +275,32 @@ export function ConsolePanel(): React.ReactNode {
             <span style={rowTitleStyle}>{plugin.name}</span>
             {official.includes(plugin) ? <Pill>内置</Pill> : null}
             <Pill active={!plugin.disabled}>{plugin.disabled ? '已停用' : '运行中'}</Pill>
+            {!official.includes(plugin) ? (
+              <Button size="sm" variant="ghost" disabled={busy || bundleBusy} onClick={() => { void updateBundle(plugin.name) }}>更新</Button>
+            ) : null}
             <Button size="sm" disabled={busy} onClick={() => { void togglePlugin(plugin.id, !plugin.disabled) }}>
               {plugin.disabled ? '启用' : '停用'}
             </Button>
           </div>
         ))}
+      </section>
+
+      <section>
+        <h3 style={sectionTitleStyle}>安装 bundle 插件</h3>
+        <p style={hintStyle}>pnpm add 到 profile 并加入层栈；安装/更新后重启 web 生效。</p>
+        {bundleMsg !== undefined ? <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--dsw-alias-success, #1a7f37)' }}>{bundleMsg}</p> : null}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Input
+            style={{ flex: 1 }}
+            value={bundleInput}
+            placeholder="git+file:///path/to/plugin 或 registry 包名"
+            onChange={(e) => { setBundleInput(e.target.value) }}
+            aria-label="bundle 插件源"
+          />
+          <Button size="sm" disabled={busy || bundleBusy} onClick={() => { void installBundle() }}>
+            {bundleBusy ? '安装中…' : '安装'}
+          </Button>
+        </div>
       </section>
 
       <section>
