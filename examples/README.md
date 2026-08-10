@@ -2,9 +2,9 @@
 
 本目录不含插件代码——插件是独立仓库/包，本页示例**如何安装**它们。两种官方安装路径 + 管理面板，覆盖 [loop](https://github.com/dsh-external/dsh-loop)、[task-status](https://github.com/dsh-external/dsh-task-status)、[whale-girl](https://github.com/dsh-external/whale-girl) 等现有插件。
 
-## 路径一：bundle 插件（dshClient 包）
+## 路径一：bundle 插件（dsh.client 包）
 
-loop / task-status / navbar 等 UI 插件是 bundle 形态（`dsh.bundle` + patch），经官方 profile 管理：
+loop / task-status / navbar 等 UI 插件是 bundle 形态（`dsh.bundle` + `dsh.client`），经官方 profile 管理：
 
 ```sh
 dsh plugin --profile web add <插件仓库或包路径>   # 挂载进当前 profile 的 bundle 层
@@ -20,7 +20,7 @@ dsh web    # 重启后设置页/对话页出现插件效果
 
 ## 路径二：repository 插件（.dsh-plugin）
 
-whale-girl 等无 UI 或自渲染 UI 的插件是 repository 形态，经 `$DSH_HOME/config.yaml` 安装：
+whale-girl 等无 UI 或自渲染 UI 的插件是 repository 形态，经 `$DSH_HOME/cordis.patch.yml` 安装：
 
 ```yaml
 repository-plugins:

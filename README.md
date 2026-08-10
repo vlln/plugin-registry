@@ -29,8 +29,8 @@ DeepSeek Harness 官方机制管「插件是什么、怎么跑」；本仓库补
 ```
 官方 DSH（DeepSeek Harness）     插件运行时 + 仓库插件机制（.dsh-plugin 格式 + config 安装）
    │
-   ├── 官方插件（bundle）        loop / task-status / navbar 等——随组合分发，`dsh plugin add` 装进 profile
-   ├── 第三方插件（repository）  whale-girl 等——独立 GitHub 仓库，`config.yaml` 安装
+   ├── 官方插件（bundle）        loop / task-status / navbar 等——随组合分发，`dsh plugin --profile web add` 装进 profile
+   ├── 第三方插件（repository）  whale-girl 等——独立 GitHub 仓库，`cordis.patch.yml` 安装
    │
    └── 本仓库（plugin-registry） ① 薄控制台：管理上述两类插件的浏览器面板
                                 ② make-dsh-plugin skill + cookbook：引导开发第三方插件
@@ -59,7 +59,7 @@ dsh plugin --profile web add <plugin-registry 绝对路径>/packages/plugin/cons
 
 | Skill | 作用 |
 |---|---|
-| [make-dsh-plugin](skills/make-dsh-plugin/SKILL.md) | 创建官方 repository-plugin（0809 格式）：先选形态（skill 包 / MCP / Node 工具 / 带 UI）→ 搭建 `.dsh-plugin/` → prepack → config.yaml 安装 → 验证纪律。详情分置 `references/`（entry 契约 / 安装验证 / 开发规范 / 踩坑清单）；完整契约见 [cookbook](docs/cookbook/creating-a-repository-plugin.md)，参考实现 `whale-girl` |
+| [make-dsh-plugin](skills/make-dsh-plugin/SKILL.md) | 创建官方 repository-plugin（0809 格式）：先选形态（skill 包 / MCP / Node 工具 / 带 UI）→ 搭建 `.dsh-plugin/` → prepack → cordis.patch.yml 安装 → 验证纪律。详情分置 `references/`（entry 契约 / 安装验证 / 开发规范 / 踩坑清单）；完整契约见 [cookbook](docs/cookbook/creating-a-repository-plugin.md)，参考实现 `whale-girl` |
 
 ## 开发前须知（踩过的坑）
 
@@ -75,7 +75,7 @@ plugin-registry 旧机制（`dsh.plugin.json` / `dsh registry` / `__ModuleLoader
 
 | 旧插件现状 | 迁移到 | 方式 |
 |---|---|---|
-| 已有官方 npm 包 + 增量清单（distill/dsh-vision 等） | **bundle 插件** | 删 `dsh.plugin.json`，声明 `dsh.bundle`，`dsh plugin add` 安装 |
+| 已有官方 npm 包 + 增量清单（distill/dsh-vision 等） | **bundle 插件** | 删 `dsh.plugin.json`，声明 `dsh.bundle`，`dsh plugin --profile web add` 安装 |
 | 纯旧机制（自造 client half） | **repository 插件** | `.dsh-plugin/` + `dsh.entry`，client 改自渲染（whale-girl 范本） |
 
 完整迁移指南（方向判断/分面迁移/执行步骤）见 [cookbook/migrating-legacy-plugins](docs/cookbook/migrating-legacy-plugins.md)。
@@ -86,8 +86,7 @@ plugin-registry 旧机制（`dsh.plugin.json` / `dsh registry` / `__ModuleLoader
 - [插件类型对比](docs/plugin-types.md) — repository 插件 vs bundle 插件：开发/分发/安装/管理四维 + 选型
 - [官方 0809 覆盖度评估](docs/official-0809-coverage.md) — 官方机制覆盖度、UI 自渲染实证、转向决策
 - [薄控制台设计](docs/console-ui-plugin-management.md) — 统一管理两类插件的设计
-- [架构](docs/architecture.md) — 两层插件模型的系统地图
-- 历史机制文档（已转向，仅存档）：[创建插件（旧）](docs/cookbook/creating-a-plugin.md)、[清单格式（旧）](docs/manifest-format.md)、[0805→0806 迁移](docs/migrating-to-0806.md) 等
+- 历史机制文档（已转向，仅存档）：[架构（旧）](docs/architecture.md)、[创建插件（旧）](docs/cookbook/creating-a-plugin.md)、[清单格式（旧）](docs/manifest-format.md)、[0805→0806 迁移](docs/migrating-to-0806.md) 等
 - [变更记录](CHANGELOG.md) / [路线图](ROADMAP.md)
 
 ## 版权

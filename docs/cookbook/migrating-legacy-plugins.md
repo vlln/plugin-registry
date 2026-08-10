@@ -13,7 +13,7 @@
 ## 方向一：bundle 插件（已有官方包）
 
 1. **删增量清单**：移除 `dsh.plugin.json`（`id`/`contributes` 声明面在官方格式不存在——工具由 entry 内 `defineTool` 注册）
-2. **声明 bundle**：`package.json#dsh.bundle`（`patch` 指向组合行 `cordis.patch.yml`），`dshClient` 声明 `exports["./client"]`
+2. **声明 bundle**：`package.json#dsh.bundle`（`patch` 指向组合行 `cordis.patch.yml`），`dsh.client` 声明 `exports["./client"]`
 3. **安装**：`dsh plugin --profile web add <包路径>`（bundle 进 profile 的 pnpm 闭包）
 4. **管理**：薄控制台 UI 插件区（profile 层 `disabled` 标记）
 
@@ -26,7 +26,7 @@
 | **Node half** | `index.mjs`（Cordis）+ `dsh.plugin.json`（contributes 声明） | 移入 `.dsh-plugin/`，`entry.mjs` re-export；删 `dsh.plugin.json`/contributes（工具由 entry 内 `defineTool` 注册） | 低（几乎零改动） |
 | **client** | `__ModuleLoader__.load({id, factory})` 挂载 | **自执行 DOM 渲染**：去掉 load 契约，entry 注册 httpServer 路由（`GET /<id>/ui.js`）+ assets 路由 | 中（最大迁移点） |
 | **页面注入** | registry patch 注入 | entry 自造（httpServer 向宿主页注入 `<script>` 或配置 hole） | 低（唯一不确定面，0809 已实证） |
-| **安装** | `dsh registry install/enable` | `$DSH_HOME/config.yaml` `repository-plugins.repositories` 一行 | 低 |
+| **安装** | `dsh registry install/enable` | `$DSH_HOME/cordis.patch.yml` `repository-plugins.repositories` 一行 | 低 |
 | **收尾** | `dsh.plugin.json`/`index.json`/`verify-contributes` 门禁 | 全删；门禁/单测/冒烟回归 | 低 |
 
 ### 执行步骤（每步可独立验证）

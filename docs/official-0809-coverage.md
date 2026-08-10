@@ -1,6 +1,6 @@
 # 评估：官方 0809 覆盖度 vs plugin-registry
 
-状态：**决策依据**（待拍板转向/归档）。目的：以官方 0809 快照（`snapshot-20260809T140917Z-a6bb5a95ba`）的插件机制为基准，逐能力评估 plugin-registry 是否还有存在必要，作为路线转向/归档的依据。本文只讨论 plugin-registry 与官方的关系；dsh-mygo 等第三方方案不在范围内。
+状态：**已决策（2026-08-10 拍板转向「薄控制台」）**。本文为转向前的覆盖度评估记录。目的：以官方 0809 快照（`snapshot-20260809T140917Z-a6bb5a95ba`）的插件机制为基准，逐能力评估 plugin-registry 是否还有存在必要，作为路线转向/归档的依据。本文只讨论 plugin-registry 与官方的关系；dsh-mygo 等第三方方案不在范围内。
 
 ## 背景：官方 0809 引入了仓库插件格式
 
@@ -14,9 +14,9 @@
 
 官方 0809 的 `dsh plugin` 命令仍是 **profile/bundle 组合管理**（pnpm forwarder + `dsh.profile.bundles` 层栈），与仓库插件通道并存：通道 1（`$DSH_HOME/cordis.patch.yml`）服务「独立用户装仓库插件」，通道 2（bundle）服务「组合里的产品服务」。
 
-### 用户配置层：config.yaml → cordis.patch.yml（官方演进）
+### 用户配置层：cordis.patch.yml → cordis.patch.yml（官方演进）
 
-官方 0805 的 profile-plugin-bundles 架构决策**弃用 `$DSH_HOME/config.yaml`**（原文：`$DSH_HOME/config.yaml is simply no longer read`），个人 overlay 机制从 `loadPersonalPatches` + `config.yaml` 改为 `loadOptionalPatches` + `watchUserPatches` 读取 `cordis.patch.yml` 两层：
+官方 0805 的 profile-plugin-bundles 架构决策**弃用 `$DSH_HOME/cordis.patch.yml`**（原文：`$DSH_HOME/cordis.patch.yml is simply no longer read`），个人 overlay 机制从 `loadPersonalPatches` + `cordis.patch.yml` 改为 `loadOptionalPatches` + `watchUserPatches` 读取 `cordis.patch.yml` 两层：
 
 | 层 | 文件 | 属主 | 用途 |
 |---|---|---|---|
@@ -24,7 +24,7 @@
 | profile 层 | `$DSH_HOME/profiles/<name>/cordis.patch.yml` | 用户（每 profile） | 覆盖该 profile |
 | **home 层** | **`$DSH_HOME/cordis.patch.yml`** | **用户（机器级）** | **跨 profile 个人偏好——repository 插件装这里（`homePatchPath()`）** |
 
-同名 `cordis.patch.yml` 出现在三个层，属主不同；薄控制台的读/写目标是 **home 层**（机器级用户配置），不是 profile 层（只覆盖单 profile），更不是 bundle 包内层（产品层，不该动）。07-30 的 config-only 决策笔记仍写 `config.yaml` 是过时表述，以 08-05 的 profile-plugin-bundles 为准。
+同名 `cordis.patch.yml` 出现在三个层，属主不同；薄控制台的读/写目标是 **home 层**（机器级用户配置），不是 profile 层（只覆盖单 profile），更不是 bundle 包内层（产品层，不该动）。07-30 的 config-only 决策笔记仍写 `cordis.patch.yml` 是过时表述，以 08-05 的 profile-plugin-bundles 为准。
 
 ## 覆盖度评估（逐能力）
 
@@ -44,7 +44,7 @@
 
 - 带 UI 的 `.dsh-plugin` 包用 `dsh.entry` 注入 `httpServer` 注册路由，浏览器 fetch 渲染——**完整官方链路，无任何 client-half 机制**
 - 实测（纯净 0809 worktree，`/tmp/dsh-0809-pure`）：tsdown 编译 entry → `dsh-plugin-prepare` 生成 wrapper → `RepositoryCache` 安装 → `loadPreparedRepository` 挂载 → entry 激活（fiber ACTIVE）→ 注册 `/api/ui-verify` 路由 → 真实 HTTP GET 返回 `200 {"ok":true,"source":"repository-plugin-entry","ui":"<div data-ui-verify>..."}`
-- 结论：**支持浏览器 UI ≠ 需要 client half**。UI 插件可经官方 entry 自渲染（路径：httpServer 路由 + 浏览器 fetch/iframe/DOM），或经官方 `dshClient` 包 + Loader 树静态加载。registry 的 `registerExternal`（client half 动态登记）只对「坚持官方 dshClient 格式 + 想运行时动态进出官方 `__DSH_BOOT__`」的窄场景有价值——官方静态通道可替代
+- 结论：**支持浏览器 UI ≠ 需要 client half**。UI 插件可经官方 entry 自渲染（路径：httpServer 路由 + 浏览器 fetch/iframe/DOM），或经官方 `dsh.client` 包 + Loader 树静态加载。registry 的 `registerExternal`（client half 动态登记）只对「坚持官方 dsh.client 格式 + 想运行时动态进出官方 `__DSH_BOOT__`」的窄场景有价值——官方静态通道可替代
 
 ## 剩余价值评估
 
@@ -62,7 +62,7 @@
 ## 转向/归档建议
 
 1. **打包/安装/分发**：全面靠拢官方 `.dsh-plugin` + `cordis.patch.yml`，registry 不再自造格式与命令
-2. **管理面**：保留一个「浏览/启停已装 .dsh-plugin 包」的控制台（且其自身应为官方 dshClient 格式的普通插件）
+2. **管理面**：保留一个「浏览/启停已装 .dsh-plugin 包」的控制台（且其自身应为官方 dsh.client 格式的普通插件）
 3. **client half**：`registerExternal` 降级为可选补充缝（官方静态通道可替代，不优先投入）
 4. **patch 瘦身**：既有 49→26 瘦身自然收尾，不再投入新机制
 5. **归档候选**：若控制台价值不成立（官方后续补 UI），整个仓库转为归档状态
@@ -70,7 +70,7 @@
 ## 决策（2026-08-10 拍板，转向「薄控制台」）
 
 - ✅ **控制台保留，形态 = 写 config 触发重载**：薄控制台读官方 `$DSH_HOME/cordis.patch.yml` 的 `repository-plugins.repositories`，写操作直接编辑该列表 → 官方 HMR watcher 事务性换代生效。控制台需要写文件能力（经官方 entry 注入 httpServer 的自建路由，或官方配置写入面）
-- ✅ **`registerExternal` 完全移除**：依赖官方静态 dshClient 通道，不保留可选缝
+- ✅ **`registerExternal` 完全移除**：依赖官方静态 dsh.client 通道，不保留可选缝
 - ✅ **patch 倾向删除**：转向后不再维护 0808/0809 patch，机制件冻结或删除
 
 ## 转向「薄控制台」——spike 验证（2026-08-10）
@@ -82,10 +82,10 @@
 | entry 经 httpServer 自渲染 UI | ✅ 真实 HTTP 200 返回 UI 数据（`/tmp/dsh-0809-pure` 实证） |
 | 写 `$DSH_HOME/cordis.patch.yml` → 官方消费 repository 行 | ✅ 启动加载 → 官方 repository-plugin git 准备插件（web4/web6 实证） |
 | 运行中写 config → 即时 HMR 换代 | ❌ **0809 web 默认 hmr disabled**（web-app bundle 显式 `hmr: disabled: true`，官方 TODO「Re-enable shared HMR for Web after its reload lifecycle is tested」）——watcher 未注册 |
-| 0 patch 可行性 | ✅ 全部官方机制（config 文件 + repository-plugin + dshClient 面板） |
+| 0 patch 可行性 | ✅ 全部官方机制（config 文件 + repository-plugin + dsh.client 面板） |
 
 **关键发现（影响形态）**：
-- **写入目标 = `$DSH_HOME/cordis.patch.yml`**（home 级用户 patch 层，`homePatchPath()`）——07-30 决策笔记所称 `config.yaml` 已被 08-05 的 profile-plugin-bundles 取代，官方实现只读 `cordis.patch.yml`（web4/web6 实证）
+- **写入目标 = `$DSH_HOME/cordis.patch.yml`**（home 级用户 patch 层，`homePatchPath()`）——07-30 决策笔记所称 `cordis.patch.yml` 已被 08-05 的 profile-plugin-bundles 取代，官方实现只读 `cordis.patch.yml`（web4/web6 实证）
 - **web 默认无运行中换代**：薄控制台写 config 后需**提示重启**（或触发整站 reload）；官方若启用 web hmr（TODO），运行中换代自动成立——控制台设计应兼容两种
 
 ## 转向规划（4 阶段）
@@ -93,7 +93,7 @@
 | 阶段 | 内容 | 验证标准 |
 |---|---|---|
 | 1 冻结 | patch 瘦身收尾；CLI/`ctx.plugins`/`registerExternal` 标 deprecated，不再投入 | CHANGELOG 标注 |
-| 2 spike | 薄控制台最小原型（读/写 cordis.patch.yml + dshClient 面板） | 0 patch；能列出/启停 .dsh-plugin 包 |
+| 2 spike | 薄控制台最小原型（读/写 cordis.patch.yml + dsh.client 面板） | 0 patch；能列出/启停 .dsh-plugin 包 |
 | 3 转型 | 新建薄控制台包替代 ui-plugin-manager；移除机制分发包与 patch | 旧机制可整体移除不影响控制台 |
 | 4 发布 | 控制台独立发版；旧 v0.1.0 标 legacy | 发布流程验证 |
 

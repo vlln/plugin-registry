@@ -1,6 +1,6 @@
 # 设计：patch 瘦身（49 → 5）
 
-> **历史（2026-08 转向后）**：描述已移除的独立机制，仅作演进记录；当前见 [official-0809-coverage](official-0809-coverage.md)。
+> **历史文档（2026-08 转向后）**：描述已移除的独立机制，仅作演进记录；当前形态见 [official-0809-coverage](official-0809-coverage.md) 与 `packages/plugin/console`。
 
 
 状态：**阶段 1 完成**（A 试点 + B 面板路由 + apiproxy 域移除，见「实施进度」；瘦身 patch 阶段产物 26 文件）。目的：把 plugin-registry 打进官方树的改动收敛到「能力结构性必需」的最小集，其余机制件转分发包（复制进 monorepo 的 `packages/`），降低基线升级重放成本。**能力零下降**：每处外置都保留原能力（A 类为「实现文件搬家 + import 改向」，B 类为「面板调用架构重写」，详见各类成本），只有「必须改官方源码的接线」留在 patch。

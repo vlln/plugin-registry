@@ -1,6 +1,6 @@
 # 设计：registry UI 插件真热更新（True Hot Reload）
 
-> **历史（2026-08 转向后）**：描述已移除的独立机制，仅作演进记录；当前见 [official-0809-coverage](official-0809-coverage.md)。
+> **历史文档（2026-08 转向后）**：描述已移除的独立机制，仅作演进记录；当前形态见 [official-0809-coverage](official-0809-coverage.md) 与 `packages/plugin/console`。
 
 
 ## 背景与现状

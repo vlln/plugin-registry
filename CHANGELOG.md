@@ -1,6 +1,6 @@
 # Changelog
 
-本仓库（plugin-registry 示例 + 文档）的变更记录。机制件改动在官方 snapshot 宿主仓库的机制分支按提交记录，本表汇总与示例/文档对应的交付。
+本仓库（plugin-registry：薄控制台 + 文档 + skill）的变更记录。机制件改动在官方 snapshot 宿主仓库的历史机制分支按提交记录（0809 转向后不再有机制件），本表汇总交付。
 
 ## 2026-08（0810 基线适配——dshClient → dsh.client）
 
@@ -13,7 +13,7 @@
 
 ## 2026-08（转向薄控制台——阶段 2/3 交付）
 
-官方 0809 覆盖度评估（[official-0809-coverage](docs/official-0809-coverage.md)）结论：官方仓库插件机制（`.dsh-plugin` + config + 事务性换代）覆盖 plugin-registry 独立机制的 ~95%，进入转向期。**当前状态：新控制台已交付，旧机制冻结待移除。**
+官方 0809 覆盖度评估（[official-0809-coverage](docs/official-0809-coverage.md)）结论：官方仓库插件机制（`.dsh-plugin` + config + 事务性换代）覆盖 plugin-registry 独立机制的 ~95%，进入转向期。**当前状态：薄控制台已交付，旧机制已移除。**
 
 - ✅ **薄控制台**（`packages/plugin/console`）：0 patch 管理官方 repository-plugins——bundle 挂载 + Node half 读写 `$DSH_HOME/cordis.patch.yml` + client half 设置页面板。端到端验证（纯净 0809）：挂载 → boot graph 含面板 → 读写路由 → 写后官方消费
 - ✅ **spike 实证**：写 config 触发官方换代 0 patch 可行；web 默认无运行中 HMR（官方 TODO），写后提示重启
@@ -26,7 +26,7 @@
 - ✅ **skill README 规范扩展**：make-dsh-plugin 的 README conventions 从「列 skill」扩展为「列全部能力面用表格」——Skills（`| Skill | 作用 |`）+ MCP servers（`| MCP | 说明 |`，若含 `dsh.mcpServers`）+ Tools（`| 工具 | 说明 |`，若注册工具）
 - ✅ **skill 自包含化**：make-dsh-plugin 不再依赖仓库 docs——cookbook 内容并入 references/entry-contract.md（布局/dsh 字段/entry/skills/mcpServers/Cordis/自渲染/安装/开发规范），新增 references/bundle-plugins.md（bundle 插件开发详情：dsh.bundle/dshClient/cordis.patch.yml/依赖解析/安装管理），3 个旧 references 去掉 cookbook 依赖；Step 0 形态表补 bundle 行；用户只装 skill 即可完整开发两类插件
 - ✅ **make-dsh-plugin SKILL.md 中文化**：正文散文转中文（专有/特殊名词保留英文：repository-plugin/Cordis/defineTool/dsh.*/prepack/ESM/MCP/frontmatter/references 文件名等）；references 本就是中文（entry-contract 标题同步）。SKILL 265→237 行
-- ⏳ **冻结中（独立一步移除）**：patch 加载（0808）、`dsh registry` CLI、`ctx.plugins`、`ui-plugin-manager` 旧面板
+- ✅ **旧机制已移除（独立一步，46ac846）**：patch 加载（0808）、`dsh registry` CLI、`ctx.plugins`、`ui-plugin-manager` 旧面板、patches/ 目录全部删除，仅留薄控制台
 - 澄清：官方用户配置层为 `$DSH_HOME/cordis.patch.yml`（08-05 取代 `config.yaml`）
 
 ## 基线
@@ -35,7 +35,7 @@
 
 - **当前基线**：官方 0810 快照（`snapshot-20260810T155924Z-8ec407cd64`，提交 `5521ff5f`）——薄控制台端到端验证通过（见上方 0810 条目）
 - **历史机制分支基线**：官方 0808 快照（`20260808T121140Z`，提交 `57ffa9de`）——机制分支 `feat/plugin-registry-mvp-0808` 已冻结退役（0809 转向后不再演进）
-- **历史 patch 基线**：`patches/dsh-plugin-registry-0808.patch` 基于官方 0808 快照（49 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、host 帧 `client-graph-changed` 自动刷新（Stage 1 起携带完整 graph）、浏览器端 graph diff 应用器（启停不整页刷新）、tasks/bash 非消耗式 `peek` seam、依赖闭包；不含复制分发包 `packages/plugin`、`packages/client/ui-plugin-manager`）；旧 0807/0806 patch 保留供对应基线追溯。**patch 瘦身（49→5）设计已定稿待实施**（机制件转分发包，patch 收敛为 CLI 接线 + `registerExternal` 硬核），见 [patch 瘦身设计](docs/patch-slimming-design.md)；实施时本段基线标注随之更新
+- **历史 patch 基线**：`patches/dsh-plugin-registry-0808.patch` 基于官方 0808 快照（49 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、host 帧 `client-graph-changed` 自动刷新（Stage 1 起携带完整 graph）、浏览器端 graph diff 应用器（启停不整页刷新）、tasks/bash 非消耗式 `peek` seam、依赖闭包；不含复制分发包 `packages/plugin`、`packages/client/ui-plugin-manager`）；旧 0807/0806 patch 保留供对应基线追溯。**patch 瘦身（49→5）计划已随 0809 转向废弃**（机制件整体移除，无 patch 可瘦身），设计稿见 [patch 瘦身设计](docs/patch-slimming-design.md)（历史文档）
 
 ## 2026-08（patch 瘦身设计定稿：49 → 5 迁移清单 + 文档契约）
 

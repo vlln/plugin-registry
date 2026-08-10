@@ -28,13 +28,9 @@ cd plugin-registry-<版本>
 - **DSH 源码环境**：官方 0808 快照 `20260808T121140Z`（commit `57ffa9de`）或兼容布局的 DSH monorepo 检出（pnpm workspace）。
 - 仓库根目录可 `git apply`（补丁基于官方 0808 快照生成）。
 
-## 一键安装
+## 一键安装（已废弃）
 
-```sh
-node scripts/install-into-dsh.mjs <dsh-monorepo路径>
-```
-
-自动完成：复制 `packages/` 下全部分发包进 monorepo → `git apply` 接线补丁（先 dry-run）→ `pnpm install`。脚本校验目标必须是 DSH monorepo 根（含 `package.json` + `pnpm-workspace.yaml`），补丁基线不匹配时提示用 `--3way` 手动对齐。
+> **已废弃（0809 转向）**：`scripts/install-into-dsh.mjs` 已删除——其依赖的 `packages/ui-plugin-manager`、`patches/`、`packages/bundle/dsh-plugin-registry` 均已移除，旧脚本运行必失败。当前集成 = 薄控制台 bundle 安装：`dsh plugin --profile web add <plugin-registry>/packages/plugin/console`（见仓库 README）。
 
 ## 手动安装
 
@@ -94,7 +90,7 @@ npm run build                # 官方：更新检出后先构建（tsc -b + tsdo
 
 ```sh
 dsh registry list        # 输出 no plugins installed（命令可用）
-（旧机制示例，已移除——当前经 config.yaml 安装，见 creating-a-repository-plugin）
+（旧机制示例，已移除——当前经 cordis.patch.yml 安装，见 creating-a-repository-plugin）
 dsh registry list        # enabled acme/greeter@0.2.0
 ```
 

@@ -1,6 +1,6 @@
 # Cookbook：创建官方 repository-plugin（0809 格式）
 
-> 本文是「创建官方 repository-plugin」的权威文档。官方 0809 的仓库插件格式（`.dsh-plugin` + `config.yaml` 安装）替代旧机制（`dsh.plugin.json`/`dsh registry`，已移除，见 [official-0809-coverage](../official-0809-coverage.md)）。完整参考实现：`whale-girl`（GUI 宠物插件，含门禁/决策/素材契约/自渲染 client）。
+> 本文是「创建官方 repository-plugin」的权威文档。官方 0809 的仓库插件格式（`.dsh-plugin` + `cordis.patch.yml` 安装）替代旧机制（`dsh.plugin.json`/`dsh registry`，已移除，见 [official-0809-coverage](../official-0809-coverage.md)）。完整参考实现：`whale-girl`（GUI 宠物插件，含门禁/决策/素材契约/自渲染 client）。
 
 ## 仓库布局
 
@@ -77,7 +77,7 @@ export default {
 
 ## 安装与验证
 
-`$DSH_HOME/config.yaml` 一行：
+`$DSH_HOME/cordis.patch.yml` 一行：
 
 ```yaml
 repository-plugins:
