@@ -22,6 +22,15 @@ function homePatchPath(): string {
   return join(resolveDshHome(), 'cordis.patch.yml')
 }
 
+/**
+ * UI 插件（bundle 插件）的用户覆盖文件：当前 profile 的 cordis.patch.yml。
+ * bundle 层的挂载行在此被用户的 `disabled: true/false` 覆盖（官方 patch
+ * 语义：按 id 覆盖同名行）。当前 profile = 启动时的 profile（web 默认）。
+ */
+function profilePatchPath(): string {
+  return join(resolveDshHome(), 'profiles', 'web', 'cordis.patch.yml')
+}
+
 interface RepositoryRow {
   /** 当前 repositories 列表。 */
   repositories: string[]
@@ -83,6 +92,94 @@ function writeRepositories(repositories: string[]): void {
   console.log(`[plugin-console] wrote ${repositories.length} repositories to ${file}`)
 }
 
+/** 一个 Loader 树插件的启停状态（bundle 插件，官方 disabled 标记管理）。 */
+interface UiPluginRow {
+  /** 插件 id（bundle 挂载行的 id）。 */
+  id: string
+  /** 是否被禁用（disabled: true）。未声明 = 启用。 */
+  disabled: boolean
+}
+
+/**
+ * 读 Loader 树插件的 disabled 状态：解析 home cordis.patch.yml 的所有
+ * `- id: <name>` 顶层行及其 `disabled: true/false` 标记。
+ */
+function readUiPlugins(): UiPluginRow[] {
+  const file = profilePatchPath()
+  let content: string
+  try {
+    content = readFileSync(file, 'utf8')
+  } catch {
+    return []
+  }
+  const rows: UiPluginRow[] = []
+  const lines = content.split('\n')
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i]!
+    const match = /^- id:\s*([^\s]+)/.exec(line.trim())
+    if (match === null) continue
+    // 该行的后续缩进行：找 disabled 标记（在本条 id 行的子树内）
+    let disabled = false
+    for (let j = i + 1; j < lines.length; j += 1) {
+      const next = lines[j]!
+      if (next.trimStart().startsWith('- id:')) break
+      const dis = /disabled:\s*(true|false)/.exec(next.trim())
+      if (dis !== null) disabled = dis[1] === 'true'
+    }
+    rows.push({ id: match[1]!, disabled })
+  }
+  return rows
+}
+
+/**
+ * 设置一个 Loader 树插件的 disabled 状态。保留其他行，只改目标行的
+ * disabled 字段（新增或移除 `  disabled: true/false`）。
+ */
+function writeUiPluginDisabled(id: string, disabled: boolean): void {
+  const file = profilePatchPath()
+  let content: string
+  try {
+    content = readFileSync(file, 'utf8')
+  } catch {
+    content = ''
+  }
+  const lines = content.split('\n')
+  let targetLine = -1
+  let targetIndent = ''
+  for (let i = 0; i < lines.length; i += 1) {
+    const match = /^- id:\s*([^\s]+)/.exec(lines[i]!.trim())
+    if (match !== null && match[1] === id) {
+      targetLine = i
+      targetIndent = /^(\s*)-/.exec(lines[i]!)?.[1] ?? ''
+      break
+    }
+  }
+  if (targetLine === -1) {
+    // 目标行不存在：追加一个新的挂载行 + disabled 标记
+    lines.push(`${targetIndent}- id: ${id}`)
+    lines.push(`${targetIndent}  disabled: ${String(disabled)}`)
+  } else {
+    // 找到该行子树内的 disabled 行
+    let disabledLine = -1
+    for (let j = targetLine + 1; j < lines.length; j += 1) {
+      const next = lines[j]!
+      if (next.trimStart().startsWith('- id:')) break
+      if (/disabled:\s*(true|false)/.test(next.trim())) {
+        disabledLine = j
+        break
+      }
+    }
+    if (disabledLine === -1) {
+      // 无 disabled 行：在 id 行后插入
+      lines.splice(targetLine + 1, 0, `${targetIndent}  disabled: ${String(disabled)}`)
+    } else {
+      lines[disabledLine] = `${targetIndent}  disabled: ${String(disabled)}`
+    }
+  }
+  writeFileSync(file, lines.join('\n'))
+  console.log(`[plugin-console] set ${id} disabled=${String(disabled)} in ${file}`)
+}
+
 interface WebServerLike {
   register(route: {
     kind: 'exact' | 'prefix'
@@ -130,6 +227,24 @@ export function apply(ctx: ConsoleCtx): void {
               const parsed = JSON.parse(body) as { repositories?: string[] }
               writeRepositories(parsed.repositories ?? [])
               json(200, { ok: true })
+            })
+            return
+          }
+          // UI 插件管理：读 Loader 树插件的 disabled 状态
+          if (method === 'GET' && (path === '/api/plugin-console/ui-plugins' || path === '/api/plugin-console/ui-plugins/')) {
+            json(200, { ok: true, plugins: readUiPlugins() })
+            return
+          }
+          // UI 插件管理：设置一个插件的 disabled 状态（POST /ui-plugins/<id>，body {disabled: bool}）
+          const uiMatch = /^\/api\/plugin-console\/ui-plugins\/([^/]+)$/.exec(path)
+          if (method === 'POST' && uiMatch !== null) {
+            const id = decodeURIComponent(uiMatch[1]!)
+            let body = ''
+            ;(req as { on?: (e: string, cb: (c: Buffer) => void) => void })?.on?.('data', (c: Buffer) => { body += c.toString('utf8') })
+            ;(req as { on?: (e: string, cb: () => void) => void })?.on?.('end', () => {
+              const parsed = JSON.parse(body) as { disabled?: boolean }
+              writeUiPluginDisabled(id, parsed.disabled === true)
+              json(200, { ok: true, id, disabled: parsed.disabled === true })
             })
             return
           }

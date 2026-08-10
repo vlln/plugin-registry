@@ -16,5 +16,6 @@
   "docs/migrating-to-0806.md": 3500,
   "docs/hot-reload-design.md": 5400,
   "docs/patch-slimming-design.md": 9200,
-  "docs/official-0809-coverage.md": 7000
+  "docs/official-0809-coverage.md": 7000,
+  "docs/console-ui-plugin-management.md": 6000
 }
