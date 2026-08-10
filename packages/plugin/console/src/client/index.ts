@@ -13,14 +13,12 @@ export const name = 'plugin-console-client'
 export const inject = ['slots']
 
 /**
- * 拼图块图标（插件语义，线条风格对齐官方 outline 图标：16px、细线
- * stroke、currentColor 跟随主题）——设置页导航的 tab 图标是官方硬编码
- * （仅 models 特例，其余统一齿轮，零扩展点），0 patch 下用
+ * 拼图块图标（插件语义）：饱满线条风格——主体占满 15/16、2px stroke、
+ * 凹槽/凸起 r2 圆润、currentColor 跟随主题。设置页导航的 tab 图标是
+ * 官方硬编码（仅 models 特例，其余统一齿轮，零扩展点），0 patch 下用
  * MutationObserver 找到「插件」tab 行替换其 svg 内容。
- * 形状：圆角主体 + 顶部凹槽（arc sweep=0）+ 右侧圆凸（arc sweep=1，
- * 方向经渲染验证）。
  */
-const PLUGIN_TAB_ICON_SVG = '<path d="M5 4 H7 A1 1 0 0 0 9 4 H11 A1 1 0 0 0 12 5 V6.5 A1.5 1.5 0 0 1 12 8.5 V11 A1 1 0 0 0 11 12 H5 A1 1 0 0 0 4 11 V5 A1 1 0 0 0 5 4 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>'
+const PLUGIN_TAB_ICON_SVG = '<path d="M4.5 3 H6 A2 2 0 0 0 10 3 H11.5 A2 2 0 0 0 13.5 5 V6.5 A2 2 0 0 1 13.5 11.5 V12 A1.5 1.5 0 0 1 12 13.5 H4 A1.5 1.5 0 0 1 2.5 12 V4 A1.5 1.5 0 0 1 4 2.5 H4.5 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'
 
 /** 替换设置页导航里「插件」tab 的默认齿轮图标为拼图块图标（幂等）。 */
 function patchPluginTabIcon(): void {
