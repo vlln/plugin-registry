@@ -141,7 +141,7 @@ pnpm prepare + prepack），无发布流程。
 
 **写安装说明时必须给出用户可直接复制的命令**：
 - repository 插件：`cordis.patch.yml` 的 `repositories` 行（`github:owner/repo#<ref>&path:/.dsh-plugin`）——**这是唯一安装方式**；不要写 `dsh plugin add`（那是 bundle 通道）、`dsh registry`（已移除）或「复制目录」等不可用形式。
-- bundle 插件：`dsh plugin --profile web add <bundle 包路径>`——`<包路径>` 必须是**含 `dsh.bundle` 且构建产物在库**的 npm 包目录/git 源，见 `references/bundle-plugins.md`；git 源需产物入库（git 源不跑 build），仓库有 prepare 脚本时 pnpm ≥10 默认阻止（dsh 会提示 `allowBuilds` 放行）；不要指向仓库根或源码目录，不要写 `git+file://`（本地可达但非分发形态）。
+- bundle 插件：`dsh plugin --profile web add <bundle 包路径>`——`<包路径>` 必须是**含 `dsh.bundle`** 的 npm 包目录/git 源，见 `references/bundle-plugins.md`；git 源 monorepo 子目录用 `#<commit>&path:/<子目录>`，产物不入库需 `prepare` 脚本自动构建（pnpm ≥10 默认阻止，dsh 提示 `allowBuilds` 放行）；不要指向仓库根或源码目录，不要写 `git+file://`（本地可达但非分发形态）。
 
 **读 `references/install-and-verify.md`** 获取按改动面的验证（哪些改动需
 重启 web vs 只刷新）与挂载失败排查。

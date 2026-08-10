@@ -30,12 +30,20 @@
 
 ## 安装
 
-本地目录安装（bundle 子目录，构建产物在库）：
+**git 源直接安装（推荐）**：
+
+```sh
+dsh plugin --profile web add "github:dsh-external/plugin-registry#main&path:/packages/plugin/console"
+```
+
+pnpm ≥10 会阻止安装时的构建脚本（prepare）：按 dsh 提示把 `allowBuilds` 的精确 key（**加引号**）写入 `$DSH_HOME/profiles/web/pnpm-workspace.yaml`，然后重跑。
+
+**本地目录安装**（无 pnpm ≥10 阻碍）：
 
 ```sh
 git clone https://github.com/dsh-external/plugin-registry.git
 cd plugin-registry/packages/plugin/console
-pnpm install && pnpm run build   # 构建 lib/（产物不入库，clone 后需自建）
+pnpm install && pnpm run build   # 构建 lib/（产物不入库）
 dsh plugin --profile web add .   # 当前目录即 bundle 包子目录（dsh 锚定 . 为绝对路径）
 ```
 

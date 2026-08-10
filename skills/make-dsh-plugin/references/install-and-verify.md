@@ -21,8 +21,8 @@ dsh plugin --profile web add <包路径>
 
 `<包路径>` 必须是**可解析的 npm 包**（`dsh plugin add` 把参数转发给 pnpm，再按已安装状态把声明 `dsh.bundle` 的依赖加进 profile 的 bundle 层栈）：
 
-- **本地目录**：指向含 `package.json#dsh.bundle` 的 bundle 包目录（非仓库根），且构建产物在库（`lib/` 等已 build）
-- **git 源**（如 `git+https://github.com/owner/my-bundle.git#<commit>`、`github:owner/repo#<commit>`）：仓库根必须是完整 npm 包（`dsh.bundle` 在包根），且**构建产物已入库**——git 源不跑 build，缺产物挂载失败；仓库若有 `prepare` 脚本，pnpm ≥10 默认阻止其执行（dsh 会提示把 pnpm 打印的 key 加入 profile 的 `pnpm-workspace.yaml` `allowBuilds` 放行）
+- **本地目录**：指向含 `package.json#dsh.bundle` 的 bundle 包目录（非仓库根），且构建产物在库（`lib/` 等已 build）——`cd` 到目录后 `dsh plugin --profile web add .`（dsh 锚定 `.` 为绝对路径）
+- **git 源**：`github:owner/repo#<commit>&path:/<子目录>`（monorepo 子目录需 `&path:/`，注意 `path:` 前缀 + 前导 `/`）或 `git+https://github.com/owner/my-bundle.git#<commit>`。产物不入库的 bundle 需 `prepare` 脚本（git 安装时自动构建）；pnpm ≥10 默认阻止 git 依赖的 prepare——按 dsh 提示把精确 key（**加引号**）加入 profile 的 `pnpm-workspace.yaml` `allowBuilds` 后重跑
 
 写法细则与坑见 [bundle-plugins.md](bundle-plugins.md)；bundle 插件的 `dependencies` 声明为空是设计（官方包由 profile 的 pnpm 闭包注入，见 [gotchas.md](gotchas.md) 1）。
 

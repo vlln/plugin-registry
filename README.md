@@ -46,10 +46,20 @@ DeepSeek Harness 官方机制管「插件是什么、怎么跑」；本仓库补
 
 ## 安装
 
+**方式一：git 源直接安装（推荐）**
+
+```sh
+dsh plugin --profile web add "github:dsh-external/plugin-registry#main&path:/packages/plugin/console"
+```
+
+pnpm ≥10 会阻止安装时的构建脚本（prepare）：按 dsh 提示把 `allowBuilds` 的精确 key（**加引号**）写入 `$DSH_HOME/profiles/web/pnpm-workspace.yaml`，然后重跑上面命令。
+
+**方式二：本地目录（无 pnpm ≥10 阻碍）**
+
 ```sh
 git clone https://github.com/dsh-external/plugin-registry.git
 cd plugin-registry/packages/plugin/console
-pnpm install && pnpm run build   # 构建 lib/（产物不入库，clone 后需自建）
+pnpm install && pnpm run build   # 构建 lib/（产物不入库）
 dsh plugin --profile web add .   # 当前目录即 bundle 包子目录（dsh 锚定 . 为绝对路径）
 ```
 

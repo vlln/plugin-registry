@@ -47,16 +47,16 @@ bundle 插件是**独立 npm 包**（或包目录），声明 `dsh.bundle`：
 
 - **本地目录**：指向**含 `package.json#dsh.bundle` 的 bundle 包目录**（而非仓库根或源码目录），且**构建产物在库**（`lib/` 等 `files` 声明的内容已 build）：
   ```sh
-  dsh plugin --profile web add ./packages/my-bundle   # bundle 包子目录，已构建
+  cd packages/my-bundle && dsh plugin --profile web add .   # 包目录内 add .（dsh 锚定 . 为绝对路径）
   ```
   ❌ 不要写仓库根（`dsh plugin --profile web add ./`）——根不是 npm 包，无 `dsh.bundle`。
-- **git 源**：官方经 npm git 依赖语法解析（`git+https://github.com/owner/my-bundle.git#<commit>`、`github:owner/repo#<commit>`、`owner/repo` 等 pnpm 语法均可用），**必须满足**：① 仓库内是完整 npm 包（`package.json#dsh.bundle` 在包根）；② **构建产物已入库**（git 源不跑 build，`lib/` 必须提交）——否则挂载时缺产物失败；③ 仓库若有 `prepare` 脚本，pnpm ≥10 默认阻止其执行——dsh 会提示把 pnpm 打印的 key 加入 profile 的 `pnpm-workspace.yaml` `allowBuilds` 放行（已入库产物的 bundle 无 prepare 则不受影响）。
+- **git 源**：官方经 npm git 依赖语法解析（`github:owner/repo#<commit>&path:/<子目录>`、`git+https://github.com/owner/my-bundle.git#<commit>` 等 pnpm 语法均可用）。bundle 在 monorepo 子目录时用 **`#<commit>&path:/<子目录>`**（注意 `path:` 前缀 + 前导 `/`，实测 plugin-registry 的 console 即 `github:dsh-external/plugin-registry#main&path:/packages/plugin/console`）。**产物不入库的 bundle 必须带 `prepare` 脚本**（如 `"prepare": "tsdown --config tsdown.config.ts"`——git 源安装时 pnpm 自动构建 lib/）；pnpm ≥10 默认阻止 git 依赖的 prepare，dsh 会提示把 pnpm 打印的精确 key（**写入 yaml 时 key 需加引号**——含冒号，无引号 YAML 解析失败）加入 profile 的 `pnpm-workspace.yaml` `allowBuilds` 后重跑。已入库产物的 bundle（无 prepare 或 prepare 非必需）不受影响。
   ```sh
-  dsh plugin --profile web add git+https://github.com/owner/my-bundle.git#<commit>
+  dsh plugin --profile web add "github:owner/my-bundle#<commit>&path:/packages/my-bundle"
   ```
-  ❌ 不要写未构建的 git 源（缺产物挂载失败）；`git+file://` 本地可达但不是分发形态（对远端用户不可用），别写进安装说明。
+  ❌ 不要写未构建且无 prepare 的 git 源（缺产物挂载失败）；`git+file://` 本地可达但不是分发形态（对远端用户不可用），别写进安装说明。
 
-**写安装说明时**（README/skill 输出）：给出**用户能直接复制执行**的命令——本地路径写清 bundle 子目录与构建前提；git 源写清需构建产物入库。不要给「指向仓库根」或「臆造协议」的说明。
+**写安装说明时**（README/skill 输出）：给出**用户能直接复制执行**的命令——本地路径写清 bundle 子目录与构建前提；git 源写清子目录语法（`&path:/`）、prepare 构建与 `allowBuilds` 放行。不要给「指向仓库根」或「臆造协议」的说明。
 
 - **启停**：写 profile 层 `$DSH_HOME/profiles/web/cordis.patch.yml` 的 `<id>: disabled: true/false`（Loader 树 patch 语义）
 - **管理**：薄控制台 UI 插件区（profile 层）
