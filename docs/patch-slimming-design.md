@@ -1,6 +1,12 @@
 # 设计：patch 瘦身（49 → 5）
 
-状态：**待实施**。目的：把 plugin-registry 打进官方树的改动收敛到「能力结构性必需」的最小集，其余机制件转分发包（复制进 monorepo 的 `packages/`），使基线升级重放成本从 49 文件降到 ~5 文件。**能力零下降**：每处外置都保留原能力（A 类为「实现文件搬家 + import 改向」，B 类为「面板调用架构重写」，详见各类成本），只有「必须改官方源码的接线」留在 patch。
+状态：**实施中**（A 类试点 + B 类面板路由已完成，见「实施进度」；剩余：apiproxy 域移除、重建 patch、验证站端到端）。目的：把 plugin-registry 打进官方树的改动收敛到「能力结构性必需」的最小集，其余机制件转分发包（复制进 monorepo 的 `packages/`），使基线升级重放成本从 49 文件降到 ~5 文件。**能力零下降**：每处外置都保留原能力（A 类为「实现文件搬家 + import 改向」，B 类为「面板调用架构重写」，详见各类成本），只有「必须改官方源码的接线」留在 patch。
+
+## 实施进度
+
+- ✅ **A 类试点**（registry.ts 外置）：机制分支 cd7e19e4——CLI 实现移入 `packages/plugin/plugin/src/cli.ts`（含 `RegistryInvocation` 类型下沉），`apps/cli` 只留 args.ts re-export + bin.ts 动态导入改 `@deepseek-ai/dsh-plugin`；CLI 全生命周期验证通过
+- ✅ **B 类面板路由**（管理面 host 化）：机制分支 86e720cd——plugin 包新增 `panel-route.ts`（`/api/plugin-registry` 前缀路由，`ctx.inject(['httpServer'])` 挂载）；ui-plugin-manager client 改 fetch 自建路由（去 connection/apiproxy 依赖）；web 端到端（list/enable/disable/install 语义/错误回报）验证通过
+- ⏳ 剩余：apiproxy `plugins` 域从机制分支移除（面板已不依赖）、其余 A 类文件（plugins.ts 等，随 apiproxy 域移除一并处理）、重建 patch（收敛 ~5 文件）、纯净基线 + 真实安装顺序验证站端到端
 
 ## 审计结论
 

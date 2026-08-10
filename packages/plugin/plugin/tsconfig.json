@@ -22,6 +22,9 @@
     },
     {
       "path": "../../support/invariants"
+    },
+    {
+      "path": "../../host/webserver"
     }
   ]
 }

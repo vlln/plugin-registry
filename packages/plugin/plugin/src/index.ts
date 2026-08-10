@@ -14,6 +14,7 @@ import z from 'schemastery'
 import type Schema from 'schemastery'
 import { resolveDshHome } from '@deepseek-ai/dsh-paths'
 import { PluginLocalService } from './service.ts'
+import { createPluginRegistryRoute, type PluginRegistryRoute } from './panel-route.ts'
 
 export * from './manifest.ts'
 export * from './registry.ts'
@@ -24,6 +25,8 @@ export * from './tarball.ts'
 export * from './deps-link.ts'
 export { normalizePlugin } from './load.ts'
 export { MANIFEST_FILE_NAME } from './types.ts'
+export { runRegistry } from './cli.ts'
+export type { RegistryInvocation } from './cli.ts'
 export type {
   CatalogEntry,
   InstalledRecord,
@@ -66,5 +69,15 @@ export const Config: Schema<Config> = z.object({
 export async function apply(ctx: Context, config: Config = {}): Promise<() => Promise<void>> {
   const service = new PluginLocalService(ctx, config.dshHome ?? resolveDshHome(), config.harnessVersion ?? '0.0.1')
   await service.reconcile()
+  // Web panel management route: mounted when httpServer is composed (web
+  // shapes), via the official inject seam — the officially open route carries
+  // the panel's registry operations (patch-slimming B class), so the
+  // apiproxy `plugins` domain is not needed as official wiring. The inject
+  // fiber is cordis-owned and disposed with this plugin's ctx.
+  ctx.inject(['httpServer'], (httpCtx) => {
+    const httpServer = (httpCtx as Context & { httpServer?: { register(r: PluginRegistryRoute): () => void } }).httpServer
+    if (httpServer === undefined) return
+    httpServer.register(createPluginRegistryRoute(service))
+  })
   return () => service.dispose()
 }
