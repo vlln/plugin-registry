@@ -314,15 +314,14 @@ export function ConsolePanel(): React.ReactNode {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <div>
             <h3 style={sectionTitleStyle}>已加载插件（{user.length} 用户 / {official.length} 内置）</h3>
-            <p style={hintStyle}>启停立即生效并持久化；版本经启动预扫描 + 手动检查缓存（不频繁打 registry）。</p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <Button size="sm" variant="ghost" disabled={versionBusy} onClick={() => { void refreshVersions() }}>
-              {versionBusy ? '检查中…' : '检查最新版本'}
+              {versionBusy ? '检查中' : '检查更新'}
             </Button>
             {official.length > 0 ? (
               <Button size="sm" variant="ghost" onClick={() => { setShowAll(v => !v) }}>
-                {showAll ? '只看用户插件' : `查看所有（${installed.length}）`}
+                {showAll ? '只看用户' : `查看全部（${installed.length}）`}
               </Button>
             ) : null}
           </div>
@@ -341,9 +340,12 @@ export function ConsolePanel(): React.ReactNode {
               {!official.includes(plugin) && version.canUpdate ? (
                 <Button size="sm" variant="ghost" disabled={busy || bundleBusy} onClick={() => { void updateBundle(plugin.name) }}>更新</Button>
               ) : null}
-              <Button size="sm" disabled={busy} onClick={() => { void togglePlugin(plugin.id, !plugin.disabled) }}>
-                {plugin.disabled ? '启用' : '停用'}
-              </Button>
+              {/* 内置插件不可停用（官方组合层，停用会破坏 web）；仅用户插件可启停 */}
+              {!official.includes(plugin) ? (
+                <Button size="sm" disabled={busy} onClick={() => { void togglePlugin(plugin.id, !plugin.disabled) }}>
+                  {plugin.disabled ? '启用' : '停用'}
+                </Button>
+              ) : null}
             </div>
           )
         })}
