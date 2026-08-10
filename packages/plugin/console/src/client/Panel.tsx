@@ -334,11 +334,11 @@ export function ConsolePanel(): React.ReactNode {
         {sectionHeader(
           `已加载插件（${user.length} 用户 / ${official.length} 内置）`,
           <div style={{ display: 'flex', gap: 8 }}>
-            <Button size="sm" variant="ghost" disabled={versionBusy} onClick={() => { void refreshVersions() }}>
+            <Button size="sm" variant="outline" disabled={versionBusy} onClick={() => { void refreshVersions() }}>
               {versionBusy ? '检查中' : '检查更新'}
             </Button>
             {official.length > 0 ? (
-              <Button size="sm" variant="ghost" onClick={() => { setShowAll(v => !v) }}>
+              <Button size="sm" variant="outline" onClick={() => { setShowAll(v => !v) }}>
                 {showAll ? '只看用户' : `查看全部（${installed.length}）`}
               </Button>
             ) : null}
@@ -358,11 +358,11 @@ export function ConsolePanel(): React.ReactNode {
                   </span>
                   <span style={actionsStyle}>
                     {!official.includes(plugin) && version.canUpdate ? (
-                      <Button size="sm" variant="ghost" disabled={busy || bundleBusy} onClick={() => { void updateBundle(plugin.name) }}>更新</Button>
+                      <Button size="sm" variant="outline" disabled={busy || bundleBusy} onClick={() => { void updateBundle(plugin.name) }}>更新</Button>
                     ) : null}
                     {/* 内置插件不可停用（官方组合层）；仅用户插件可启停 */}
                     {!official.includes(plugin) ? (
-                      <Button size="sm" variant="ghost" disabled={busy} onClick={() => { void togglePlugin(plugin.id, !plugin.disabled) }}>
+                      <Button size="sm" variant="outline" disabled={busy} onClick={() => { void togglePlugin(plugin.id, !plugin.disabled) }}>
                         {plugin.disabled ? '启用' : '停用'}
                       </Button>
                     ) : null}
@@ -379,7 +379,7 @@ export function ConsolePanel(): React.ReactNode {
       <section style={sectionStyle}>
         {sectionHeader(
           'repository 插件',
-          <Button size="sm" variant="ghost" disabled={busy || checking} onClick={() => { void checkUpdates() }}>
+          <Button size="sm" variant="outline" disabled={busy || checking} onClick={() => { void checkUpdates() }}>
             {checking ? '检查中' : '检查更新'}
           </Button>,
         )}
@@ -400,9 +400,9 @@ export function ConsolePanel(): React.ReactNode {
                   </span>
                   <span style={actionsStyle}>
                     {canUpdate ? (
-                      <Button size="sm" variant="ghost" disabled={busy} onClick={() => { void applyUpdate(id) }}>更新</Button>
+                      <Button size="sm" variant="outline" disabled={busy} onClick={() => { void applyUpdate(id) }}>更新</Button>
                     ) : null}
-                    <Button size="sm" variant="ghost" disabled={busy} onClick={() => { remove(id) }}>移除</Button>
+                    <Button size="sm" variant="outline" disabled={busy} onClick={() => { remove(id) }}>移除</Button>
                   </span>
                 </div>
               </div>
@@ -420,7 +420,7 @@ export function ConsolePanel(): React.ReactNode {
             />
           </div>
           <div style={editorActionsStyle}>
-            <Button size="sm" disabled={busy} onClick={() => { void add() }}>添加</Button>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => { void add() }}>添加</Button>
           </div>
         </div>
       </section>
@@ -441,7 +441,7 @@ export function ConsolePanel(): React.ReactNode {
             />
           </div>
           <div style={editorActionsStyle}>
-            <Button size="sm" disabled={busy || bundleBusy} onClick={() => { void installBundle() }}>
+            <Button size="sm" variant="outline" disabled={busy || bundleBusy} onClick={() => { void installBundle() }}>
               {bundleBusy ? '安装中' : '安装'}
             </Button>
           </div>
