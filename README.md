@@ -105,18 +105,16 @@ Web 设置页「插件」面板：
 
 ## Agent Skill
 
-仓库自带 `plugin-registry-create` Skill（`skills/plugin-registry-create/SKILL.md`），指导 agent 快速创建 registry 插件：选 id → 脚手架 → 写 Cordis 入口 → 同步 `contributes` → 安装启用验证，含常见坑（默认禁用、声明面 vs 能力面、Loader 树边界等）。与官方 harness 的 `dsh-*` skills / `cordis` 工具集命名区分，避免混淆。
+仓库自带 `plugin-registry-create` Skill（`skills/plugin-registry-create/SKILL.md`），指导 agent 创建官方 repository-plugin（0809 格式）：先选形态（skill 包 / MCP / Node 工具 / 带 UI）→ 按对应路径搭建 `.dsh-plugin/` → prepack → `config.yaml` 安装 → 验证纪律。详情分置 `references/`；完整契约见 [cookbook](docs/cookbook/creating-a-repository-plugin.md)，参考实现 `whale-girl`。
+
+**插件管理面板**：薄控制台（`packages/plugin/console`）管理已装的官方 repository 插件与 UI 插件（读写作 `$DSH_HOME/cordis.patch.yml`）。
 
 ## 文档
 
-- [创建插件](docs/cookbook/creating-a-plugin.md) — 从零开发：脚手架 → 入口 → contributes 同步 → 安装启用
-- [清单格式参考](docs/manifest-format.md) — `dsh.plugin.json` 完整字段定义（原生 + 增量两种形态）
-- [加 client half](docs/cookbook/adding-a-client-half.md) — 给插件带浏览器端 UI：client 声明 → bundle 契约 → 构建 → 验证
-- [官方插件增量兼容](docs/official-plugin-incremental-compat.md) — 官方格式插件加增量清单进 registry（设计规范）
-- [0805→0806 迁移](docs/migrating-to-0806.md) — 命令/slots/挂载三处契约变化的插件迁移指南
-- [集成到 dsh](docs/cookbook/integrating-into-dsh.md) — 复制包 + 补丁 + 组合启用，接入 DSH 源码环境
-- [卸载](docs/cookbook/uninstalling-plugins.md) — 卸载插件，或把 registry 从 DSH 移除（集成反操作）
-- [分发插件](docs/cookbook/distributing-plugins.md) — tarball 分发与社区目录模式
+- [创建官方 repository-plugin](docs/cookbook/creating-a-repository-plugin.md) — 0809 格式权威契约：仓库布局 → entry → 自渲染 client → 安装 → 开发规范
+- [官方 0809 覆盖度评估](docs/official-0809-coverage.md) — 官方机制覆盖度、UI 自渲染实证、转向决策
+- [薄控制台设计](docs/console-ui-plugin-management.md) — 统一管理两类插件的设计
+- 历史机制文档（已转向，仅存档）：[创建插件（旧）](docs/cookbook/creating-a-plugin.md)、[清单格式（旧）](docs/manifest-format.md)、[0805→0806 迁移](docs/migrating-to-0806.md) 等
 - [架构](docs/architecture.md) — 两层插件模型的系统地图（好奇者阅读）
 - [真热更新设计](docs/hot-reload-design.md) — UI 插件不整页刷新的方案、困难与 Stage（承接 client-half 评审 O3）
 - [变更记录](CHANGELOG.md) — 机制件交付与示例增删汇总
