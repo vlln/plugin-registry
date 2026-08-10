@@ -97,6 +97,21 @@
 | 3 转型 | 新建薄控制台包替代 ui-plugin-manager；移除机制分发包与 patch | 旧机制可整体移除不影响控制台 |
 | 4 发布 | 控制台独立发版；旧 v0.1.0 标 legacy | 发布流程验证 |
 
+## 阶段 2 spike 结果（2026-08-10，原型已实证）
+
+纯净 0809 + 独立控制台 bundle（`/tmp/dsh-console`，Node half 读写 `$DSH_HOME/cordis.patch.yml`）：
+
+| 验证点 | 结果 |
+|---|---|
+| 控制台 bundle 挂载（`dsh plugin --profile web add`） | ✅ 0 patch 进 profile（base + web-app + plugin-console） |
+| Node half 读路由（GET /api/plugin-console/repositories） | ✅ 返回当前 repositories 列表 |
+| Node half 写路由（POST → 写 cordis.patch.yml） | ✅ config 正确写入（修复字符串引号序列化 bug） |
+| 读写闭环 | ✅ 写后读回一致 |
+| **写完 → 官方消费** | ✅ 重启后官方 repository-plugin git 拉取 + 准备插件（web5 实证：`Failed to prepare ... Path "/.dsh-plugin" is not a directory`——失败因 test-vlln 无 .dsh-plugin，机制本身完整工作） |
+| **0 patch** | ✅ 全官方机制（bundle + httpServer 路由 + cordis.patch.yml + repository-plugin） |
+
+**结论**：薄控制台「写 config 触发官方换代」0 patch 可行——阶段 2 核心不确定性消除。client half（面板 UI）因需官方 clientBundle preset 构建暂缓，Node half 读写已独立验证；阶段 3 补 client 面板 + 完整 UI。
+
 ## 相关
 
 - 官方机制：`.agents/notes/implemented/feature/2026-07-30-config-only-repository-plugins.md`（config 安装）、`2026-08-08-trusted-repository-package-code.md`（dsh.entry 可信代码）、`2026-07-30-static-repository-plugin-format.md`（打包格式）
