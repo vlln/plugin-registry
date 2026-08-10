@@ -355,8 +355,6 @@ export function ConsolePanel(): React.ReactNode {
                     <span style={nameStyle}>{plugin.name}</span>
                   </span>
                   <span style={actionsStyle}>
-                    {official.includes(plugin) ? <Pill>内置</Pill> : null}
-                    <Pill active={!plugin.disabled}>{plugin.disabled ? '已停用' : '运行中'}</Pill>
                     {!official.includes(plugin) && version.canUpdate ? (
                       <Button size="sm" variant="outline" disabled={busy || bundleBusy} onClick={() => { void updateBundle(plugin.name) }}>更新</Button>
                     ) : null}
@@ -366,6 +364,9 @@ export function ConsolePanel(): React.ReactNode {
                         {plugin.disabled ? '启用' : '停用'}
                       </Button>
                     ) : null}
+                    {/* 状态 Pill 贴右缘（名称左、按钮中、Pill 右） */}
+                    {official.includes(plugin) ? <Pill>内置</Pill> : null}
+                    <Pill active={!plugin.disabled}>{plugin.disabled ? '已停用' : '运行中'}</Pill>
                   </span>
                 </div>
                 <span style={versionLineStyle}>{version.text}</span>
