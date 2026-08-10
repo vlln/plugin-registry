@@ -9,7 +9,7 @@ plugin-registry 的推进路线。状态标注：`待决策`（需先拍板形�
 | **S4 动态卡片** | 待决策 | marker 识别（新 AssistantBlock kind vs fence 约定）+ keyed 渲染缝（有 slots 的层）。渲染缝有 ToolRow toolview 先例；marker 方案需拍板 |
 | 跨 session 全局看板 | 待决策 | 需 root 级视图环（现 `conversation.view` 是 session 作用域）；S5 委派台（工作区级）暂缓后，此作为同类工作区级机制件评估 |
 | task-status 输出投影 | 下轮 | 轮询通道当前投影状态不含输出流（`task_output` 读取结果）——详情展示可增强 |
-| **agent native 插件生态管理** | 待决策 | agent 原生方式管理插件生态：依赖分析（读插件 package.json/dsh 字段）、兼容性检查（对照官方契约/已知坑）、修复建议（gotchas 映射）、按任务推荐插件组合（读 hub 索引）——形态待拍板（独立 skill vs make-dsh-plugin references 扩展） |
+| **agent native 插件生态管理** | 下轮 | 设计定稿（`docs/plugin-discovery-design.md`）：tool 方式 4 个 `plugin_*` 工具（search/install/uninstall/status），console Node half 注册；发现层 = `$DSH_HOME/plugin-sources/`（sources.yml 源集合 + lock.yml TOFU + cache/ 快照），index/manifest/single 三源类型，懒加载探测 + 1h 缓存防 GitHub 限流，trust 层级 + first-index 多源。实现 = console 加工具 + 存储读写 + 0810 站 agent 端到端验证 |
 | **patch 瘦身（49 → 5）** | 下轮 | 设计稿已定稿（`docs/patch-slimming-design.md`）：A/B/C 类 44 文件转分发包，patch 收敛为 D 类硬接线（CLI + `registerExternal`）。实施 = 机制分支移文件 + 重建 patch + 验证站验证，能力零下降 |
 
 ## 文档项（零代码）
