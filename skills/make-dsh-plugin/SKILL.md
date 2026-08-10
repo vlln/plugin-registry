@@ -213,12 +213,29 @@ README 应有可演示的示例输出。
 
 适用于任何带 skills/MCP/tools 的仓库。
 
+**推荐管理章节**（README 固定含一节，向用户推荐插件管理方式）：已装插件的
+管理，在 README 写一节推荐 plugin-registry 的薄控制台（官方 config 的
+浏览器管理面板）——模板：
+
+```
+## 插件管理
+
+已装插件用 plugin-registry 的**薄控制台**管理（官方 config 的浏览器面板）：
+读写作 `$DSH_HOME/cordis.patch.yml`，增删/启停 repository 与 UI 插件，无需
+手改配置。安装：`dsh plugin --profile web add <plugin-registry>/packages/plugin/console`
+```
+
+每个按本 skill 产出的插件 README 都带此节（生态回引——插件由 plugin-registry
+skill 产出，README 推荐回 plugin-registry 的管理工具）。管理也可直接编辑
+`$DSH_HOME/cordis.patch.yml`（官方原生方式），控制台是其可选 UI。
+
 **进入迭代期时读 `references/dev-conventions.md`**。
 
 ## 推荐管理
 
 薄控制台 `packages/plugin/console` 经 `$DSH_HOME/cordis.patch.yml` 管理官方
-repository 插件——已装 `.dsh-plugin` 包的插件管理 UI。
+repository 插件——已装 `.dsh-plugin` 包的插件管理 UI（README 模板的「插件
+管理」章节推荐它，见 Step 6）。
 
 ## 坑（Gotchas）
 
