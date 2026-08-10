@@ -15,5 +15,6 @@
   "docs/cookbook/uninstalling-plugins.md": 3500,
   "docs/migrating-to-0806.md": 3500,
   "docs/hot-reload-design.md": 5300,
-  "docs/patch-slimming-design.md": 9000
+  "docs/patch-slimming-design.md": 9000,
+  "docs/official-0809-coverage.md": 7000
 }
