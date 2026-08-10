@@ -6,7 +6,9 @@
 
 - ✅ **A 类试点**（registry.ts 外置）：机制分支 cd7e19e4——CLI 实现移入 `packages/plugin/plugin/src/cli.ts`（含 `RegistryInvocation` 类型下沉），`apps/cli` 只留 args.ts re-export + bin.ts 动态导入改 `@deepseek-ai/dsh-plugin`；CLI 全生命周期验证通过
 - ✅ **B 类面板路由**（管理面 host 化）：机制分支 86e720cd——plugin 包新增 `panel-route.ts`（`/api/plugin-registry` 前缀路由，`ctx.inject(['httpServer'])` 挂载）；ui-plugin-manager client 改 fetch 自建路由（去 connection/apiproxy 依赖）；web 端到端（list/enable/disable/install 语义/错误回报）验证通过
-- ⏳ 剩余：apiproxy `plugins` 域从机制分支移除（面板已不依赖）、其余 A 类文件（plugins.ts 等，随 apiproxy 域移除一并处理）、重建 patch（收敛 ~5 文件）、纯净基线 + 真实安装顺序验证站端到端
+- ✅ **apiproxy plugins 域移除**：机制分支 731215dd——域实现/schema/rpc-map/fetch/index 全删（-391 行），connection fixture/fake-api 清 mock；apiproxy+plugin+connection 500 测试全过；瘦身验证站（/tmp/dsh-0808-slim，机制分支 worktree）端到端：CLI + 面板自建路由 + 热更新帧全通
+- ✅ **瘦身 patch 阶段产物**：`patches/dsh-plugin-registry-0808-slim.patch`（26 文件，相对 49 收敛 47%）——纯净 0808 基线 `git apply --check` 通过 + 真实安装顺序（先复制 packages 再 apply）无重叠；正式 0808 patch 保留未动
+- ⏳ 剩余：bash/tasks peek 外置（插件作者面，7 文件）、热更新帧链路评估（4 文件，独立于 plugins 域）、正式 patch 替换（收敛到 ~10 文件内）、文档基线标注同步
 
 ## 审计结论
 
