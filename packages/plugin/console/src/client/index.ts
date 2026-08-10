@@ -14,11 +14,12 @@ export const inject = ['slots']
 
 /**
  * 插头图标（plugin-line，参考 Clarity 图标库，dsh 风格：fill
- * currentColor 细条 + 16px 显示）——设置页导航的 tab 图标是官方硬编码
- * （仅 models 特例，其余统一齿轮，零扩展点），0 patch 下用
- * MutationObserver 找到「插件」tab 行替换其 svg 内容。
+ * currentColor 细条 + 16px 显示；fill+stroke 同色叠加加粗线条
+ * 0.5u/36 系 ≈ +22%）——设置页导航的 tab 图标是官方硬编码（仅 models
+ * 特例，其余统一齿轮，零扩展点），0 patch 下用 MutationObserver 找到
+ * 「插件」tab 行替换其 svg 内容。
  */
-const PLUGIN_TAB_ICON_SVG = '<path fill="currentColor" d="M29.81 16H29V8.83a2 2 0 0 0-2-2h-6A5.14 5.14 0 0 0 16.51 2A5 5 0 0 0 11 6.83H4a2 2 0 0 0-2 2V17h2.81A3.13 3.13 0 0 1 8 19.69A3 3 0 0 1 7.22 22A3 3 0 0 1 5 23H2v8.83a2 2 0 0 0 2 2h23a2 2 0 0 0 2-2V26h1a5 5 0 0 0 5-5.51A5.15 5.15 0 0 0 29.81 16m2.41 7A3 3 0 0 1 30 24h-3v7.83H4V25h1a5 5 0 0 0 5-5.51A5.15 5.15 0 0 0 4.81 15H4V8.83h9V7a3 3 0 0 1 1-2.22A3 3 0 0 1 16.31 4A3.13 3.13 0 0 1 19 7.19v1.64h8V18h2.81A3.13 3.13 0 0 1 33 20.69a3 3 0 0 1-.78 2.31"/>'
+const PLUGIN_TAB_ICON_SVG = '<path fill="currentColor" stroke="currentColor" stroke-width="0.5" stroke-linejoin="round" d="M29.81 16H29V8.83a2 2 0 0 0-2-2h-6A5.14 5.14 0 0 0 16.51 2A5 5 0 0 0 11 6.83H4a2 2 0 0 0-2 2V17h2.81A3.13 3.13 0 0 1 8 19.69A3 3 0 0 1 7.22 22A3 3 0 0 1 5 23H2v8.83a2 2 0 0 0 2 2h23a2 2 0 0 0 2-2V26h1a5 5 0 0 0 5-5.51A5.15 5.15 0 0 0 29.81 16m2.41 7A3 3 0 0 1 30 24h-3v7.83H4V25h1a5 5 0 0 0 5-5.51A5.15 5.15 0 0 0 4.81 15H4V8.83h9V7a3 3 0 0 1 1-2.22A3 3 0 0 1 16.31 4A3.13 3.13 0 0 1 19 7.19v1.64h8V18h2.81A3.13 3.13 0 0 1 33 20.69a3 3 0 0 1-.78 2.31"/>'
 
 /** 替换设置页导航里「插件」tab 的默认齿轮图标为插头图标（幂等）。 */
 function patchPluginTabIcon(): void {
