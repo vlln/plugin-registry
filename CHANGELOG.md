@@ -11,6 +11,7 @@
 - ✅ **开发规范引导（skills/cookbook）**：`make-dsh-plugin` skill 重写为官方 repository-plugin 开发引导（废弃旧机制教学）；新增 `docs/cookbook/creating-a-repository-plugin.md` 权威契约（仓库布局/entry/prepack/安装/开发规范）；console README 链接引导——「薄控制台 + 开发规范引导」定位落实
 - ✅ **examples 改为安装示例**：删除 4 个旧机制插件示例（greeter/loop/navbar/task-status，`dsh.plugin.json` 已废弃）；`examples/README.md` 重写为「如何安装外部插件」——bundle 路径（`dsh plugin --profile web add`，loop/task-status/navbar）+ repository 路径（`config.yaml`，whale-girl）+ 薄控制台管理；README/AGENTS/活文档 examples 引用清理（历史文档保留）
 - ✅ **skill 重命名 make-dsh-plugin + 插件类型对比文档**：`plugin-registry-create` → `make-dsh-plugin`（目录/frontmatter/全部引用同步）；新增 [docs/plugin-types.md](docs/plugin-types.md)——repository 插件 vs bundle 插件四维对比（形态/开发/分发/安装/管理）+ 选型判据 + 依赖解析（官方包未发布）
+- ✅ **README 整理 + release 清理**：删除 v0.1.0 release（旧机制 patch 分发，转向后失效）；console 安装命令改指 `packages/plugin/console` 子目录；删「安装其他插件」章节（生态关系段保留 examples 链接）；Agent Skill 段落改表格（make-skill 规范）；skill 补「README 用表格列 skill」约定
 - ⏳ **冻结中（独立一步移除）**：patch 加载（0808）、`dsh registry` CLI、`ctx.plugins`、`ui-plugin-manager` 旧面板
 - 澄清：官方用户配置层为 `$DSH_HOME/cordis.patch.yml`（08-05 取代 `config.yaml`）
 

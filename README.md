@@ -23,7 +23,7 @@ DeepSeek Harness 官方机制管「插件是什么、怎么跑」；本仓库补
                                 ② make-dsh-plugin skill + cookbook：引导开发第三方插件
 ```
 
-两类插件的完整区别（开发/分发/安装/管理四维 + 选型）见 [插件类型对比](docs/plugin-types.md)。
+两类插件的完整区别（开发/分发/安装/管理四维 + 选型）见 [插件类型对比](docs/plugin-types.md)；现有插件的安装示例（loop/task-status/whale-girl 等）见 [examples](examples/README.md)。
 
 ## 安装薄控制台
 
@@ -33,13 +33,11 @@ dsh plugin --profile web add <本仓库>/packages/plugin/console
 
 挂载后设置页出现「插件」面板：repository 插件区（增删 `repositories` 列表）+ UI 插件区（`disabled` 启停标记）。
 
-## 安装其他插件
+## Agent Skills
 
-本仓库不含插件代码——插件是独立仓库/包。安装示例（loop/task-status/whale-girl 等，两种官方路径）见 [examples](examples/README.md)。
-
-## Agent Skill
-
-仓库自带 `make-dsh-plugin` Skill（`skills/make-dsh-plugin/SKILL.md`），指导 agent 创建官方 repository-plugin（0809 格式）：**先选形态**（skill 包 / MCP / Node 工具 / 带 UI）→ 按对应路径搭建 `.dsh-plugin/` → prepack → `config.yaml` 安装 → 验证纪律。详情分置 `references/`（entry 契约 / 安装验证 / 开发规范 / 踩坑清单）；完整契约见 [cookbook](docs/cookbook/creating-a-repository-plugin.md)，参考实现 `whale-girl`。
+| Skill | 作用 |
+|---|---|
+| [make-dsh-plugin](skills/make-dsh-plugin/SKILL.md) | 创建官方 repository-plugin（0809 格式）：先选形态（skill 包 / MCP / Node 工具 / 带 UI）→ 搭建 `.dsh-plugin/` → prepack → config.yaml 安装 → 验证纪律。详情分置 `references/`（entry 契约 / 安装验证 / 开发规范 / 踩坑清单）；完整契约见 [cookbook](docs/cookbook/creating-a-repository-plugin.md)，参考实现 `whale-girl` |
 
 ## 开发前须知（踩过的坑）
 

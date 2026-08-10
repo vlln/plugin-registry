@@ -125,6 +125,11 @@ A maintainable plugin follows the discipline in
 for every non-trivial change, generated artifacts never hand-edited,
 first-time host behaviors recorded as environment facts.
 
+**README conventions** (make-skill spec): the repo README lists its skills in
+a table (`| Skill | 作用 |`), one row per skill with a one-line description —
+human readers scan the table to decide what to use; details stay in each
+SKILL.md. Apply this to any repo that ships skills.
+
 **Read `references/dev-conventions.md`** when the project enters iteration.
 
 ## Recommended management
