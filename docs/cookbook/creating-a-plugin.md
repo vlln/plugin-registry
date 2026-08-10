@@ -79,5 +79,5 @@ dsh registry uninstall acme/cool-tool                                     # 卸�
 ## 参考
 
 - 完整可安装示例：`examples/greeter`（清单 + 入口 + README）
-- Agent Skill `plugin-registry-create`：同一流程的 agent 指导版，含常见坑
+- Agent Skill `make-dsh-plugin`：同一流程的 agent 指导版，含常见坑
 - 分发：见 [分发插件](distributing-plugins.md)

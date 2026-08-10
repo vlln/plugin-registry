@@ -16,4 +16,4 @@
 
 ## 开发插件（引导）
 
-创建官方 repository-plugin 的完整契约见 [cookbook/creating-a-repository-plugin](../../../docs/cookbook/creating-a-repository-plugin.md)；agent 工作流引导见 [skills/plugin-registry-create](../../../skills/plugin-registry-create/SKILL.md)。参考实现：`whale-girl`。
+创建官方 repository-plugin 的完整契约见 [cookbook/creating-a-repository-plugin](../../../docs/cookbook/creating-a-repository-plugin.md)；agent 工作流引导见 [skills/make-dsh-plugin](../../../skills/make-dsh-plugin/SKILL.md)。参考实现：`whale-girl`。

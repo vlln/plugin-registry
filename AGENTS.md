@@ -26,7 +26,7 @@
 | [`examples/`](examples/) | 安装示例（如何装外部插件：bundle 与 repository 两种官方路径） |
 | [`packages/plugin/console`](packages/plugin/console/) | 薄控制台（当前交付物） |
 | [`scripts/`](scripts/) | 校验脚本（md 链接、文档预算） |
-| [`skills/`](skills/) | agent skill（plugin-registry-create） |
+| [`skills/`](skills/) | agent skill（make-dsh-plugin） |
 | [`CHANGELOG.md`](CHANGELOG.md) / [`ROADMAP.md`](ROADMAP.md) | 交付记录 / 推进路线 |
 
 ## Agent 协作约束

@@ -370,7 +370,7 @@ export const name = 'plugin-console'
 /** 需要宿主 web server（web 组合）+ loader（读/改 loader 树条目）。 */
 export const inject = ['httpServer', 'loader']
 
-/** loader 树条目投影（条目短 id + 包名 + 当前 disabled）。 */
+/** loader 树条目投影（条目短 id + 包名 + 当前 disabled + 当前版本）。 */
 interface LoadedEntryRow {
   /**
    * 条目短 id（EntryOptions.id，如 dsh-loop）——profile patch 的
@@ -382,6 +382,44 @@ interface LoadedEntryRow {
   name: string
   /** 当前是否被禁用（含父条目禁用继承）。 */
   disabled: boolean
+  /** 已安装版本（读 profile node_modules 的 package.json）；未装/读不到为 undefined。 */
+  version?: string
+}
+
+/** 版本检查缓存：name -> { latest, checkedAt }（10 分钟 TTL，进程内存）。 */
+const versionCache = new Map<string, { latest: string | null; checkedAt: number }>()
+const VERSION_CACHE_TTL_MS = 10 * 60 * 1000
+
+/** npm view <name> version（registry 最新版）；失败/非 registry 包返回 null。结果缓存 10 分钟。 */
+function npmLatestVersion(name: string): string | null {
+  const cached = versionCache.get(name)
+  if (cached !== undefined && Date.now() - cached.checkedAt < VERSION_CACHE_TTL_MS) {
+    return cached.latest
+  }
+  let latest: string | null = null
+  try {
+    const result = spawnSync('npm', ['view', name, 'version'], { encoding: 'utf8', timeout: 15_000, stdio: ['ignore', 'pipe', 'pipe'] })
+    const text = (result.stdout ?? '').trim()
+    if (result.status === 0 && /^\d+(\.\d+)+/.test(text)) {
+      latest = text.split('\n')[0]!.trim()
+    }
+  } catch {
+    // 保持 null（无法查询 = 非 registry 包或网络问题）。
+  }
+  versionCache.set(name, { latest, checkedAt: Date.now() })
+  return latest
+}
+
+/** 读已安装包版本（profile node_modules/<name>/package.json）；未装返回 undefined。 */
+function readInstalledVersion(name: string): string | undefined {
+  try {
+    const manifest = JSON.parse(readFileSync(join(profileWebDir(), 'node_modules', name, 'package.json'), 'utf8')) as {
+      version?: string
+    }
+    return typeof manifest.version === 'string' ? manifest.version : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /** 遍历 loader 树收集全部条目（含嵌套子树），id 取短 id（options.id）。 */
@@ -393,10 +431,12 @@ function collectLoaderEntries(ctx: ConsoleCtx): LoadedEntryRow[] {
     const entry = raw as { id?: string; options?: { id?: string; name?: string }; disabled?: boolean }
     const id = entry.options?.id ?? entry.id
     if (typeof id !== 'string' || id.length === 0) continue
+    const name = entry.options?.name ?? id
     rows.push({
       id,
-      name: entry.options?.name ?? id,
+      name,
       disabled: entry.disabled === true,
+      version: readInstalledVersion(name),
     })
   }
   return rows

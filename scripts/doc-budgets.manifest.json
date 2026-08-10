@@ -18,5 +18,6 @@
   "docs/patch-slimming-design.md": 9200,
   "docs/official-0809-coverage.md": 7000,
   "docs/console-ui-plugin-management.md": 6000,
-  "docs/cookbook/creating-a-repository-plugin.md": 3500
+  "docs/cookbook/creating-a-repository-plugin.md": 3500,
+  "docs/plugin-types.md": 4000
 }

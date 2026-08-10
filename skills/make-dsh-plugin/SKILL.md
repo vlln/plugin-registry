@@ -1,5 +1,5 @@
 ---
-name: plugin-registry-create
+name: make-dsh-plugin
 description: >
   Use this skill when the user wants to develop a new plugin for DeepSeek
   Harness as an official repository-plugin (0809 format). Guides shape

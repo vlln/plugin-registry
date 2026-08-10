@@ -41,4 +41,4 @@ dsh plugin --profile web add <本仓库>/packages/plugin/console
 
 ## 开发新插件
 
-创建官方 repository-plugin 的契约与引导见 [cookbook/creating-a-repository-plugin](../docs/cookbook/creating-a-repository-plugin.md) 与 [skills/plugin-registry-create](../skills/plugin-registry-create/SKILL.md)。
+创建官方 repository-plugin 的契约与引导见 [cookbook/creating-a-repository-plugin](../docs/cookbook/creating-a-repository-plugin.md) 与 [skills/make-dsh-plugin](../skills/make-dsh-plugin/SKILL.md)。
