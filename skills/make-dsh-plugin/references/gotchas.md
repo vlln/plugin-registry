@@ -12,6 +12,18 @@
 
 **bundle 插件同坑、更隐蔽**：bundle（dsh.client 包，如 loop/task-status）同样 import `@deepseek-ai/dsh-tools`/`dsh-llm`，但 **`dependencies` 声明为空**——官方包由 profile 的 pnpm 闭包（`dsh plugin --profile web add` 挂载环境）注入。**插件不该自己声明这些依赖**：声明了公共 npm 解析不到反而失败；依赖由挂载环境提供是设计。本地装 bundle 同样需官方 monorepo 构建产物 link 进 profile。
 
+### 1a. repository 插件分发期断点：安装 404（官方未发布）
+
+repository 插件（`.dsh-plugin`）的 `devDependencies` 必含 `@deepseek-ai/dsh-repository-plugin`（`dsh-plugin-prepare` 提供者，官方 `installedPackageSchema` 硬校验：prepack 必须调 `dsh-plugin-prepare` + devDep 必须声明）——而该包 `private: true` 未发布，RepositoryCache 安装时在 `.dsh-plugin/` 跑 `pnpm install` 直接 404。**声明必须、安装必败**，不能通过移除 devDep 绕过（loader 拒绝加载）。这是官方发布前的分发期断点，任何按官方格式开发的第三方插件在真实环境都装不上（官方 e2e 用本地 registry 模拟发布，真实用户撞 404）。
+
+**过渡方案（实测链路，whale-girl 范本）**：预填充 RepositoryCache 让 loader 跳过 `pnpm install`：
+
+1. **wrapper 入库**：本地在可用官方包的环境跑 `dsh-plugin-prepare` 生成 `dsh-plugin.mjs` + `dsh-plugin-assets/`，提交入库（官方建议生成物不入库，过渡期例外；`files` 已声明则只需取消 gitignore）。
+2. **预填充 cache**（whale-girl 的 `scripts/prepare-cache.mjs` 可复刻）：cache 目录 = `$DSH_HOME/cache/repository-plugins/<sha256(specifier)>`（specifier = `github:owner/repo#<ref>&path:/.dsh-plugin` 全文）；拷贝 `.dsh-plugin` 到 `node_modules/repository/`；**临时摘除 devDependencies** 后 `npm install`（只装 runtime 依赖，避开官方包 404），**恢复原始 package.json**（loader metadata 校验需要 prepack/devDep 声明）；写 `.repository-cache.json` = `{"specifier": "<完整 specifier>"}`（loader `readCached` 精确匹配）。
+3. loader 命中缓存后跳过 `pnpm install`、校验 metadata、加载 wrapper。
+
+**未来**：官方发布 `@deepseek-ai/dsh-repository-plugin` 后此过渡方案废弃（正常安装跑 prepack 生成 wrapper），仓库应移除桥脚本与入库 wrapper。
+
 ## 1c. git 源装 bundle：pnpm ≥10 阻止 prepare 脚本（allowBuilds）
 
 `dsh plugin --profile web add github:owner/repo#<ref>&path:/<子目录>`（或 `git+https://...`）安装 git 依赖时，pnpm ≥10 默认**阻止其 prepare（build）脚本执行**——dsh 的 `plugin` 命令失败时会提示把 pnpm 打印的 key 加入 profile 的 `pnpm-workspace.yaml` 的 `allowBuilds` 后重跑。两条出路：
