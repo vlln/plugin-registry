@@ -13,12 +13,16 @@ export const name = 'plugin-console-client'
 export const inject = ['slots']
 
 /**
- * 拼图块图标（插件语义）：饱满线条风格——主体占满 15/16、2px stroke、
- * 凹槽/凸起 r2 圆润、currentColor 跟随主题。设置页导航的 tab 图标是
- * 官方硬编码（仅 models 特例，其余统一齿轮，零扩展点），0 patch 下用
+ * 拼图块图标（插件语义，subagent 审查重画版 SF）：
+ * - 顶部 U 型凹槽（0.75 圆角 + 直壁 + r1.25 圆底）与右侧胶囊凸起
+ *   （0.75 圆角 + r1.25 半圆顶）共用同一半径组——槽是凸起的负形，
+ *   设计语言一致；四角统一 r1.5
+ * - stroke 1.5（对齐官方细条 1.34-1.45 视觉）、currentColor
+ * - 18 个接点程序化验证 0 处切线不连续；墨迹 x∈[2.0,15.5] 16px 完整
+ * 设置页 tab 图标为官方硬编码（仅 models 特例），0 patch 下用
  * MutationObserver 找到「插件」tab 行替换其 svg 内容。
  */
-const PLUGIN_TAB_ICON_SVG = '<path d="M4.5 3 H6 A2 2 0 0 0 10 3 H11.5 A2 2 0 0 0 13.5 5 V6.5 A2 2 0 0 1 13.5 11.5 V12 A1.5 1.5 0 0 1 12 13.5 H4 A1.5 1.5 0 0 1 2.5 12 V4 A1.5 1.5 0 0 1 4 2.5 H4.5 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'
+const PLUGIN_TAB_ICON_SVG = '<path d="M4.25 2.75 H5.75 A0.75 0.75 0 0 1 6.5 3.5 V4.25 A1.25 1.25 0 0 0 9.0 4.25 V3.5 A0.75 0.75 0 0 1 9.75 2.75 H11.25 A1.5 1.5 0 0 1 12.75 4.25 V6.0 A0.75 0.75 0 0 0 13.5 6.75 A1.25 1.25 0 0 1 13.5 9.25 A0.75 0.75 0 0 0 12.75 10.0 V11.75 A1.5 1.5 0 0 1 11.25 13.25 H4.25 A1.5 1.5 0 0 1 2.75 11.75 V4.25 A1.5 1.5 0 0 1 4.25 2.75 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>'
 
 /** 替换设置页导航里「插件」tab 的默认齿轮图标为拼图块图标（幂等）。 */
 function patchPluginTabIcon(): void {
