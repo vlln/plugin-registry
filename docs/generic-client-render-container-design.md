@@ -1,5 +1,8 @@
 # 设计：client 通用渲染容器（generic client render container）
 
+> **历史文档（2026-08 转向后）**：本文描述 plugin-registry 已移除的独立机制（patch/CLI/`ctx.plugins`），仅作决策依据与演进记录保留；当前形态见 [official-0809-coverage](official-0809-coverage.md) 与 `packages/plugin/console`。
+
+
 状态：**设计已回退**（曾实现为 runtime client half `ctx.ui`，2026-08 缝降级中从官方树移除；`examples/greeter` 已改回纯 DOM 自渲染）。本文保留作为「附加式 UI 标准化」方向的设计记录：目标曾让 registry client 插件获得 Obsidian 式的通用 UI 挂载能力——官方维护一组通用渲染容器与 API，插件往里渲染自己的 React UI，而不是依赖官方为每个插件挖专用 slot hole。当前纪律：插件自建（自渲染/自造缝），官方不为示例开通用 API。本文是 [registry client half](registry-client-half-design.md) 的能力扩展设想：前者解决「bundle 怎么进浏览器」，本文解决「插件的 UI 挂到哪里」。
 
 ## 问题：专用 hole 的扩展成本

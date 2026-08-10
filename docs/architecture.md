@@ -1,5 +1,8 @@
 # 架构：plugin-registry 的两层插件模型
 
+> **历史文档（2026-08 转向后）**：本文描述 plugin-registry 已移除的独立机制（patch/CLI/`ctx.plugins`），仅作决策依据与演进记录保留；当前形态见 [official-0809-coverage](official-0809-coverage.md) 与 `packages/plugin/console`。
+
+
 本文是 plugin-registry 的系统地图：registry 插件是什么、怎么加载、能力边界在哪。阅读顺序：先看两层模型，再沿「加载路径 → 能力面 → 服务关系 → 信任边界 → web 边界」展开。
 
 ## 两层插件模型

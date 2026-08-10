@@ -1,5 +1,8 @@
 # 设计：registry 插件支持 client half（浏览器端 UI 插件）
 
+> **历史文档（2026-08 转向后）**：本文描述 plugin-registry 已移除的独立机制（patch/CLI/`ctx.plugins`），仅作决策依据与演进记录保留；当前形态见 [official-0809-coverage](official-0809-coverage.md) 与 `packages/plugin/console`。
+
+
 状态：**已实现（v3）**。本文记录从设计到实现的全过程：现状链路、断点、登记/分发机制、构建契约、生命周期联动，以及两轮 subagent 评审的结论与修订。实现位于 `packages/client/modules`（`registerExternal`/`unregisterExternal`）与 `packages/plugin/plugin`（`client` 声明、`PluginLocalService` 联动、`ctx.inject` 补登记）；示例见 `examples/greeter`。本文的「设计」各节描述落地后的机制，与源码一致；「开放决策」记录拍板结论。
 
 ## 目标与范围

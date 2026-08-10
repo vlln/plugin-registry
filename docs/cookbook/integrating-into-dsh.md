@@ -1,5 +1,8 @@
 # Cookbook：集成到 DeepSeek Harness
 
+> **历史文档（2026-08 转向后）**：本文描述 plugin-registry 已移除的独立机制（patch/CLI/`ctx.plugins`），仅作决策依据与演进记录保留；当前形态见 [official-0809-coverage](../official-0809-coverage.md) 与 `packages/plugin/console`。
+
+
 目标：把 plugin-registry 集成进 DSH 源码环境，让 `dsh registry` 命令与 Web 设置页插件面板可用。集成方式与社区其他扩展一致：**复制包 + git apply 补丁 + profile bundle 挂载**（0806 起官方用 profile/bundle 组合机制，见 [官方 dsh plugin / bundle](../manifest-format.md)）。
 
 两条路径等价：**一键安装**（脚本代劳）或**手动安装**（四步，适合想看清每一步、或基线有差异需对齐时）。

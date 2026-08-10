@@ -1,5 +1,8 @@
 # 设计：registry UI 插件真热更新（True Hot Reload）
 
+> **历史（2026-08 转向后）**：描述已移除的独立机制，仅作演进记录；当前见 [official-0809-coverage](official-0809-coverage.md)。
+
+
 ## 背景与现状
 
 registry 插件启停目前是「近似热更新」：服务端实时（plugin-local 同进程挂载/卸载），浏览器端收到 host 帧 `host/client-graph-changed`（纯信号）后**整页 `location.reload()`** 重新拉 `__DSH_BOOT__`——会话上下文、输入、滚动全部丢失。

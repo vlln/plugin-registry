@@ -1,5 +1,8 @@
 # Cookbook：给插件加 client half（浏览器端 UI）
 
+> **历史文档（2026-08 转向后）**：本文描述 plugin-registry 已移除的独立机制（patch/CLI/`ctx.plugins`），仅作决策依据与演进记录保留；当前形态见 [official-0809-coverage](../official-0809-coverage.md) 与 `packages/plugin/console`。
+
+
 目标：让 registry 插件带浏览器端 bundle——启用后进入 `__DSH_BOOT__`，在 Web 端呈现/运行（工具之外的 UI、DOM 操作、client 服务协作）。前置：DSH 源码环境已集成 plugin-registry（见 [集成到 dsh](integrating-into-dsh.md)），插件已按 [创建插件](creating-a-plugin.md) 走通 Node 侧。
 
 ## 1. 声明 client 字段

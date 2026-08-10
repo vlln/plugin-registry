@@ -1,5 +1,8 @@
 # 卸载（插件与 registry 自身）
 
+> **历史文档（2026-08 转向后）**：本文描述 plugin-registry 已移除的独立机制（patch/CLI/`ctx.plugins`），仅作决策依据与演进记录保留；当前形态见 [official-0809-coverage](../official-0809-coverage.md) 与 `packages/plugin/console`。
+
+
 本 cookbook 覆盖两个层次：**卸载已安装的插件**，以及**把 plugin-registry 从 DSH 中移除**（集成反操作）。前置：已按 [集成到 dsh](integrating-into-dsh.md) 接入 registry。
 
 ## 卸载插件

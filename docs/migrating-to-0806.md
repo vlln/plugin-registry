@@ -1,5 +1,8 @@
 # 迁移指南：0805 → 0806
 
+> **历史文档（2026-08 转向后）**：本文描述 plugin-registry 已移除的独立机制（patch/CLI/`ctx.plugins`），仅作决策依据与演进记录保留；当前形态见 [official-0809-coverage](official-0809-coverage.md) 与 `packages/plugin/console`。
+
+
 官方 0806 大重构（profile/bundle 机制、slots 契约、命令面）对 registry 插件有 3 处**破坏性变化**。本指南给插件作者自查与迁移；示例 `examples/task-status` 已按 0806 迁移（可对照）。
 
 ## 1. 命令面：`dsh plugin` → `dsh registry`

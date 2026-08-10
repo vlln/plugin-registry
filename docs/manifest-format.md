@@ -1,5 +1,8 @@
 # 清单格式参考（`dsh.plugin.json`）
 
+> **历史文档（2026-08 转向后）**：本文描述 plugin-registry 已移除的独立机制（patch/CLI/`ctx.plugins`），仅作决策依据与演进记录保留；当前形态见 [official-0809-coverage](official-0809-coverage.md) 与 `packages/plugin/console`。
+
+
 registry 插件的定义：**清单 + Cordis 入口**——`dsh.plugin.json` 声明身份与贡献，`main` 指向的 Cordis 插件提供实现（`apply(ctx)`）。两种清单形态：**原生插件**（`publisher/name` + 自建 bundle）与**官方插件增量**（npm 包名 + 复用官方构建产物，见 [官方插件增量兼容](official-plugin-incremental-compat.md)）。校验实现：`packages/plugin/plugin/src/manifest.ts`。
 
 ## 字段参考

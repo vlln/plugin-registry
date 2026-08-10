@@ -1,5 +1,8 @@
 # Cookbook：创建 registry 插件
 
+> **历史文档（2026-08 转向后）**：本文描述 plugin-registry 已移除的独立机制（patch/CLI/`ctx.plugins`），仅作决策依据与演进记录保留；当前形态见 [official-0809-coverage](../official-0809-coverage.md) 与 `packages/plugin/console`。
+
+
 目标：从零产出一个可安装、可启用的 registry 插件。前置：DSH 源码环境已集成 plugin-registry（见 [集成到 dsh](integrating-into-dsh.md)），`dsh registry` 命令可用。
 
 ## 1. 脚手架

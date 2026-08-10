@@ -1,5 +1,8 @@
 # 机制提案：宿主暴露模型 token 用量（usage）事件
 
+> **历史文档（2026-08 转向后）**：本文描述 plugin-registry 已移除的独立机制（patch/CLI/`ctx.plugins`），仅作决策依据与演进记录保留；当前形态见 [official-0809-coverage](official-0809-coverage.md) 与 `packages/plugin/console`。
+
+
 > 状态：proposed（机制开发需求记录，供 test-vlln 机制分支评估实现）
 > 提出方：dsh-pet 插件（registry 生态消费者）
 
