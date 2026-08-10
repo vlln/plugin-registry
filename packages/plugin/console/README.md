@@ -13,3 +13,7 @@
 - **生效**：web 默认无运行中 HMR（官方 TODO），写后提示重启；官方启用 web hmr 后自动换代
 
 两类插件的写入目标不同：repository 插件配置在 home 级（跨 profile 的用户配置层），UI 插件的启停覆盖在 profile 级（针对当前 profile 的 Loader 树行）。背景与转向决策见 `docs/official-0809-coverage.md`。
+
+## 开发插件（引导）
+
+创建官方 repository-plugin 的完整契约见 [cookbook/creating-a-repository-plugin](../../../docs/cookbook/creating-a-repository-plugin.md)；agent 工作流引导见 [skills/plugin-registry-create](../../../skills/plugin-registry-create/SKILL.md)。参考实现：`whale-girl`。
