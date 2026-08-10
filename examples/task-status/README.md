@@ -1,5 +1,8 @@
 # vlln/task-status
 
+> **已废弃（2026-08 转向后）**：旧机制示例，仅作历史保留；当前见 `packages/plugin/console` 与官方 `.dsh-plugin` 格式。
+
+
 示例插件：**后台任务状态条**（S2 场景）——对话页对话框（composer）上方的任务状态条。UI 与官方机制对齐（`conversation.input.dock` 官方槽），**数据通道自造**（Node half 只读路由 + 客户端轮询），官方树仅一处最小 seam 扩展（`tasks.peek`，见下）。
 
 ## 原理

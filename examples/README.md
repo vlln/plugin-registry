@@ -1,5 +1,11 @@
 # 从零开发一个 registry 插件
 
+> **已废弃（2026-08 转向后）**：本目录示例演示 plugin-registry 已移除的旧机制
+> （`dsh.plugin.json` + `dsh registry` CLI + `ctx.plugins` 管理）。官方 0809 已提供
+> 仓库插件格式（`.dsh-plugin`），当前交付物为薄控制台（`packages/plugin/console`）。
+> 本目录仅作历史演进记录保留，不再作为开发模板。
+
+
 最快路径：**复制 `examples/greeter` 改**，或 **`dsh registry create` 脚手架**。两种方式得到的插件都能直接安装、启用、验证。
 
 ## 方式一：脚手架（推荐起点）

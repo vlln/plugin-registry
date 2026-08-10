@@ -1,4 +1,7 @@
 ---
+
+> **已废弃（2026-08 转向后）**：本 skill 教学 plugin-registry 已移除的旧机制（`dsh.plugin.json` + `dsh registry`）。官方 0809 提供仓库插件格式（`.dsh-plugin`），当前交付物为薄控制台。仅作历史保留。
+
 name: plugin-registry-create
 description: >
   Use this skill when the user wants to develop a new plugin for the

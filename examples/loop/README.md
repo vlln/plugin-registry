@@ -1,5 +1,8 @@
 # acme/loop
 
+> **已废弃（2026-08 转向后）**：旧机制示例，仅作历史保留；当前见 `packages/plugin/console` 与官方 `.dsh-plugin` 格式。
+
+
 定时循环插件：`/loop` 命令 + `loop` 工具，按间隔向当前 agent 重复投递 prompt，对齐 Claude Code `/loop` 语义（[调研笔记](../../README.md#agent-skill)）。
 
 ## 安装与启用

@@ -1,5 +1,8 @@
 # acme/greeter
 
+> **已废弃（2026-08 转向后）**：旧机制示例，仅作历史保留；当前见 `packages/plugin/console` 与官方 `.dsh-plugin` 格式。
+
+
 示例插件：注册一个 `greet` 工具，并带浏览器端 client half（页面右下角显示问候标记）。演示 registry 插件的完整形态：Node 侧工具 + 浏览器侧 UI。
 
 ## 文件
