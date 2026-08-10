@@ -22,21 +22,23 @@ index a648901c..2ff17cf6 100644
      "@deepseek-ai/dsh-pty-local": "workspace:^",
      "@deepseek-ai/dsh-session-reference": "workspace:^",
 diff --git a/apps/cli/src/args.ts b/apps/cli/src/args.ts
-index d96b7a50..8f14cdae 100644
+index d96b7a50..5060b45c 100644
 --- a/apps/cli/src/args.ts
 +++ b/apps/cli/src/args.ts
-@@ -61,8 +61,17 @@ interface PluginInvocation {
+@@ -9,6 +9,7 @@
+  */
+ 
+ import { Command, CommanderError } from 'commander'
++import type { RegistryInvocation } from '@deepseek-ai/dsh-plugin'
+ 
+ /** Boot a named profile. */
+ interface ProfileInvocation {
+@@ -61,8 +62,11 @@ interface PluginInvocation {
    args: string[]
  }
  
 +/** Local plugin registry management: `dsh registry <action> [target]`. */
-+export interface RegistryInvocation {
-+  mode: 'registry'
-+  /** The registry action to run. */
-+  action: 'install' | 'list' | 'enable' | 'disable' | 'uninstall' | 'create'
-+  /** Plugin directory/tarball for `install`, or the id for enable/disable/uninstall/create. */
-+  target?: string
-+}
++export type { RegistryInvocation } from '@deepseek-ai/dsh-plugin'
 +
  /** The resolved `dsh` invocation. Help, version, and errors exit inside {@link parseDshArgs}. */
 -export type DshInvocation = ProfileInvocation | RunInvocation | DumpConfigInvocation | WebInvocation | PluginInvocation
@@ -44,7 +46,7 @@ index d96b7a50..8f14cdae 100644
  
  /** Raw web-subcommand options straight from Commander. */
  interface WebOptions {
-@@ -228,6 +237,22 @@ Examples:
+@@ -228,6 +232,22 @@ Examples:
        resolved = { mode: 'plugin', profile: options.profile, args }
      })
  
@@ -68,7 +70,7 @@ index d96b7a50..8f14cdae 100644
      program.parse(argv, { from: 'user' })
    } catch (error) {
 diff --git a/apps/cli/src/bin.ts b/apps/cli/src/bin.ts
-index a53ba4bf..3f0a71af 100644
+index a53ba4bf..7905ce5d 100644
 --- a/apps/cli/src/bin.ts
 +++ b/apps/cli/src/bin.ts
 @@ -56,6 +56,11 @@ switch (invocation.mode) {
@@ -76,113 +78,13 @@ index a53ba4bf..3f0a71af 100644
      break
    }
 +  case 'registry': {
-+    const { runRegistry } = await import('./registry.ts')
++    const { runRegistry } = await import('@deepseek-ai/dsh-plugin')
 +    await runRegistry(invocation, readVersion())
 +    break
 +  }
    case 'dump-config': {
      const { runDumpConfig } = await import('./dump-config.ts')
      runDumpConfig(invocation.profile, invocation.defaultOnly, invocation.patches)
-diff --git a/apps/cli/src/registry.ts b/apps/cli/src/registry.ts
-new file mode 100644
-index 00000000..fb4c49f6
---- /dev/null
-+++ b/apps/cli/src/registry.ts
-@@ -0,0 +1,94 @@
-+/**
-+ * `dsh registry` — manage the local plugin registry: install from a
-+ * directory or tarball, list, enable/disable, uninstall, and scaffold.
-+ * Pure filesystem operations against the registry under `$DSH_HOME/plugins`;
-+ * no harness boot.
-+ *
-+ * Named `registry` (not `plugin`) because the official `dsh plugin`
-+ * manages a profile's pnpm plugins; the local registry is a separate surface
-+ * and keeps its own command name to avoid collision.
-+ * @module @deepseek-ai/dsh/registry
-+ */
-+
-+import { resolveDshHome } from '@deepseek-ai/dsh-paths'
-+import {
-+  installFromTarball,
-+  installPlugin,
-+  isTarball,
-+  listPlugins,
-+  requireDirectory,
-+  scaffoldPlugin,
-+  setEnabled,
-+  uninstallPlugin,
-+} from '@deepseek-ai/dsh-plugin'
-+import { join } from 'node:path'
-+import type { RegistryInvocation } from './args.ts'
-+
-+/**
-+ * Run one plugin-registry action and print its outcome. Domain failures print
-+ * to stderr and set the exit code instead of throwing, so a mistyped id or a
-+ * bad manifest never surfaces a stack trace.
-+ * @param invocation - the resolved plugin-local subcommand.
-+ * @param harnessVersion - the running dsh version, checked against `engines.dsh` at install.
-+ */
-+export async function runRegistry(invocation: RegistryInvocation, harnessVersion: string): Promise<void> {
-+  try {
-+    const dshHome = resolveDshHome()
-+    switch (invocation.action) {
-+      case 'install': {
-+        if (invocation.target === undefined) throw new Error('dsh registry install needs a plugin directory or tarball')
-+        const installed = isTarball(invocation.target)
-+          ? await installFromTarball(invocation.target, { dshHome, harnessVersion })
-+          : await (async () => {
-+            await requireDirectory(invocation.target as string)
-+            return installPlugin(invocation.target as string, { dshHome, harnessVersion })
-+          })()
-+        console.log(`installed ${installed.id}@${installed.record.version} (disabled; run \`dsh registry enable ${installed.id}\` to activate)`)
-+        break
-+      }
-+      case 'create': {
-+        if (invocation.target === undefined) throw new Error('dsh registry create needs a plugin id (publisher/name)')
-+        const name = invocation.target.split('/').at(-1) ?? invocation.target
-+        const dir = await scaffoldPlugin({ id: invocation.target, dir: join(process.cwd(), name) })
-+        console.log(`created plugin ${invocation.target} in ${dir}; run \`dsh registry install ${dir}\` to install it`)
-+        break
-+      }
-+      case 'list': {
-+        const listed = await listPlugins(dshHome)
-+        if (listed.length === 0) {
-+          console.log('no plugins installed')
-+          break
-+        }
-+        for (const plugin of listed) {
-+          const state = plugin.record.enabled ? 'enabled ' : 'disabled'
-+          const summary = plugin.manifest.description ? ` — ${plugin.manifest.description}` : ''
-+          console.log(`${state} ${plugin.id}@${plugin.record.version}${summary}`)
-+        }
-+        break
-+      }
-+      case 'enable': {
-+        if (invocation.target === undefined) throw new Error('dsh registry enable needs a plugin id')
-+        await setEnabled(dshHome, invocation.target, true)
-+        console.log(`enabled ${invocation.target}`)
-+        break
-+      }
-+      case 'disable': {
-+        if (invocation.target === undefined) throw new Error('dsh registry disable needs a plugin id')
-+        await setEnabled(dshHome, invocation.target, false)
-+        console.log(`disabled ${invocation.target}`)
-+        break
-+      }
-+      case 'uninstall': {
-+        if (invocation.target === undefined) throw new Error('dsh registry uninstall needs a plugin id')
-+        await uninstallPlugin(dshHome, invocation.target)
-+        console.log(`uninstalled ${invocation.target}`)
-+        break
-+      }
-+      default:
-+        throw new Error(`dsh registry: unhandled action ${JSON.stringify(invocation.action)}`)
-+    }
-+  } catch (error) {
-+    console.error(String(error))
-+    process.exitCode = 1
-+  }
-+}
 diff --git a/apps/cli/tsconfig.json b/apps/cli/tsconfig.json
 index 36c4bad6..c6600a26 100644
 --- a/apps/cli/tsconfig.json
@@ -231,36 +133,6 @@ index ccb5a32a..d667faa8 100644
        kill: (): boolean => {
          if (proc.status !== 'running') return false
          proc.status = 'killed'
-diff --git a/packages/bash/bash-local/tests/executor.spec.ts b/packages/bash/bash-local/tests/executor.spec.ts
-index af556608..1bb2d186 100644
---- a/packages/bash/bash-local/tests/executor.spec.ts
-+++ b/packages/bash/bash-local/tests/executor.spec.ts
-@@ -197,6 +197,25 @@ describe('LocalBashExecutor.start (background process handles)', () => {
-     expect(proc.readOutput().delta).toBe('')
-   })
- 
-+  it('peekOutput is non-consuming: repeated peeks re-deliver, reads stay unaffected', async () => {
-+    const { bash } = await setup()
-+    const proc = bash.start(bash.resolve({ command: 'echo first; sleep 1; echo second' }))
-+    await readUntil(proc, 'first\n')
-+
-+    // A peek shows the retained stream since the cursor without advancing it.
-+    const peeked = proc.peekOutput()
-+    expect(peeked.delta).toContain('first\n')
-+    expect(proc.peekOutput().delta).toBe(peeked.delta)
-+
-+    await proc.done
-+    // The same retained tail stays visible to peeks after exit…
-+    const tail = proc.peekOutput()
-+    expect(tail.delta).toContain('second\n')
-+    expect(proc.peekOutput().delta).toBe(tail.delta)
-+    // …while a consuming read still delivers the full remaining delta once.
-+    expect(proc.readOutput().delta).toBe('second\n')
-+  })
-+
-   it('readOutput marks stderr sections', async () => {
-     const { bash } = await setup()
-     const proc = bash.start(bash.resolve({ command: 'echo out; echo err >&2' }))
 diff --git a/packages/bash/bash/src/types.ts b/packages/bash/bash/src/types.ts
 index 6fdd8b36..a471beb2 100644
 --- a/packages/bash/bash/src/types.ts
@@ -280,18 +152,6 @@ index 6fdd8b36..a471beb2 100644
    /**
     * Kill the process group. Returns false when it had already finished
     * (no-op); idempotent.
-diff --git a/packages/bash/bash/tests/service.spec.ts b/packages/bash/bash/tests/service.spec.ts
-index 77527d97..407e4cf3 100644
---- a/packages/bash/bash/tests/service.spec.ts
-+++ b/packages/bash/bash/tests/service.spec.ts
-@@ -40,6 +40,7 @@ class StubExecutor extends BashExecutor {
-       signal: null,
-       done: Promise.resolve(),
-       readOutput: (): BashProcessRead => ({ delta: '', lossy: false }),
-+      peekOutput: (): BashProcessRead => ({ delta: '', lossy: false }),
-       kill: (): boolean => {
-         if (proc.status !== 'running') return false
-         proc.status = 'killed'
 diff --git a/packages/bash/pwsh-local/src/index.ts b/packages/bash/pwsh-local/src/index.ts
 index b026795c..04c1a50d 100644
 --- a/packages/bash/pwsh-local/src/index.ts
@@ -335,70 +195,6 @@ index d9410482..45ce37d5 100644
              }
            },
          })
-diff --git a/packages/bash/tool-bash/tests/tools.spec.ts b/packages/bash/tool-bash/tests/tools.spec.ts
-index 2e76b16d..bcad385d 100644
---- a/packages/bash/tool-bash/tests/tools.spec.ts
-+++ b/packages/bash/tool-bash/tests/tools.spec.ts
-@@ -147,6 +147,7 @@ class RecordingSandboxExecutor extends BashExecutor {
-       done: Promise.resolve(),
-       sandbox: { mode: spec.sandboxPolicy?.mode ?? 'read-only', denied: false },
-       readOutput: () => ({ delta: '', lossy: false }),
-+      peekOutput: () => ({ delta: '', lossy: false }),
-       kill: () => false,
-     }
-   }
-@@ -176,6 +177,7 @@ class CountingStartExecutor extends BashExecutor {
-       signal: null,
-       done: Promise.resolve(),
-       readOutput: () => ({ delta: '', lossy: false }),
-+      peekOutput: () => ({ delta: '', lossy: false }),
-       kill: () => false,
-     }
-   }
-@@ -772,6 +774,7 @@ describe('processOutcome', () => {
-       signal: null,
-       done: Promise.resolve(),
-       readOutput: () => ({ delta: '', lossy: false }),
-+      peekOutput: () => ({ delta: '', lossy: false }),
-       kill: () => false,
-       ...over,
-     }
-@@ -1095,6 +1098,7 @@ describe('the model-facing bash tool builds its request from named args only (no
-         signal: null,
-         done: Promise.resolve(),
-         readOutput: () => ({ delta: '', lossy: false }),
-+        peekOutput: () => ({ delta: '', lossy: false }),
-         kill: () => false,
-       }
-     }
-diff --git a/packages/bash/tool-pwsh/tests/tools.spec.ts b/packages/bash/tool-pwsh/tests/tools.spec.ts
-index 71e3124e..c03e0646 100644
---- a/packages/bash/tool-pwsh/tests/tools.spec.ts
-+++ b/packages/bash/tool-pwsh/tests/tools.spec.ts
-@@ -98,6 +98,7 @@ function fakeProcess(delta = 'bg-ok\n'): BashProcess {
-       consumed = true
-       return { delta, lossy: false }
-     },
-+    peekOutput: () => ({ delta, lossy: false }),
-     kill: () => false,
-   }
- }
-@@ -112,6 +113,7 @@ function killableProcess(): BashProcess {
-     signal: null,
-     done,
-     readOutput: () => ({ delta: '', lossy: false }),
-+    peekOutput: () => ({ delta: '', lossy: false }),
-     kill: () => {
-       if (proc.status !== 'running') return false
-       proc.status = 'killed'
-@@ -687,6 +689,7 @@ describe('processOutcome', () => {
-       signal: null,
-       done: Promise.resolve(),
-       readOutput: () => ({ delta: '', lossy: false }),
-+      peekOutput: () => ({ delta: '', lossy: false }),
-       kill: () => false,
-       ...over,
-     }
 diff --git a/packages/client/connection/src/client/api.ts b/packages/client/connection/src/client/api.ts
 index 6f29b2dd..b40313be 100644
 --- a/packages/client/connection/src/client/api.ts
@@ -412,36 +208,6 @@ index 6f29b2dd..b40313be 100644
    ApprovalResponsePayload, QuestionResponsePayload, HistoryEntry, ToolEventView,
    DirectoryEntry, DirectoryListing,
    WorkspaceApi, WorkspaceId, WorkspaceView,
-diff --git a/packages/client/connection/src/client/fixture.ts b/packages/client/connection/src/client/fixture.ts
-index df9712ab..969b9df5 100644
---- a/packages/client/connection/src/client/fixture.ts
-+++ b/packages/client/connection/src/client/fixture.ts
-@@ -2628,6 +2628,13 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
-         models: fixtureModelGroups().flatMap(group => group.models.map(model => ({ id: model.id, name: model.name }))),
-       }),
-     },
-+    plugins: {
-+      list: request => ok(request, { plugins: [] }),
-+      install: request => ok(request, { id: request.payload.id }),
-+      enable: request => ok(request, { id: request.payload.id }),
-+      disable: request => ok(request, { id: request.payload.id }),
-+      uninstall: request => ok(request, { id: request.payload.id }),
-+    },
-     respond(message: ClientResponse): Promise<RpcReceipt> {
-       // Same routing discipline as the host: rpcId first, then the payload's
-       // audit correlation; a settled or unknown id is not-pending.
-@@ -2779,6 +2786,11 @@ export class FixtureApiClient extends AbstractApiClient {
-       case 'llm.providers': return this.api.llm.providers(request)
-       case 'llm.models': return this.api.llm.models(request)
-       case 'llm.discoverModels': return this.api.llm.discoverModels(request, signal)
-+      case 'plugin.list': return this.api.plugins.list(request)
-+      case 'plugin.install': return this.api.plugins.install(request)
-+      case 'plugin.enable': return this.api.plugins.enable(request)
-+      case 'plugin.disable': return this.api.plugins.disable(request)
-+      case 'plugin.uninstall': return this.api.plugins.uninstall(request)
-     }
-   }
- 
 diff --git a/packages/client/connection/src/client/index.ts b/packages/client/connection/src/client/index.ts
 index c2a6668d..1df4393c 100644
 --- a/packages/client/connection/src/client/index.ts
@@ -455,25 +221,6 @@ index c2a6668d..1df4393c 100644
    ApprovalResponsePayload, QuestionResponsePayload, HistoryEntry, ToolEventView,
    DirectoryEntry, DirectoryListing,
    ToolCallView, ToolResultView, WorkspaceApi, WorkspaceId, WorkspaceView,
-diff --git a/packages/client/connection/tests/fake-api.ts b/packages/client/connection/tests/fake-api.ts
-index 54e45fef..4ae4ad13 100644
---- a/packages/client/connection/tests/fake-api.ts
-+++ b/packages/client/connection/tests/fake-api.ts
-@@ -95,6 +95,14 @@ export class FakeApiClient implements IApiClient {
-   // Parameter annotations below are local structural types on purpose: the CI
-   // lint lane runs without built artifacts, where IApiClient's wire types
-   // (apiproxy subpath) resolve to any and inferred params trip no-unsafe-argument.
-+  readonly plugins = {
-+    list: () => Promise.resolve(ok({ plugins: [] as never })),
-+    install: () => Promise.resolve(ok({ id: 'x' as never })),
-+    enable: () => Promise.resolve(ok({ id: 'x' as never })),
-+    disable: () => Promise.resolve(ok({ id: 'x' as never })),
-+    uninstall: () => Promise.resolve(ok({ id: 'x' as never })),
-+  } as never
-+
-   readonly sessions: IApiClient['sessions'] = {
-     list: (payload: unknown) => this.record('session.list', payload, this.onList(payload)),
-     search: (payload: unknown, signal?: AbortSignal) => {
 diff --git a/packages/client/modules/src/client/manifest.ts b/packages/client/modules/src/client/manifest.ts
 index eb6b40d5..a049c6f1 100644
 --- a/packages/client/modules/src/client/manifest.ts
@@ -615,170 +362,6 @@ index ec3822e5..2644f910 100644
    /**
     * Re-hash one bundle (the HMR watch's registration hook — the only entry
     * point through which bundle content changes reach the graph).
-diff --git a/packages/client/modules/tests/loader.spec.ts b/packages/client/modules/tests/loader.spec.ts
-index 4c41419c..bc7a648a 100644
---- a/packages/client/modules/tests/loader.spec.ts
-+++ b/packages/client/modules/tests/loader.spec.ts
-@@ -23,7 +23,7 @@ afterEach(() => {
-   for (const el of document.querySelectorAll('style, script')) el.remove()
- })
- 
--const row = (id: string): BootModuleRow => ({ id, url: `/plugins/${id}/client.js?rev=0`, rev: '0' })
-+const row = (id: string, rev = '0'): BootModuleRow => ({ id, url: `/plugins/${id}/client.js?rev=${rev}`, rev })
- 
- interface Bench {
-   loader: ClientModuleLoader
-@@ -303,3 +303,25 @@ describe('default transport seam', () => {
-     expect([...document.querySelectorAll('script')]).toEqual([])
-   })
- })
-+
-+describe('hot-reload addRow', () => {
-+  it('addRow makes a post-boot id importable', async () => {
-+    const b = bench([row('a')], { a: () => ({ marker: 'a' }), b: () => ({ marker: 'b' }) })
-+    await b.loader.import('a', '', {})
-+    b.loader.addRow(row('b', '1'))
-+    const surface = await b.loader.import('b', '', {})
-+    expect((surface as { marker: string }).marker).toBe('b')
-+    expect(b.fetched).toContain('/plugins/b/client.js?rev=1')
-+  })
-+
-+  it('addRow with a changed rev invalidates the stale bundle and reloads', async () => {
-+    const b = bench([row('a')], { a: () => ({ marker: 'v1' }) })
-+    await b.loader.import('a', '', {})
-+    expect(b.fetched).toEqual(['/plugins/a/client.js?rev=0'])
-+    b.loader.addRow(row('a', '2'))
-+    expect(b.loader.loadCache.size).toBe(0) // invalidated by the rev change
-+    const surface = await b.loader.import('a', '', {})
-+    expect(b.fetched).toEqual(['/plugins/a/client.js?rev=0', '/plugins/a/client.js?rev=2'])
-+    expect((surface as { marker: string }).marker).toBe('v1')
-+  })
-+})
-diff --git a/packages/client/modules/tests/node-half.spec.ts b/packages/client/modules/tests/node-half.spec.ts
-index 186cfe10..b37448e7 100644
---- a/packages/client/modules/tests/node-half.spec.ts
-+++ b/packages/client/modules/tests/node-half.spec.ts
-@@ -133,3 +133,120 @@ describe('client bundle activation', () => {
-     expect(body).toBe(map)
-   })
- })
-+
-+describe('external client rows (registerExternal/unregisterExternal)', () => {
-+  /** Write a registry-style client bundle at a caller-chosen path. */
-+  function writeExternalBundle(contents = 'module.exports = {}\n'): { id: string; clientPath: string } {
-+    root ??= realpathSync(mkdtempSync(join(tmpdir(), 'dsh-client-modules-')))
-+    const id = 'acme/greeter'
-+    const clientPath = join(root, 'plugins', ...id.split('/'), 'client.js')
-+    mkdirSync(dirname(clientPath), { recursive: true })
-+    writeFileSync(clientPath, contents)
-+    return { id, clientPath }
-+  }
-+
-+  it('adds a row to the graph and serves its bundle through the /plugins route', async () => {
-+    const { id, clientPath } = writeExternalBundle('module.exports = { greet: 1 }\n')
-+    const { service, route } = constructWithRoute([])
-+
-+    const rev = service.registerExternal(id, { clientPath })
-+
-+    expect(service.graph().entries).toHaveLength(1)
-+    expect(service.graph().entries[0]).toMatchObject({ id, rev })
-+    expect(service.clientPath(id)).toBe(clientPath)
-+
-+    let status = 0
-+    let body = ''
-+    const response = {
-+      writeHead(nextStatus: number) {
-+        status = nextStatus
-+        return response
-+      },
-+      end(chunk?: Uint8Array) {
-+        body = chunk === undefined ? '' : Buffer.from(chunk).toString('utf8')
-+        return response
-+      },
-+    } as unknown as ServerResponse
-+    await route.handler({
-+      method: 'GET',
-+      url: `/plugins/${id}/client.js?rev=${rev}`,
-+    } as IncomingMessage, response)
-+
-+    expect(status).toBe(200)
-+    expect(body).toBe('module.exports = { greet: 1 }\n')
-+  })
-+
-+  it('replaces an existing row atomically and fires onRebuilt on a rev change', () => {
-+    const { id, clientPath } = writeExternalBundle('module.exports = { v: 1 }\n')
-+    const { service } = constructWithRoute([])
-+
-+    const firstRev = service.registerExternal(id, { clientPath })
-+    let rebuilt: { id: string; rev: string } | null = null
-+    service.onRebuilt((notifiedId, rev) => { rebuilt = { id: notifiedId, rev } })
-+
-+    writeFileSync(clientPath, 'module.exports = { v: 2 }\n')
-+    const secondRev = service.registerExternal(id, { clientPath })
-+
-+    expect(secondRev).not.toBe(firstRev)
-+    expect(service.graph().entries).toHaveLength(1)
-+    expect(service.graph().entries[0]).toMatchObject({ id, rev: secondRev })
-+    expect(rebuilt).toEqual({ id, rev: secondRev })
-+  })
-+
-+  it('serves 404 for an unknown external id', async () => {
-+    writeExternalBundle() // initializes the temp root the service anchors on
-+    const { route } = constructWithRoute([])
-+    let status = 0
-+    const response = {
-+      writeHead(nextStatus: number) {
-+        status = nextStatus
-+        return response
-+      },
-+      end() { return response },
-+    } as unknown as ServerResponse
-+    await route.handler({
-+      method: 'GET',
-+      url: '/plugins/acme/ghost/client.js',
-+    } as IncomingMessage, response)
-+    expect(status).toBe(404)
-+  })
-+
-+  it('unregistering an unknown id is a no-op', () => {
-+    writeExternalBundle() // initializes the temp root the service anchors on
-+    const { service } = constructWithRoute([])
-+    expect(() => { service.unregisterExternal('acme/never-registered') }).not.toThrow()
-+    expect(service.graph().entries).toHaveLength(0)
-+  })
-+
-+  it('rejects a malformed id loud before touching the table', () => {
-+    const { clientPath } = writeExternalBundle()
-+    const { service } = constructWithRoute([])
-+    for (const bad of ['NoSlash', '../escape', 'acme/../up', 'acme/name?query', '@a/b/c', '@/name', '@scope/..', 'a/b/c']) {
-+      expect(() => service.registerExternal(bad, { clientPath })).toThrow(/expected publisher\/name or @scope\/name/)
-+    }
-+    expect(service.graph().entries).toHaveLength(0)
-+  })
-+
-+  it('accepts a scoped npm package id (official-plugin incremental compat)', () => {
-+    root ??= realpathSync(mkdtempSync(join(tmpdir(), 'dsh-client-modules-')))
-+    const id = '@dsh-external/dsh-web-terminal'
-+    const clientPath = join(root, 'plugins', '@dsh-external', 'dsh-web-terminal', 'client.js')
-+    mkdirSync(dirname(clientPath), { recursive: true })
-+    writeFileSync(clientPath, 'module.exports = {}\n')
-+    const { service } = constructWithRoute([])
-+
-+    const rev = service.registerExternal(id, { clientPath })
-+
-+    expect(service.graph().entries).toHaveLength(1)
-+    expect(service.graph().entries[0]).toMatchObject({ id, rev })
-+    expect(service.clientPath(id)).toBe(clientPath)
-+  })
-+
-+  it('rejects an external id that collides with a Loader entry', () => {
-+    const { id, clientPath } = writeExternalBundle()
-+    const { service } = constructWithRoute(['acme/greeter'])
-+    expect(() => service.registerExternal(id, { clientPath }))
-+      .toThrow(/is a Loader entry/)
-+    expect(service.graph().entries).toHaveLength(0)
-+  })
-+})
 diff --git a/packages/client/runtime/src/client/index.ts b/packages/client/runtime/src/client/index.ts
 index b7226c00..84129cf3 100644
 --- a/packages/client/runtime/src/client/index.ts
@@ -908,129 +491,11 @@ index 64199c48..978689a0 100644
        default:
          return // stream/error ignored; unknown frames ignored (documented default)
      }
-diff --git a/packages/client/runtime/tests/apply-graph.spec.ts b/packages/client/runtime/tests/apply-graph.spec.ts
-new file mode 100644
-index 00000000..89d3a12e
---- /dev/null
-+++ b/packages/client/runtime/tests/apply-graph.spec.ts
-@@ -0,0 +1,63 @@
-+import { describe, expect, it } from 'vitest'
-+import { applyClientGraph } from '../src/client/index.ts'
-+import type { ClientGraphEntryView } from '@deepseek-ai/dsh-client-connection/client'
-+
-+interface FakeEntry {
-+  options: { name: string }
-+  disabled: boolean
-+  update: (o: { disabled: boolean }) => Promise<void>
-+  updated: Array<{ disabled: boolean }>
-+}
-+
-+function fakeLoader(initial: string[], disabled: string[] = []) {
-+  const entries = new Map<string, FakeEntry>()
-+  for (const name of initial) {
-+    entries.set(name, { options: { name }, disabled: disabled.includes(name), updated: [], update: async (o) => { entries.get(name)!.disabled = o.disabled; entries.get(name)!.updated.push(o) } })
-+  }
-+  const created: string[] = []
-+  return {
-+    face: {
-+      entries: () => entries.values(),
-+      create: async (o: { name: string }) => { created.push(o.name); entries.set(o.name, { options: o, disabled: false, updated: [], update: async (x) => { entries.get(o.name)!.disabled = x.disabled } }) },
-+    },
-+    entries, created,
-+  }
-+}
-+
-+const entry = (id: string, rev = 'r1'): ClientGraphEntryView => ({ id, url: `/plugins/${id}/client.js?rev=${rev}`, rev })
-+
-+describe('applyClientGraph diff applier', () => {
-+  it('creates added entries and registers their module rows', async () => {
-+    const loader = fakeLoader(['a'])
-+    const added: Array<{ id: string }> = []
-+    const ctx = {
-+      get: (name: string) => name === 'loader' ? loader.face
-+        : name === 'modules' ? { addRow: (row: { id: string }) => { added.push(row) }, removeStyles: () => {} } : undefined,
-+    } as never
-+    await applyClientGraph(ctx as never, [entry('a'), entry('b')])
-+    expect(loader.created).toEqual(['b'])
-+    expect(added.map(r => r.id)).toEqual(['a', 'b'])
-+  })
-+
-+  it('re-activates a disabled entry instead of creating', async () => {
-+    const loader = fakeLoader(['a'], ['a'])
-+    const ctx = {
-+      get: (name: string) => name === 'loader' ? loader.face : { addRow: () => {}, removeStyles: () => {} },
-+    } as never
-+    await applyClientGraph(ctx as never, [entry('a')])
-+    expect(loader.created).toEqual([])
-+    expect(loader.entries.get('a')!.disabled).toBe(false)
-+  })
-+
-+  it('disables removed entries in place and clears their styles', async () => {
-+    const loader = fakeLoader(['a', 'b'])
-+    const removed: string[] = []
-+    const ctx = {
-+      get: (name: string) => name === 'loader' ? loader.face : { addRow: () => {}, removeStyles: (id: string) => { removed.push(id) } },
-+    } as never
-+    await applyClientGraph(ctx as never, [entry('a')])
-+    expect(loader.entries.get('b')!.disabled).toBe(true)
-+    expect(loader.entries.get('a')!.disabled).toBe(false)
-+    expect(removed).toEqual(['b'])
-+  })
-+})
-diff --git a/packages/client/runtime/tests/fake-api.ts b/packages/client/runtime/tests/fake-api.ts
-index 2f4299ce..ca4c0856 100644
---- a/packages/client/runtime/tests/fake-api.ts
-+++ b/packages/client/runtime/tests/fake-api.ts
-@@ -256,6 +256,14 @@ export class FakeApiClient implements IApiClient {
-     host: (_payload: unknown, signal: AbortSignal, onOpen?: () => void) => this.openStream(this.hostConns, signal, onOpen),
-   }
- 
-+  readonly plugins: IApiClient['plugins'] = {
-+    list: _p => Promise.resolve({ rpcId: '', result: { ok: true, value: { plugins: [] } } } as never),
-+    install: _p => Promise.resolve({ rpcId: '', result: { ok: true, value: { id: 'x' } } } as never),
-+    enable: _p => Promise.resolve({ rpcId: '', result: { ok: true, value: { id: 'x' } } } as never),
-+    disable: _p => Promise.resolve({ rpcId: '', result: { ok: true, value: { id: 'x' } } } as never),
-+    uninstall: _p => Promise.resolve({ rpcId: '', result: { ok: true, value: { id: 'x' } } } as never),
-+  }
-+
-   onRespond: (message: ClientResponse) => Promise<RpcReceipt> = () => Promise.resolve({ accepted: true })
- 
-   respond(message: ClientResponse): Promise<RpcReceipt> {
 diff --git a/packages/host/apiproxy/src/api-proxy.ts b/packages/host/apiproxy/src/api-proxy.ts
-index 46dbde98..eac3ebd0 100644
+index 46dbde98..99e8c46e 100644
 --- a/packages/host/apiproxy/src/api-proxy.ts
 +++ b/packages/host/apiproxy/src/api-proxy.ts
-@@ -26,6 +26,7 @@ import {
- } from '@deepseek-ai/dsh-workspace'
- // Type-only: brings the `ctx.tools` Context merge into this program (viewFor reads presenters).
- import type {} from '@deepseek-ai/dsh-tools'
-+import type { PluginLocalService } from '@deepseek-ai/dsh-plugin'
- import type {
-   ApiProxy, ConfigurableProviderView, CredentialView, GoalRef, HistoryEntry, HostFrame,
-   ModelCatalogFailure, ModelProviderGroup,
-@@ -1327,6 +1328,21 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
-     return { code: 'internal', message: 'credentials service is absent: this deployment does not mount a credential provider (e.g. @deepseek-ai/dsh-credentials-local) in its composition', details: {} }
-   }
- 
-+  /** Missing-service report shared by the plugins domain. */
-+  function pluginsAbsent(): RpcError {
-+    return { code: 'internal', message: 'plugin registry is absent: this deployment does not mount @deepseek-ai/dsh-plugin in its composition (cordis.yml or explicit assembly)', details: {} }
-+  }
-+
-+  /**
-+   * Resolve the plugin registry service. The plugins domain keeps the same
-+   * stance as settings/skills: a deployment without `ctx.plugins` is a
-+   * composition gap, not an empty catalog.
-+   * @returns the registry service, or undefined when absent.
-+   */
-+  function pluginRegistry(): PluginLocalService | undefined {
-+    return ctx.get('plugins')
-+  }
-+
-   /** Map one redacted seam descriptor to its wire view. */
-   function namespaceView(descriptor: SettingsDescriptor): SettingsNamespaceView {
-     return {
-@@ -2695,6 +2711,29 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
+@@ -2695,6 +2695,29 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
            ctx.on('commands/change', () => {
              queue.push(frame({ type: 'host/commands-changed' }))
            }),
@@ -1060,68 +525,6 @@ index 46dbde98..eac3ebd0 100644
            ctx.on('settings/document-updated', (ns) => {
              // The RAW-section event, not the resolved one: a field going from
              // inherited to overridden leaves the resolved value equal, and a
-@@ -2771,5 +2810,61 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
-       pending.resolve(payload.answer)
-       return Promise.resolve({ accepted: true })
-     },
-+
-+    plugins: {
-+      async list(request) {
-+        const registry = pluginRegistry()
-+        if (registry === undefined) return err(request, pluginsAbsent())
-+        try {
-+          return ok(request, { plugins: await registry.list() })
-+        } catch (error: unknown) {
-+          return err(request, { code: 'internal', message: `plugin listing failed: ${String(error)}`, details: {} })
-+        }
-+      },
-+
-+      async install(request) {
-+        const registry = pluginRegistry()
-+        if (registry === undefined) return err(request, pluginsAbsent())
-+        try {
-+          const installed = await registry.install(request.payload.id)
-+          return ok(request, { id: installed.id })
-+        } catch (error: unknown) {
-+          return err(request, { code: 'internal', message: `plugin install failed: ${String(error)}`, details: {} })
-+        }
-+      },
-+
-+      async enable(request) {
-+        const registry = pluginRegistry()
-+        if (registry === undefined) return err(request, pluginsAbsent())
-+        try {
-+          await registry.enable(request.payload.id)
-+          return ok(request, { id: request.payload.id })
-+        } catch (error: unknown) {
-+          return err(request, { code: 'internal', message: `plugin enable failed: ${String(error)}`, details: {} })
-+        }
-+      },
-+
-+      async disable(request) {
-+        const registry = pluginRegistry()
-+        if (registry === undefined) return err(request, pluginsAbsent())
-+        try {
-+          await registry.disable(request.payload.id)
-+          return ok(request, { id: request.payload.id })
-+        } catch (error: unknown) {
-+          return err(request, { code: 'internal', message: `plugin disable failed: ${String(error)}`, details: {} })
-+        }
-+      },
-+
-+      async uninstall(request) {
-+        const registry = pluginRegistry()
-+        if (registry === undefined) return err(request, pluginsAbsent())
-+        try {
-+          await registry.uninstall(request.payload.id)
-+          return ok(request, { id: request.payload.id })
-+        } catch (error: unknown) {
-+          return err(request, { code: 'internal', message: `plugin uninstall failed: ${String(error)}`, details: {} })
-+        }
-+      },
-+    },
-   }
- }
 diff --git a/packages/host/apiproxy/src/api/events.schema.ts b/packages/host/apiproxy/src/api/events.schema.ts
 index 13ead7d0..c6991027 100644
 --- a/packages/host/apiproxy/src/api/events.schema.ts
@@ -1174,26 +577,10 @@ index 7fc54f6f..9c887045 100644
     * The command registry changed (`commands/change` passthrough). Pure
     * invalidation signal, no payload: clients refetch `command.list` in the
 diff --git a/packages/host/apiproxy/src/api/index.ts b/packages/host/apiproxy/src/api/index.ts
-index cb83c532..161aae14 100644
+index cb83c532..c2d94eb2 100644
 --- a/packages/host/apiproxy/src/api/index.ts
 +++ b/packages/host/apiproxy/src/api/index.ts
-@@ -15,6 +15,7 @@ import type { GoalsApi } from './goals.ts'
- import type { SettingsApi } from './settings.ts'
- import type { CredentialsApi } from './credentials.ts'
- import type { LlmApi } from './llm.ts'
-+import type { PluginsApi } from './plugins.ts'
- import type { ClientResponse, RpcReceipt } from './rpc.ts'
- 
- /** Root interface of the unified API surface. New client-request domain = one new file pair + one field here + one map row. */
-@@ -30,6 +31,7 @@ export interface ApiProxy {
-   settings: SettingsApi
-   credentials: CredentialsApi
-   llm: LlmApi
-+  plugins: PluginsApi
-   /** Response entry for server-requests (client-response, echoing their rpcId); not a domain method (four-quadrant model). */
-   respond(message: ClientResponse): Promise<RpcReceipt>
- }
-@@ -47,11 +49,12 @@ export type {
+@@ -47,7 +47,7 @@ export type {
  export type { WorkspaceApi, WorkspaceId, WorkspaceView } from './workspace.ts'
  export type { CommandsApi, CommandDescriptor } from './commands.ts'
  export type { SkillsApi, SkillEntry } from './skills.ts'
@@ -1202,444 +589,6 @@ index cb83c532..161aae14 100644
  export type { GoalsApi, GoalId, GoalRef } from './goals.ts'
  export type { SettingsApi, SettingsNamespaceView, SettingsPathOpView, SettingsSecretView } from './settings.ts'
  export type { CredentialsApi, CredentialView } from './credentials.ts'
- export type { ConfigurableProviderView, DiscoveredModelView, LlmApi } from './llm.ts'
-+export type { PluginEntryView, PluginsApi } from './plugins.ts'
- export type { ApprovalResponsePayload } from './approvals.ts'
- 
- export type { QuestionResponsePayload } from './questions.ts'
-diff --git a/packages/host/apiproxy/src/api/plugins.schema.ts b/packages/host/apiproxy/src/api/plugins.schema.ts
-new file mode 100644
-index 00000000..6ca14a7f
---- /dev/null
-+++ b/packages/host/apiproxy/src/api/plugins.schema.ts
-@@ -0,0 +1,36 @@
-+/**
-+ * plugins domain zod schemas (names derived from map keys: pluginListRequestSchema /
-+ * pluginListValueSchema / pluginInstall* / pluginEnable* / pluginDisable* / pluginUninstall*).
-+ */
-+
-+import { z } from 'zod'
-+import type { RequestPayload, ResponseValue } from './rpc-map.ts'
-+import type { Wire } from './rpc.schema.ts'
-+import type { PluginEntryView } from './plugins.ts'
-+
-+/** One plugin browse row. */
-+export const pluginEntryViewSchema = z.object({
-+  id: z.string().min(1),
-+  version: z.string().min(1),
-+  description: z.string(),
-+  installed: z.boolean(),
-+  enabled: z.boolean(),
-+}) satisfies z.ZodType<Wire<PluginEntryView>>
-+
-+/** plugin.list request payload. */
-+export const pluginListRequestSchema = z.object({}) satisfies z.ZodType<Wire<RequestPayload<'plugin.list'>>>
-+
-+/** plugin.list response value. */
-+export const pluginListValueSchema = z.object({
-+  plugins: z.array(pluginEntryViewSchema),
-+}) satisfies z.ZodType<Wire<ResponseValue<'plugin.list'>>>
-+
-+/** The id-addressed request payload shared by install/enable/disable/uninstall. */
-+export const pluginIdRequestSchema = z.object({
-+  id: z.string().min(1),
-+}) satisfies z.ZodType<Wire<RequestPayload<'plugin.install'>>>
-+
-+/** The id echo shared by install/enable/disable/uninstall response values. */
-+export const pluginIdValueSchema = z.object({
-+  id: z.string().min(1),
-+}) satisfies z.ZodType<Wire<ResponseValue<'plugin.install'>>>
-diff --git a/packages/host/apiproxy/src/api/plugins.ts b/packages/host/apiproxy/src/api/plugins.ts
-new file mode 100644
-index 00000000..32f4e406
---- /dev/null
-+++ b/packages/host/apiproxy/src/api/plugins.ts
-@@ -0,0 +1,43 @@
-+/**
-+ * plugins domain contract: the web face of the local plugin registry
-+ * (`ctx.plugins`, provided by `@deepseek-ai/dsh-plugin`). Rows merge the local
-+ * catalog (the browse list) with installed state; install/enable/disable/
-+ * uninstall operate on the registry, and enable/disable keep the live mount
-+ * set in sync — a toggled plugin mounts or unmounts immediately.
-+ */
-+
-+import type { RpcRequest, RpcResponse } from './rpc.ts'
-+
-+/** One plugin browse row (wire projection of the registry's PluginEntryView). */
-+export interface PluginEntryView {
-+  /** Publisher-scoped plugin id. */
-+  readonly id: string
-+  /** Installed version when installed, else the catalog-advertised version. */
-+  readonly version: string
-+  /** One-line summary. */
-+  readonly description: string
-+  /** Whether the plugin is installed in the registry. */
-+  readonly installed: boolean
-+  /** Whether the installed plugin is mounted (and will mount on the next load). */
-+  readonly enabled: boolean
-+}
-+
-+/** One plugin id addressed by every mutating method. */
-+export interface PluginIdPayload {
-+  /** The plugin id. */
-+  readonly id: string
-+}
-+
-+/** Plugin-domain unary methods (the map keys plugin.* of RpcMethodMap). */
-+export interface PluginsApi {
-+  /** List every browse row: catalog entries merged with installed state, sorted by id. */
-+  list(request: RpcRequest<{}>): Promise<RpcResponse<{ plugins: readonly PluginEntryView[] }>>
-+  /** Install a catalog entry (disabled by default; not mounted). */
-+  install(request: RpcRequest<PluginIdPayload>): Promise<RpcResponse<{ id: string }>>
-+  /** Enable an installed plugin and mount it immediately. */
-+  enable(request: RpcRequest<PluginIdPayload>): Promise<RpcResponse<{ id: string }>>
-+  /** Unmount and disable an installed plugin. */
-+  disable(request: RpcRequest<PluginIdPayload>): Promise<RpcResponse<{ id: string }>>
-+  /** Unmount and remove an installed plugin from the registry. */
-+  uninstall(request: RpcRequest<PluginIdPayload>): Promise<RpcResponse<{ id: string }>>
-+}
-diff --git a/packages/host/apiproxy/src/api/rpc-map.ts b/packages/host/apiproxy/src/api/rpc-map.ts
-index 9a8750c7..9a2120cb 100644
---- a/packages/host/apiproxy/src/api/rpc-map.ts
-+++ b/packages/host/apiproxy/src/api/rpc-map.ts
-@@ -13,6 +13,7 @@ import type { GoalsApi } from './goals.ts'
- import type { SettingsApi } from './settings.ts'
- import type { CredentialsApi } from './credentials.ts'
- import type { LlmApi } from './llm.ts'
-+import type { PluginsApi } from './plugins.ts'
- import type { SubagentsApi } from './subagents.ts'
- import type { RpcResponse } from './rpc.ts'
- 
-@@ -67,6 +68,11 @@ export interface RpcMethodMap {
-   'llm.providers': LlmApi['providers']
-   'llm.models': LlmApi['models']
-   'llm.discoverModels': LlmApi['discoverModels']
-+  'plugin.list': PluginsApi['list']
-+  'plugin.install': PluginsApi['install']
-+  'plugin.enable': PluginsApi['enable']
-+  'plugin.disable': PluginsApi['disable']
-+  'plugin.uninstall': PluginsApi['uninstall']
- }
- 
- /** Business request payload of method K (reaches through the RpcRequest narrow form to payload). */
-diff --git a/packages/host/apiproxy/src/fetch/client.ts b/packages/host/apiproxy/src/fetch/client.ts
-index 0f54d76d..d80718e8 100644
---- a/packages/host/apiproxy/src/fetch/client.ts
-+++ b/packages/host/apiproxy/src/fetch/client.ts
-@@ -56,6 +56,7 @@ import {
-   credentialsDescribeValueSchema, credentialsSetValueSchema, credentialsUnsetValueSchema,
- } from '../api/credentials.schema.ts'
- import { llmDiscoverModelsValueSchema, llmModelsValueSchema, llmProvidersValueSchema } from '../api/llm.schema.ts'
-+import { pluginIdValueSchema, pluginListValueSchema } from '../api/plugins.schema.ts'
- import {
-   subagentHistoryValueSchema,
-   subagentListValueSchema,
-@@ -148,6 +149,13 @@ export interface IApiClient {
-     models(payload: RequestPayload<'llm.models'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'llm.models'>>>
-     discoverModels(payload: RequestPayload<'llm.discoverModels'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'llm.discoverModels'>>>
-   }
-+  plugins: {
-+    list(payload: RequestPayload<'plugin.list'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'plugin.list'>>>
-+    install(payload: RequestPayload<'plugin.install'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'plugin.install'>>>
-+    enable(payload: RequestPayload<'plugin.enable'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'plugin.enable'>>>
-+    disable(payload: RequestPayload<'plugin.disable'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'plugin.disable'>>>
-+    uninstall(payload: RequestPayload<'plugin.uninstall'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'plugin.uninstall'>>>
-+  }
-   /** client-response passthrough (rpcId is a backfill of the server-request's id — never minted here). */
-   respond(message: ClientResponse, signal?: AbortSignal): Promise<RpcReceipt>
- }
-@@ -202,6 +210,11 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
-   'llm.providers': llmProvidersValueSchema,
-   'llm.models': llmModelsValueSchema,
-   'llm.discoverModels': llmDiscoverModelsValueSchema,
-+  'plugin.list': pluginListValueSchema,
-+  'plugin.install': pluginIdValueSchema,
-+  'plugin.enable': pluginIdValueSchema,
-+  'plugin.disable': pluginIdValueSchema,
-+  'plugin.uninstall': pluginIdValueSchema,
- }
- 
- /** Default timeout for bounded unary calls (rpc-compare 2026-07-19: a hung host must not leave callers pending forever). */
-@@ -472,6 +485,14 @@ export abstract class AbstractApiClient implements IApiClient {
-     discoverModels: (payload, signal) => this.callUnary('llm.discoverModels', payload, signal),
-   }
- 
-+  readonly plugins: IApiClient['plugins'] = {
-+    list: (payload, signal) => this.callUnary('plugin.list', payload, signal),
-+    install: (payload, signal) => this.callUnary('plugin.install', payload, signal),
-+    enable: (payload, signal) => this.callUnary('plugin.enable', payload, signal),
-+    disable: (payload, signal) => this.callUnary('plugin.disable', payload, signal),
-+    uninstall: (payload, signal) => this.callUnary('plugin.uninstall', payload, signal),
-+  }
-+
-   readonly events: IApiClient['events'] = {
-     mux: (payload, signal, onOpen) => this.openMux(payload, signal, onOpen),
-     host: (payload, signal, onOpen) => this.openHost(payload, signal, onOpen),
-diff --git a/packages/host/apiproxy/src/fetch/handler.ts b/packages/host/apiproxy/src/fetch/handler.ts
-index 2b30e3fe..41736387 100644
---- a/packages/host/apiproxy/src/fetch/handler.ts
-+++ b/packages/host/apiproxy/src/fetch/handler.ts
-@@ -58,6 +58,7 @@ import {
-   credentialsDescribeRequestSchema, credentialsSetRequestSchema, credentialsUnsetRequestSchema,
- } from '../api/credentials.schema.ts'
- import { llmDiscoverModelsRequestSchema, llmModelsRequestSchema, llmProvidersRequestSchema } from '../api/llm.schema.ts'
-+import { pluginIdRequestSchema, pluginListRequestSchema } from '../api/plugins.schema.ts'
- import {
-   subagentHistoryRequestSchema,
-   subagentListRequestSchema,
-@@ -126,6 +127,11 @@ const UNARY_ROUTES: UnaryRoutes = {
-   'llm.providers': { schema: llmProvidersRequestSchema, invoke: (api, r) => api.llm.providers(r) },
-   'llm.models': { schema: llmModelsRequestSchema, invoke: (api, r) => api.llm.models(r) },
-   'llm.discoverModels': { schema: llmDiscoverModelsRequestSchema, invoke: (api, r, signal) => api.llm.discoverModels(r, signal) },
-+  'plugin.list': { schema: pluginListRequestSchema, invoke: (api, r) => api.plugins.list(r) },
-+  'plugin.install': { schema: pluginIdRequestSchema, invoke: (api, r) => api.plugins.install(r) },
-+  'plugin.enable': { schema: pluginIdRequestSchema, invoke: (api, r) => api.plugins.enable(r) },
-+  'plugin.disable': { schema: pluginIdRequestSchema, invoke: (api, r) => api.plugins.disable(r) },
-+  'plugin.uninstall': { schema: pluginIdRequestSchema, invoke: (api, r) => api.plugins.uninstall(r) },
- }
- 
- /** Route lookup that narrows an arbitrary path segment to a map key (single cast point for the string→key refinement). */
-diff --git a/packages/host/apiproxy/src/index.ts b/packages/host/apiproxy/src/index.ts
-index 1a6e0be2..84fbd54f 100644
---- a/packages/host/apiproxy/src/index.ts
-+++ b/packages/host/apiproxy/src/index.ts
-@@ -121,6 +121,7 @@ export class ApiProxyService extends Service implements ApiProxy {
-   readonly settings: ApiProxy['settings']
-   readonly credentials: ApiProxy['credentials']
-   readonly llm: ApiProxy['llm']
-+  readonly plugins: ApiProxy['plugins']
-   readonly events: ApiProxy['events']
-   readonly respond: ApiProxy['respond']
- 
-@@ -164,6 +165,7 @@ export class ApiProxyService extends Service implements ApiProxy {
-     this.settings = api.settings
-     this.credentials = api.credentials
-     this.llm = api.llm
-+    this.plugins = api.plugins
-     this.events = api.events
-     // createApiProxy returns closures (no `this` capture); bind only satisfies
-     // the unbound-method lint without changing behavior.
-diff --git a/packages/host/apiproxy/tests/api-proxy-plugins.spec.ts b/packages/host/apiproxy/tests/api-proxy-plugins.spec.ts
-new file mode 100644
-index 00000000..77ef990c
---- /dev/null
-+++ b/packages/host/apiproxy/tests/api-proxy-plugins.spec.ts
-@@ -0,0 +1,150 @@
-+/**
-+ * plugins-domain handler tests: browse list, install, enable (with live
-+ * mount), disable (with live unmount), and uninstall against a real
-+ * `ctx.plugins` service on a temp harness home.
-+ */
-+
-+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
-+import { tmpdir } from 'node:os'
-+import { join } from 'node:path'
-+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-+import { Context } from 'cordis'
-+import AgentRegistry from '@deepseek-ai/dsh-agent'
-+import SessionStore from '@deepseek-ai/dsh-session'
-+import UserInteractionService from '@deepseek-ai/dsh-user-interaction'
-+import { createApiProxy } from '../src/api-proxy.ts'
-+import { RpcId, type RpcRequest, type RpcResponse } from '../src/api/rpc.ts'
-+import { MANIFEST_FILE_NAME, PluginLocalService } from '@deepseek-ai/dsh-plugin'
-+
-+declare module 'cordis' {
-+  interface Events {
-+    'plugin/api-test'(value: string): void
-+  }
-+}
-+
-+let nextRpc = 1
-+
-+function request<P>(payload: P): RpcRequest<P> {
-+  return { rpcId: RpcId(`req-${String(nextRpc++)}`), payload }
-+}
-+
-+function expectOk<T>(response: RpcResponse<T>): T {
-+  expect(response.result.ok).toBe(true)
-+  if (!response.result.ok) throw new Error('unreachable')
-+  return response.result.value
-+}
-+
-+function expectErr(response: RpcResponse<unknown>): string {
-+  expect(response.result.ok).toBe(false)
-+  if (response.result.ok) throw new Error('unreachable')
-+  return response.result.error.message
-+}
-+
-+const ENTRY = `
-+export default {
-+  name: 'api-entry',
-+  apply(ctx) {
-+    ctx.on('plugin/api-test', (value) => { globalThis.__dshPluginApiTest = value })
-+  },
-+}
-+`
-+
-+let tempDir: string
-+let dshHome: string
-+let ctx: Context
-+let api: ReturnType<typeof createApiProxy>
-+let dispose: () => Promise<void>
-+let sequence = 0
-+
-+async function writeSource(root: string, id: string): Promise<void> {
-+  await mkdir(root, { recursive: true })
-+  await writeFile(join(root, MANIFEST_FILE_NAME), JSON.stringify({ id, version: '0.1.0', main: './index.mjs' }))
-+  await writeFile(join(root, 'index.mjs'), ENTRY)
-+}
-+
-+beforeEach(async () => {
-+  tempDir = await mkdtemp(join(tmpdir(), 'dsh-apiproxy-plugin-'))
-+  dshHome = join(tempDir, 'home')
-+  await mkdir(dshHome, { recursive: true })
-+  sequence += 1
-+
-+  ctx = new Context()
-+  await ctx.plugin(SessionStore)
-+  await ctx.plugin(UserInteractionService)
-+  await ctx.plugin(AgentRegistry)
-+  const service = new PluginLocalService(ctx, dshHome, '0.2.0')
-+  api = createApiProxy(ctx, { defaultTarget: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp', workspaceRoot: '/tmp' })
-+  dispose = () => service.dispose()
-+})
-+
-+afterEach(async () => {
-+  delete (globalThis as Record<string, unknown>).__dshPluginApiTest
-+  await dispose()
-+  await rm(tempDir, { recursive: true, force: true })
-+})
-+
-+async function writeCatalog(entries: Array<{ id: string; description?: string; version?: string; source: string }>): Promise<void> {
-+  await writeFile(join(dshHome, 'plugins-catalog.json'), JSON.stringify(entries))
-+}
-+
-+describe('plugins.list', () => {
-+  it('lists catalog rows with install and enable state', async () => {
-+    const id = `acme/listed-${sequence}`
-+    const source = join(tempDir, 'src-listed')
-+    await writeSource(source, id)
-+    await writeCatalog([{ id, description: 'listed', version: '0.1.0', source }])
-+
-+    const value = expectOk(await api.plugins.list(request({})))
-+    expect(value.plugins).toEqual([
-+      { id, version: '0.1.0', description: 'listed', installed: false, enabled: false },
-+    ])
-+  })
-+
-+  it('reports a missing registry service as a composition gap', async () => {
-+    const bareCtx = new Context()
-+    await bareCtx.plugin(SessionStore)
-+    await bareCtx.plugin(UserInteractionService)
-+    await bareCtx.plugin(AgentRegistry)
-+    const bare = createApiProxy(bareCtx, { defaultTarget: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp', workspaceRoot: '/tmp' })
-+    const message = expectErr(await bare.plugins.list(request({})))
-+    expect(message).toContain('does not mount @deepseek-ai/dsh-plugin')
-+  })
-+})
-+
-+describe('plugins install/enable/disable/uninstall', () => {
-+  it('installs disabled, then enables with a live mount', async () => {
-+    const id = `acme/live-${sequence}`
-+    const source = join(tempDir, 'src-live')
-+    await writeSource(source, id)
-+    await writeCatalog([{ id, version: '0.1.0', source }])
-+
-+    expect(expectOk(await api.plugins.install(request({ id })))).toEqual({ id })
-+    const listed = expectOk(await api.plugins.list(request({})))
-+    expect(listed.plugins[0]).toMatchObject({ id, installed: true, enabled: false })
-+
-+    expect(expectOk(await api.plugins.enable(request({ id })))).toEqual({ id })
-+    ctx.emit('plugin/api-test', 'mounted-live')
-+    expect((globalThis as Record<string, unknown>).__dshPluginApiTest).toBe('mounted-live')
-+
-+    expect(expectOk(await api.plugins.disable(request({ id })))).toEqual({ id })
-+    delete (globalThis as Record<string, unknown>).__dshPluginApiTest
-+    ctx.emit('plugin/api-test', 'unmounted')
-+    expect((globalThis as Record<string, unknown>).__dshPluginApiTest).toBeUndefined()
-+
-+    expect(expectOk(await api.plugins.uninstall(request({ id })))).toEqual({ id })
-+    const after = expectOk(await api.plugins.list(request({})))
-+    expect(after.plugins).toEqual([
-+      { id, version: '0.1.0', description: '', installed: false, enabled: false },
-+    ])
-+  })
-+
-+  it('fails loud when enabling an unknown plugin', async () => {
-+    const message = expectErr(await api.plugins.enable(request({ id: 'acme/ghost' })))
-+    expect(message).toContain('not installed')
-+  })
-+
-+  it('fails loud when installing an id absent from the catalog', async () => {
-+    const message = expectErr(await api.plugins.install(request({ id: 'acme/ghost' })))
-+    expect(message).toContain('not in the catalog')
-+  })
-+})
-diff --git a/packages/host/apiproxy/tests/client-handler.spec.ts b/packages/host/apiproxy/tests/client-handler.spec.ts
-index fb2e86d9..ceffcd61 100644
---- a/packages/host/apiproxy/tests/client-handler.spec.ts
-+++ b/packages/host/apiproxy/tests/client-handler.spec.ts
-@@ -34,6 +34,14 @@ function scriptedApi(overrides: {
-   const err = <T>(r: RpcRequest<unknown>): Promise<RpcResponse<T>> =>
-     Promise.resolve({ rpcId: r.rpcId, result: { ok: false, error: { code: 'internal' as const, message: 'stub', details: {} } } })
-   return {
-+    plugins: {
-+      list: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { plugins: [] as never } } }),
-+      install: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { id: 'x' as never } } }),
-+      enable: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { id: 'x' as never } } }),
-+      disable: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { id: 'x' as never } } }),
-+      uninstall: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { id: 'x' as never } } }),
-+    } as unknown as ApiProxy['plugins'],
-+
-     sessions: {
-       list: r => ok(r, { items: [] }),
-       search: r => ok(r, { items: [], hasMore: false }),
-diff --git a/packages/host/apiproxy/tests/events-schema.spec.ts b/packages/host/apiproxy/tests/events-schema.spec.ts
-new file mode 100644
-index 00000000..83845c3d
---- /dev/null
-+++ b/packages/host/apiproxy/tests/events-schema.spec.ts
-@@ -0,0 +1,21 @@
-+import { describe, expect, it } from 'vitest'
-+import { hostFrameSchema } from '../src/api/events.schema.ts'
-+
-+describe('host frame schema: client-graph-changed payload', () => {
-+  it('accepts the graph frame with the full entry table', () => {
-+    const parsed = hostFrameSchema.parse({
-+      type: 'host/client-graph-changed',
-+      entries: [
-+        { id: 'vlln/navbar', url: '/plugins/vlln/navbar/client.js?rev=abc123', rev: 'abc123' },
-+        { id: 'acme/greeter', url: '/plugins/acme/greeter/client.js?rev=def456', rev: 'def456' },
-+      ],
-+    })
-+    expect(parsed.type).toBe('host/client-graph-changed')
-+    expect(parsed.entries).toHaveLength(2)
-+    expect(parsed.entries[1]?.id).toBe('acme/greeter')
-+  })
-+
-+  it('rejects a graph frame without entries (old pure-signal shape)', () => {
-+    expect(() => hostFrameSchema.parse({ type: 'host/client-graph-changed' })).toThrow()
-+  })
-+})
-diff --git a/packages/host/apiproxy/tests/fetch-carrier.spec.ts b/packages/host/apiproxy/tests/fetch-carrier.spec.ts
-index 5289edf8..a2611787 100644
---- a/packages/host/apiproxy/tests/fetch-carrier.spec.ts
-+++ b/packages/host/apiproxy/tests/fetch-carrier.spec.ts
-@@ -17,6 +17,14 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
-     }
-   }
-   return {
-+    plugins: {
-+      list: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { plugins: [] as never } } }),
-+      install: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { id: 'x' as never } } }),
-+      enable: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { id: 'x' as never } } }),
-+      disable: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { id: 'x' as never } } }),
-+      uninstall: () => Promise.resolve({ rpcId: 'x', result: { ok: true, value: { id: 'x' as never } } }),
-+    } as unknown as ApiProxy['plugins'],
-+
-     sessions: {
-       async list(request) {
-         if (overrides.crashOn === 'session.list') throw new Error('impl crashed')
 diff --git a/packages/host/apiproxy/tsconfig.json b/packages/host/apiproxy/tsconfig.json
 index 8686a9e4..950023f8 100644
 --- a/packages/host/apiproxy/tsconfig.json
@@ -1704,52 +653,6 @@ index f108022b..5ae86f6a 100644
    kill(id: TaskId, caller?: Agent, reason?: string): 'requested' | 'already-finished' {
      const task = this.expect(id)
      this.assertAccess(task, caller)
-diff --git a/packages/tasks/tasks-local/tests/tasks.spec.ts b/packages/tasks/tasks-local/tests/tasks.spec.ts
-index 8e0a17af..ffdd539c 100644
---- a/packages/tasks/tasks-local/tests/tasks.spec.ts
-+++ b/packages/tasks/tasks-local/tests/tasks.spec.ts
-@@ -130,6 +130,41 @@ describe('LocalTaskService reads and settlement', () => {
-     expect(read.snapshot.finishedAt).toBeTypeOf('number')
-   })
- 
-+  it('peek returns the retained output without consuming or marking reported', async () => {
-+    const ctx = await harness()
-+    const chunks = ['first', '', 'rest']
-+    const p = producer({ readOutput: () => chunks.shift() ?? '', peekOutput: () => chunks.join('') })
-+    const id = ctx.tasks.start(p.spec)
-+
-+    // A peek never consumes the read cursor: the producer's retained view is
-+    // re-delivered until a consuming read advances it.
-+    const peeked = ctx.tasks.peek(id)
-+    expect(peeked.text).toBe('firstrest')
-+    expect(peeked.snapshot).toMatchObject({ status: 'running', reported: false })
-+    expect(ctx.tasks.peek(id).text).toBe('firstrest')
-+
-+    // A terminal peek keeps the notice owed: reported stays false until a
-+    // consuming read or wait commits to report.
-+    p.settle({ status: 'completed', detail: 'exit code: 0' })
-+    await tick()
-+    expect(ctx.tasks.peek(id).snapshot).toMatchObject({ status: 'completed', reported: false })
-+    expect(ctx.tasks.read(id).snapshot).toMatchObject({ status: 'completed', reported: true })
-+  })
-+
-+  it('peek on a final-output kind falls back to the idempotent terminal output', async () => {
-+    const ctx = await harness()
-+    const p = producer({ kind: 'subagent', label: 'research task' })
-+    const id = ctx.tasks.start(p.spec)
-+
-+    expect(ctx.tasks.peek(id)).toMatchObject({ text: '', snapshot: { status: 'running' } })
-+
-+    p.settle({ status: 'completed', output: 'final answer' })
-+    await tick()
-+    expect(ctx.tasks.peek(id).text).toBe('final answer')
-+    expect(ctx.tasks.peek(id).text).toBe('final answer') // idempotent, not consumed
-+    expect(ctx.tasks.peek(id).snapshot.reported).toBe(false)
-+  })
-+
-   it('projects a producer-owned model output limit into reads and snapshots', async () => {
-     const ctx = await harness()
-     const p = producer({ outputLimitBytes: 64, readOutput: () => 'delta' })
 diff --git a/packages/tasks/tasks/src/index.ts b/packages/tasks/tasks/src/index.ts
 index e237aa06..682d02fb 100644
 --- a/packages/tasks/tasks/src/index.ts
@@ -1830,30 +733,6 @@ index d722f3fc..b80a4bc8 100644
  /**
   * Completion callback with the exact owner supplied at start, or `undefined`
   * for an unowned task. Returned promises are observed but not awaited.
-diff --git a/packages/tasks/tasks/tests/service.spec.ts b/packages/tasks/tasks/tests/service.spec.ts
-index 6ab9b142..79d5dbf4 100644
---- a/packages/tasks/tasks/tests/service.spec.ts
-+++ b/packages/tasks/tasks/tests/service.spec.ts
-@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
- import { Context } from 'cordis'
- import type { Agent } from '@deepseek-ai/dsh-agent'
- import { TaskId, TaskService } from '@deepseek-ai/dsh-tasks'
--import type { TaskDoneListener, TaskRead, TaskSnapshot, TaskStart } from '@deepseek-ai/dsh-tasks'
-+import type { TaskDoneListener, TaskPeek, TaskRead, TaskSnapshot, TaskStart } from '@deepseek-ai/dsh-tasks'
- 
- /**
-  * Minimal concrete registry: one canned record. The seam owns the contract
-@@ -38,6 +38,10 @@ class StubTaskService extends TaskService {
-     return { text: '', snapshot: this.snapshotOf(id) }
-   }
- 
-+  peek(id: TaskId): TaskPeek {
-+    return { text: '', snapshot: this.snapshotOf(id) }
-+  }
-+
-   kill(): 'requested' | 'already-finished' {
-     return 'requested'
-   }
 diff --git a/tsconfig.base.json b/tsconfig.base.json
 index de9b6345..02e5ce60 100644
 --- a/tsconfig.base.json

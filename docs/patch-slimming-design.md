@@ -1,6 +1,6 @@
 # 设计：patch 瘦身（49 → 5）
 
-状态：**实施中**（A 类试点 + B 类面板路由已完成，见「实施进度」；剩余：apiproxy 域移除、重建 patch、验证站端到端）。目的：把 plugin-registry 打进官方树的改动收敛到「能力结构性必需」的最小集，其余机制件转分发包（复制进 monorepo 的 `packages/`），使基线升级重放成本从 49 文件降到 ~5 文件。**能力零下降**：每处外置都保留原能力（A 类为「实现文件搬家 + import 改向」，B 类为「面板调用架构重写」，详见各类成本），只有「必须改官方源码的接线」留在 patch。
+状态：**阶段 1 完成**（A 试点 + B 面板路由 + apiproxy 域移除，见「实施进度」；瘦身 patch 阶段产物 26 文件）。目的：把 plugin-registry 打进官方树的改动收敛到「能力结构性必需」的最小集，其余机制件转分发包（复制进 monorepo 的 `packages/`），降低基线升级重放成本。**能力零下降**：每处外置都保留原能力（A 类为「实现文件搬家 + import 改向」，B 类为「面板调用架构重写」，详见各类成本），只有「必须改官方源码的接线」留在 patch。
 
 ## 实施进度
 
@@ -8,7 +8,7 @@
 - ✅ **B 类面板路由**（管理面 host 化）：机制分支 86e720cd——plugin 包新增 `panel-route.ts`（`/api/plugin-registry` 前缀路由，`ctx.inject(['httpServer'])` 挂载）；ui-plugin-manager client 改 fetch 自建路由（去 connection/apiproxy 依赖）；web 端到端（list/enable/disable/install 语义/错误回报）验证通过
 - ✅ **apiproxy plugins 域移除**：机制分支 731215dd——域实现/schema/rpc-map/fetch/index 全删（-391 行），connection fixture/fake-api 清 mock；apiproxy+plugin+connection 500 测试全过；瘦身验证站（/tmp/dsh-0808-slim，机制分支 worktree）端到端：CLI + 面板自建路由 + 热更新帧全通
 - ✅ **瘦身 patch 阶段产物**：`patches/dsh-plugin-registry-0808-slim.patch`（26 文件，相对 49 收敛 47%）——纯净 0808 基线 `git apply --check` 通过 + 真实安装顺序（先复制 packages 再 apply）无重叠；正式 0808 patch 保留未动
-- ⏳ 剩余：bash/tasks peek 外置（插件作者面，7 文件）、热更新帧链路评估（4 文件，独立于 plugins 域）、正式 patch 替换（收敛到 ~10 文件内）、文档基线标注同步
+- ⏳ 剩余（阶段 2，独立子项）：热更新帧链路评估（apiproxy 4 文件，独立于 plugins 域，是否随面板外置）、正式 patch 替换（当前 26 文件为阶段 1 产物，peek 保留 → 目标收敛到 ~19）、文档基线标注同步
 
 ## 审计结论
 
@@ -110,6 +110,16 @@
 
 **为什么不可 0 侵入**：mygo 的投影桥（生成 bridge 包走 Loader 扫描）可以**绕**（静态进图），但绕的代价是「禁用驻留 / 等 boot」——与「实时进出 + 真移除」不等价。`registerExternal` 是「UI 插件实时进出浏览器」在官方源码里的唯一落点。
 
+### D3. 任务输出 peek（7 文件，修正归类：B → D 保留）
+
+`bash`（5 文件）+ `tasks`（2 文件）的 `peek` seam 最初归类为 B「可外置」，评审后**修正为 D 保留**。理由：
+
+- **非消耗语义依赖官方缓冲实现**：`peekOutput` 的 bounded 窗口 + lossy/spill 语义是官方 `BashProcess` 进程管理的内部状态——插件是消费者，拿不到官方任务进程的原始流。真外置 = task-status 类插件自己 spawn 任务、自己收集 stdout，只对插件自起进程有效，对官方任务引擎管理的任务无效。
+- **放弃能力的代价**：插件 tail 与官方 `task_output` 工具共用同一读游标，无 peek 时插件轮询会抢走工具的增量——「实时 tail」与「工具可读」两者不可兼得。peek 是根治，不是优化。
+- **成本可承受**：7 文件在阶段 1 的 26 文件里占比不大；瘦身主战场是冗余部分（apiproxy 帧链路评估），不是砍真实能力。
+
+**结论**：peek 属「必须进官方树」一类，保留在 patch。瘦身目标从「~5」修正为「~19」（26 文件减热更新帧评估的 ~7 冗余）。
+
 ## 瘦身后 patch 构成（预期）
 
 ```
@@ -120,20 +130,21 @@ packages/client/modules/src/client/manifest.ts (+15) D2
 packages/client/modules/src/client/system.ts   (+19) D2
 ```
 
-≈ 5 文件 / +141 行。C 类残留（CLI 对 registry 实现的引用）并入 D1 文件计数。
+**阶段 1 实际产物**：`patches/dsh-plugin-registry-0808-slim.patch`（26 文件，含 D1/D2/D3 peek + apiproxy 热更新帧 + tsconfig 接线），相对原 49 收敛 47%；纯净 0808 基线 `git apply --check` 通过 + 真实安装顺序（先复制 packages 再 apply）无重叠。阶段 2 目标：热更新帧链路评估后收敛到 ~19（D3 peek 保留）。
 
 ## 能力对比（0 下降证明）
 
-| 能力 | 现在 | 瘦身后 | 差异 |
+| 能力 | 瘦身前 | 瘦身后 | 差异 |
 |---|---|---|---|
-| `dsh registry` 子命令 | patch D1 | patch D1 | 无 |
-| 面板管理（启停/装卸/列表） | apiproxy plugins 域 | 面板自建路由 + `ctx.pluginManager` | 无（内部通道不同，能力相同） |
-| UI 插件实时进出 + 真移除 | `registerExternal`（patch D2） | 同左 | 无 |
-| 浏览器 diff 应用器 | 官方 runtime | 面板 client half | 无（同逻辑换宿主） |
+| `dsh registry` 子命令 | patch（cli 接线） | 同左（D1） | 无 |
+| 面板管理（启停/装卸/列表） | apiproxy `plugins` 域 RPC | 面板自建 `/api/plugin-registry` 路由 + `ctx.pluginManager` | 无（内部通道不同，能力相同） |
+| UI 插件实时进出 + 真移除 | `registerExternal`（patch） | 同左（D2） | 无 |
+| 浏览器 diff 应用器 | 官方 runtime | 同左（保留，评估中） | 无 |
+| 任务输出 tail 与工具共存 | `peek` seam（patch） | 同左（D3 保留） | 无 |
 | 安装默认禁用 + 校验回滚 | 应用层 | 应用层 | 无 |
 | 碰撞守卫 | patch D2 | patch D2 | 无 |
 | 官方插件增量兼容 | 依赖 registerExternal | 同左 | 无 |
-| 安装流程 | 复制 plugin+ui-plugin-manager + apply patch | 复制 plugin+ui-plugin-manager+新分发包 + apply 小 patch | 复制列表变长，patch 变小 |
+| 安装流程 | 复制 plugin+ui-plugin-manager + apply 49 文件 patch | 复制同款 + apply 26 文件 patch | patch 变小 47% |
 
 ## 实施步骤
 
