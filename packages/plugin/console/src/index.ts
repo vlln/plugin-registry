@@ -621,6 +621,12 @@ export function apply(ctx: ConsoleCtx): void {
                 try {
                   const parsed = JSON.parse(body) as { disabled?: boolean }
                   const disabled = parsed.disabled === true
+                  // 管理工具自身不可停用：禁用会卸载本面板（管理入口消失），
+                  // 前端按钮已隐藏，此处防护直接调 API 的路径。
+                  if (id === '@dsh-external/plugin-console') {
+                    json(409, { ok: false, message: '管理工具自身不可停用' })
+                    return
+                  }
                   // 运行时启停：用与 GET /installed 相同的 entries() 遍历匹配条目
                   // （resolve 可能命中不同的 Entry 对象——已实证状态不生效）。
                   // 匹配短 id（options.id），与 patch 的 `- id:` 一致。

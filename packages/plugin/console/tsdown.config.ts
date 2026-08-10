@@ -12,6 +12,9 @@ export default [
     target: 'es2024',
     outDir: 'lib',
     clean: true,
+    // bundle 语义：官方包（@deepseek-ai/*）由 profile 的 pnpm 闭包在挂载时
+    // 注入——不打包（本地也无公共 npm 可解析），与 client 配置同理由。
+    external: [/@deepseek-ai\//],
   },
   {
     name: '@dsh-external/plugin-console/client',

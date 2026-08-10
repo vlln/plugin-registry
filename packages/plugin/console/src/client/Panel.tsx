@@ -314,6 +314,8 @@ export function ConsolePanel(): React.ReactNode {
   // 区分产品内置（@deepseek-ai/*、@cordisjs/*、cordis: 组合）与用户添加。
   const isOfficial = (p: LoadedPluginRow): boolean =>
     p.name.startsWith('@deepseek-ai/') || p.name.startsWith('@cordisjs/') || p.name.startsWith('cordis:')
+  // 管理工具自身：禁用会卸载本面板（管理入口消失），不可停用。
+  const isSelf = (p: LoadedPluginRow): boolean => p.name === '@dsh-external/plugin-console'
   const official = installed.filter(isOfficial)
   const user = installed.filter(p => !isOfficial(p))
   const shown = showAll ? installed : user
@@ -358,14 +360,15 @@ export function ConsolePanel(): React.ReactNode {
                     {!official.includes(plugin) && version.canUpdate ? (
                       <Button size="sm" variant="outline" disabled={busy || bundleBusy} onClick={() => { void updateBundle(plugin.name) }}>更新</Button>
                     ) : null}
-                    {/* 内置插件不可停用（官方组合层）；仅用户插件可启停 */}
-                    {!official.includes(plugin) ? (
+                    {/* 内置插件不可停用（官方组合层）；管理工具自身不可停用（自毁）；仅其他用户插件可启停 */}
+                    {!official.includes(plugin) && !isSelf(plugin) ? (
                       <Button size="sm" variant="outline" disabled={busy} onClick={() => { void togglePlugin(plugin.id, !plugin.disabled) }}>
                         {plugin.disabled ? '启用' : '停用'}
                       </Button>
                     ) : null}
                     {/* 状态 Pill 贴右缘（名称左、按钮中、Pill 右） */}
                     {official.includes(plugin) ? <Pill>内置</Pill> : null}
+                    {isSelf(plugin) ? <Pill>管理工具</Pill> : null}
                     <Pill active={!plugin.disabled}>{plugin.disabled ? '已停用' : '运行中'}</Pill>
                   </span>
                 </div>
