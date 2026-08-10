@@ -11,6 +11,20 @@ DeepSeek Harness 官方机制管「插件是什么、怎么跑」；本仓库补
 1. **薄控制台**（`packages/plugin/console`）——管理已装的官方 repository 插件与 UI 插件的浏览器面板（读写作 `$DSH_HOME/cordis.patch.yml`）
 2. **开发规范和引导**——`make-dsh-plugin` skill + cookbook，指导创建官方 repository-plugin（0809 格式）
 
+## 生态关系（谁能干什么）
+
+```
+官方 DSH（DeepSeek Harness）     插件运行时 + 仓库插件机制（.dsh-plugin 格式 + config 安装）
+   │
+   ├── 官方插件（bundle）        loop / task-status / navbar 等——随组合分发，`dsh plugin add` 装进 profile
+   ├── 第三方插件（repository）  whale-girl 等——独立 GitHub 仓库，`config.yaml` 安装
+   │
+   └── 本仓库（plugin-registry） ① 薄控制台：管理上述两类插件的浏览器面板
+                                ② make-dsh-plugin skill + cookbook：引导开发第三方插件
+```
+
+两类插件的完整区别（开发/分发/安装/管理四维 + 选型）见 [插件类型对比](docs/plugin-types.md)。
+
 ## 安装薄控制台
 
 ```sh
