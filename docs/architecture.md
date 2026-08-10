@@ -79,6 +79,8 @@ registry 插件是**消费者**：`inject: ['tasks']` 登记自己的后台任�
 
 「web 插件」分两种：**被 Web 面板管理**（浏览/搜索/安装/启停/卸载——`ui-plugin-manager` 面板，✅）与**在浏览器里跑**（带 UI 的 client 插件，✅ 经 `client` 声明支持）。
 
+**实现分布**：registry 机制中只有「必须改官方源码的接线」进 patch（CLI `dsh registry` 注册 + `registerExternal`/`addRow`/`removeStyles`，约 5 文件）；面板、plugins 域、浏览器 diff 应用器等均为分发包（复制进 `packages/`）。分类与去向见 [patch 瘦身设计](patch-slimming-design.md)。
+
 ### 加载通道：官方 client 插件 vs registry client half
 
 浏览器端插件的加载通道（`packages/client/modules`）：浏览器侧按 `window.__DSH_BOOT__`（boot graph）逐行加载 bundle；Node 侧 `ClientModuleHostService` 由 **Loader 树扫描**（`dshClient` 声明 + `exports["./client"]`）与 **`registerExternal` 动态登记**（registry 插件启用时登记；`compose`/`/plugins` 路由/`__DSH_BOOT__` 注入全部复用）共同组成 graph。

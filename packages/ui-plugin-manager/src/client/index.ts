@@ -2,17 +2,17 @@
  * Plugin manager surface plugin, browser half — a Settings section that
  * browses the local plugin registry: search, install (disabled by default),
  * enable/disable (which mounts/unmounts live on the host), and uninstall.
- * All data crosses the plugins host API; the panel holds only its own
- * browse/search state.
+ * All data crosses the panel's own `/api/plugin-registry` route (patch
+ * slimming B class: fetch face replaces the apiproxy plugins RPC domain);
+ * the panel holds only its own browse/search state.
  */
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { PluginPanel, type PluginPanelInjected } from './PluginPanel.tsx'
 
 export type { PluginPanelInjected, PluginPanelProps } from './PluginPanel.tsx'
 
 /** Required services (cordis fiber inject). The target slot is declared by ui-settings. */
-export const inject = ['slots', 'connection']
+export const inject = ['slots']
 
 /**
  * Register the Settings plugin section. 0806 dropped the deferred-registration
@@ -21,8 +21,7 @@ export const inject = ['slots', 'connection']
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
-  const connection = ctx.get('connection') as ConnectionHandle
-  const injected = (): PluginPanelInjected => ({ api: connection.api })
+  const injected = (): PluginPanelInjected => ({})
   ctx.slots.inject('settings.section', () =>
     ctx.slots.register({
       name: 'settings.section',

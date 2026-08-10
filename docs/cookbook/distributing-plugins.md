@@ -20,12 +20,14 @@ tarball 安装走严格解压（防路径穿越），定位到含 `dsh.plugin.js
 
 ## 形态二：社区目录模式（registry 功能分发）
 
-本仓库自身用此模式：把 `packages/plugin/`、`packages/ui-plugin-manager/` 复制进目标 DSH monorepo + `git apply patches/dsh-plugin-registry-0808.patch`（基于官方 0808 快照生成）；registry 服务经 profile bundle 挂载（`packages/bundle/dsh-plugin-registry`）。见 [集成到 dsh](integrating-into-dsh.md)。
+本仓库自身用此模式：把 `packages/` 下分发包（`plugin`、`ui-plugin-manager` 及瘦身后新增的实现包）复制进目标 DSH monorepo + `git apply patches/dsh-plugin-registry-0808.patch`（基于官方 0808 快照生成）；registry 服务经 profile bundle 挂载（`packages/bundle/dsh-plugin-registry`）。见 [集成到 dsh](integrating-into-dsh.md)。
 
-适配新基线：在官方新快照上重新生成补丁。scope 以现有 patch 的文件清单为准并排除复制分发包（`packages/plugin`、`packages/client/ui-plugin-manager`，否则复制+apply 两步骤文件重叠冲突）：
+**patch 范围契约**：补丁只含**必须改官方源码的接线**——CLI `dsh registry` 子命令注册（`apps/cli/src/args.ts`、`bin.ts`）与运行时 client 登记（`packages/client/modules` 的 `registerExternal`/`addRow`/`removeStyles`），约 5 文件。其余机制件（CLI 实现 `registry.ts`、apiproxy plugins 域、浏览器 diff 应用器等）是**分发包**，复制进 `packages/`，不进补丁。分类与去向见 [patch 瘦身设计](../patch-slimming-design.md)。
+
+适配新基线：在官方新快照上重新生成补丁。scope 以当前 patch 的文件清单为准并排除全部复制分发包（`packages/plugin`、`packages/client/ui-plugin-manager` 及瘦身后新增实现包，否则复制+apply 两步骤文件重叠冲突）：
 
 ```sh
-git diff --abbrev=8 <snapshot-ref>..HEAD -- $(grep '^diff --git' patches/dsh-plugin-registry-0808.patch | sed 's/^diff --git a\///; s/ b\/.*//' | grep -v '^packages/client/ui-plugin-manager$') > patches/dsh-plugin-registry-0808.patch
+git diff --abbrev=8 <snapshot-ref>..HEAD -- $(grep '^diff --git' patches/dsh-plugin-registry-0808.patch | sed 's/^diff --git a\///; s/ b\/.*//' | grep -v '^packages/client/ui-plugin-manager$' | grep -v '^apps/cli/src/registry.ts$' | grep -v '^packages/host/apiproxy/src/api/plugins') > patches/dsh-plugin-registry-0808.patch
 ```
 
 **验证点**：在干净的新快照 checkout 上 `git apply --check` 通过；再按真实安装顺序验证——先复制 `packages/` 进目标、后 `git apply`（复制分发包与补丁不重叠）。

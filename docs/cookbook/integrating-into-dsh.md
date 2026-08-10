@@ -31,17 +31,18 @@ cd plugin-registry-<版本>
 node scripts/install-into-dsh.mjs <dsh-monorepo路径>
 ```
 
-自动完成：复制 `packages/plugin`、`packages/ui-plugin-manager` 进 monorepo → `git apply` 接线补丁（先 dry-run）→ `pnpm install`。脚本校验目标必须是 DSH monorepo 根（含 `package.json` + `pnpm-workspace.yaml`），补丁基线不匹配时提示用 `--3way` 手动对齐。
+自动完成：复制 `packages/` 下全部分发包进 monorepo → `git apply` 接线补丁（先 dry-run）→ `pnpm install`。脚本校验目标必须是 DSH monorepo 根（含 `package.json` + `pnpm-workspace.yaml`），补丁基线不匹配时提示用 `--3way` 手动对齐。
 
 ## 手动安装
 
-### 1. 放插件
+### 1. 放插件（分发包）
 
-`packages/plugin/`、`packages/ui-plugin-manager/` 复制到 DSH monorepo 对应路径：
+`packages/` 下全部分发包复制到 DSH monorepo 对应路径：
 
 ```sh
 cp -r packages/plugin DSH_MONOREPO/packages/
 cp -r packages/ui-plugin-manager DSH_MONOREPO/packages/client/
+# 瘦身后的实现分发包（CLI registry 实现、apiproxy 域、浏览器应用器等）按 packages/ 结构复制
 ```
 
 ### 2. 打接线补丁
@@ -50,7 +51,7 @@ cp -r packages/ui-plugin-manager DSH_MONOREPO/packages/client/
 git apply patches/dsh-plugin-registry-0808.patch   # 在 DSH monorepo 根目录执行
 ```
 
-补丁基于官方 0808 快照生成，改动 41 个官方文件（**纯平台接线**：CLI `dsh registry`、apiproxy `plugins` 域、`client-graph-changed` 自动刷新、tasks/bash `peek` seam、tsconfig、依赖闭包），不含复制分发包 `packages/plugin` 与 ui-plugin-manager。基线漂移时 `git apply --3way` 或手动对齐。具体插件的宿主依赖由各插件仓库自带补丁提供。
+补丁基于官方 0808 快照生成，**只含必须改官方源码的接线**（约 5 文件：CLI `dsh registry` 注册 + client-modules `registerExternal`/`addRow`/`removeStyles`），不含复制分发包；范围契约见 [patch 瘦身设计](../patch-slimming-design.md)。基线漂移时 `git apply --3way` 或手动对齐。
 
 **验证点**：`git apply --check` 无输出（干净应用）；`git status` 显示改动文件数符合预期。
 

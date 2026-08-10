@@ -4,14 +4,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pulls ui-settings' SlotMap merge ('settings.section') into view.
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
-import type { IApiClient } from '@deepseek-ai/dsh-client-connection/client'
-import type { PluginEntryView } from '@deepseek-ai/dsh-host-apiproxy'
+import type { PluginEntryView } from './api.ts'
+import { listPlugins, runPluginAction } from './api.ts'
 import { Button, Input } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './PluginPanel.module.css'
 
-/** Registrant-owned dependencies of {@link PluginPanel}: the host plugins API. */
+/** Registrant-owned dependencies of {@link PluginPanel}: none (fetch face). */
 export interface PluginPanelInjected {
-  api: Pick<IApiClient, 'plugins'>
+  /** Reserved for future injected services. */
+  readonly _?: undefined
 }
 
 /** The settings-section owner props plus the injected plugins API. */
@@ -28,39 +29,29 @@ function actionsFor(plugin: PluginEntryView): readonly Action[] {
 }
 
 /** Render the plugin browse list and its controls against the host plugins API. */
-export function PluginPanel(props: PluginPanelProps): React.ReactNode {
-  const { api } = props
+export function PluginPanel(_props: PluginPanelProps): React.ReactNode {
   const [plugins, setPlugins] = useState<PluginEntryView[]>([])
   const [query, setQuery] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
 
   const refresh = useCallback(async (): Promise<void> => {
-    const response = await api.plugins.list({})
-    if (response.result.ok) setPlugins([...response.result.value.plugins])
-  }, [api])
+    const rows = await listPlugins()
+    setPlugins([...rows])
+  }, [])
 
   const run = useCallback(async (action: 'install' | 'enable' | 'disable' | 'uninstall', id: string): Promise<void> => {
     setBusy(true)
     setError(undefined)
     try {
-      const call = api.plugins[action]
-      const response = await call({ id })
-      // The RPC carrier returns ok:false for business failures (a broken
-      // enable, a missing source) instead of throwing — surface it or the
-      // click looks dead.
-      if (!response.result.ok) {
-        const message = response.result.error.message
-        setError(`操作失败：${id} — ${message}`)
-        return
-      }
+      await runPluginAction(action, id)
       await refresh()
     } catch (caught: unknown) {
       setError(`操作失败：${id} — ${caught instanceof Error ? caught.message : String(caught)}`)
     } finally {
       setBusy(false)
     }
-  }, [api, refresh])
+  }, [refresh])
 
   useEffect(() => {
     void refresh()

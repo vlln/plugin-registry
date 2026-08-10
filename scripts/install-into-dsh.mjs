@@ -8,12 +8,19 @@
  * What it does (mirrors docs/cookbook/integrating-into-dsh.md):
  *   1. copies packages/plugin  -> <repo>/packages/plugin
  *   2. copies packages/ui-plugin-manager -> <repo>/packages/client/ui-plugin-manager
- *   3. applies patches/dsh-plugin-registry-0808.patch (dry-run first)
- *   4. runs `pnpm install` so the copied packages' deps resolve
+ *   3. copies every distribution implementation package under packages/
+ *      (patch-slimming design: mechanism files live in packages, not the patch)
+ *   4. applies patches/dsh-plugin-registry-0808.patch (dry-run first)
+ *   5. runs `pnpm install` so the copied packages' deps resolve
  *
  * The patch is generated against the official 0808 snapshot
- * (20260808T121140Z, commit 57ffa9de). On a different baseline use
- * `git apply --3way` per docs/cookbook/integrating-into-dsh.md.
+ * (20260808T121140Z, commit 57ffa9de). It contains ONLY the hard wiring
+ * that must touch official source (CLI `dsh registry` registration +
+ * client-modules registerExternal/addRow/removeStyles, ~5 files); every
+ * other mechanism file ships as a copied distribution package. See
+ * docs/patch-slimming-design.md for the 49→5 classification.
+ * On a different baseline use `git apply --3way` per
+ * docs/cookbook/integrating-into-dsh.md.
  *
  * On 0808 the registry services mount through the official profile-bundle
  * mechanism: after this script, add the registry bundle to a profile via
@@ -22,7 +29,7 @@
  * patch inserts plugin-local + ui-plugin-manager into the composition.
  */
 import { cpSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
@@ -45,11 +52,25 @@ if (!existsSync(patch)) {
 }
 
 // 1. copy packages (registry is a copy-in + patch-on-top distribution)
+//    Every distribution implementation package ships in packages/; the patch
+//    only carries hard official wiring (~5 files, see patch-slimming-design).
 step(`copying packages/plugin -> ${target}/packages/plugin`)
 cpSync(join(here, 'packages/plugin'), join(target, 'packages/plugin'), { recursive: true })
 step(`copying packages/ui-plugin-manager -> ${target}/packages/client/ui-plugin-manager`)
 mkdirSync(join(target, 'packages/client'), { recursive: true })
 cpSync(join(here, 'packages/ui-plugin-manager'), join(target, 'packages/client/ui-plugin-manager'), { recursive: true })
+// Implementation packages (slimmed from the patch into packages/) are copied
+// per directory. Add each new distribution package here as it lands.
+const IMPLEMENTATION_PACKAGES = [
+  // e.g. { src: 'packages/registry-cli', dst: 'packages/registry-cli' }
+  // TODO(patch-slimming): move apps/cli/src/registry.ts + apiproxy plugins
+  // domain + browser applier out of the patch into packages/ and list them.
+]
+for (const pkg of IMPLEMENTATION_PACKAGES) {
+  step(`copying ${pkg.src} -> ${target}/${pkg.dst}`)
+  mkdirSync(join(target, dirname(pkg.dst)), { recursive: true })
+  cpSync(join(here, pkg.src), join(target, pkg.dst), { recursive: true })
+}
 
 // 2. apply the wiring patch (dry-run first so a bad baseline fails cleanly)
 step('applying patches/dsh-plugin-registry-0808.patch')

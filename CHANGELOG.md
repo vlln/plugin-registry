@@ -7,7 +7,16 @@
 本仓库是「官方基线 + patch + package」构建式仓库（见 [AGENTS.md](AGENTS.md)），交付时需标明基线：
 
 - **机制分支基线**：官方 0808 快照（`20260808T121140Z`，提交 `57ffa9de`）——机制分支 `feat/plugin-registry-mvp-0808` 已对齐
-- **patch 基线**：`patches/dsh-plugin-registry-0808.patch` 基于官方 0808 快照（49 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、host 帧 `client-graph-changed` 自动刷新（Stage 1 起携带完整 graph）、浏览器端 graph diff 应用器（启停不整页刷新）、tasks/bash 非消耗式 `peek` seam、依赖闭包；不含复制分发包 `packages/plugin`、`packages/client/ui-plugin-manager`）；旧 0807/0806 patch 保留供对应基线追溯
+- **patch 基线**：`patches/dsh-plugin-registry-0808.patch` 基于官方 0808 快照（49 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、host 帧 `client-graph-changed` 自动刷新（Stage 1 起携带完整 graph）、浏览器端 graph diff 应用器（启停不整页刷新）、tasks/bash 非消耗式 `peek` seam、依赖闭包；不含复制分发包 `packages/plugin`、`packages/client/ui-plugin-manager`）；旧 0807/0806 patch 保留供对应基线追溯。**patch 瘦身（49→5）设计已定稿待实施**（机制件转分发包，patch 收敛为 CLI 接线 + `registerExternal` 硬核），见 [patch 瘦身设计](docs/patch-slimming-design.md)；实施时本段基线标注随之更新
+
+## 2026-08（patch 瘦身设计定稿：49 → 5 迁移清单 + 文档契约）
+
+审计 0808 patch 的 49 个文件，按「是否必须进官方树」分四类：A 纯新增文件（12，本就不该在 patch）、B 可 0 侵入替代（15，面板自建路由可达同等能力）、C 构建接线（6，随 A/B 外置消失）、D 必须改官方源码（5，CLI 接线 + `registerExternal` 硬核）。定稿迁移清单与能力 0 下降证明：
+
+- **新增**：[patch 瘦身设计](docs/patch-slimming-design.md)（每文件去向、能力对比、验证点）
+- **文档契约同步**：distributing-plugins「形态二」patch 范围契约重写（scope 收敛为硬接线 + 指向设计稿）；integrating-into-dsh 复制列表/补丁描述更新；install-into-dsh.mjs 注释与复制结构更新（实现分发包清单占位）；architecture「web 边界」补实现分布说明
+- **doc-budgets**：注册新设计稿预算（9000）
+- **能力影响**：零（A/B/C 全为内容搬家，D 两条硬接线保留）
 
 ## 2026-08（热更新 Stage 1：启停插件不再整页刷新）
 
