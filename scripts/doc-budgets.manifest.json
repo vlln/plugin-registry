@@ -19,5 +19,6 @@
   "docs/official-0809-coverage.md": 7000,
   "docs/console-ui-plugin-management.md": 6000,
   "docs/cookbook/creating-a-repository-plugin.md": 3500,
-  "docs/plugin-types.md": 4000
+  "docs/plugin-types.md": 4000,
+  "docs/cookbook/migrating-legacy-plugins.md": 4000
 }

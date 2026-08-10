@@ -47,6 +47,17 @@ dsh plugin --profile web add <本仓库>/packages/plugin/console
 
 完整坑清单见 [skill references/gotchas](skills/make-dsh-plugin/references/gotchas.md)。
 
+## 旧用户迁移（旧机制插件 → 官方形态）
+
+plugin-registry 旧机制（`dsh.plugin.json` / `dsh registry` / `__ModuleLoader__`）已移除——旧插件需迁移到官方 0809 形态：
+
+| 旧插件现状 | 迁移到 | 方式 |
+|---|---|---|
+| 已有官方 npm 包 + 增量清单（distill/dsh-vision 等） | **bundle 插件** | 删 `dsh.plugin.json`，声明 `dsh.bundle`，`dsh plugin add` 安装 |
+| 纯旧机制（自造 client half） | **repository 插件** | `.dsh-plugin/` + `dsh.entry`，client 改自渲染（whale-girl 范本） |
+
+完整迁移指南（方向判断/分面迁移/执行步骤）见 [cookbook/migrating-legacy-plugins](docs/cookbook/migrating-legacy-plugins.md)。
+
 ## 文档
 
 - [创建官方 repository-plugin](docs/cookbook/creating-a-repository-plugin.md) — 0809 格式权威契约：仓库布局 → entry → 自渲染 client → 安装 → 开发规范
