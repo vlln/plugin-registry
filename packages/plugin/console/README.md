@@ -5,9 +5,9 @@
 | 管理区 | 插件类型 | 操作 | 写入文件 |
 |---|---|---|---|
 | **repository 插件** | `.dsh-plugin` 包（skill/mcp/tool） | `repositories` 列表增删（装/卸） | home 级 `$DSH_HOME/cordis.patch.yml`（`homePatchPath()`） |
-| **UI 插件** | bundle 插件（dshClient 包，如 dsh-loop/navbar/task-status） | Loader 树行 `disabled` 标记（停/启） | profile 级 `$DSH_HOME/profiles/web/cordis.patch.yml`（`profilePatchPath()`） |
+| **UI 插件** | bundle 插件（`dsh.client` 包，如 dsh-loop/navbar/task-status） | Loader 树行 `disabled` 标记（停/启） | profile 级 `$DSH_HOME/profiles/web/cordis.patch.yml`（`profilePatchPath()`） |
 
-- **形态**：官方 bundle（`dsh.bundle` + `dshClient`），经 `dsh plugin --profile web add <dir>` 挂载
+- **形态**：官方 bundle（`dsh.bundle` + `dsh.client`），经 `dsh plugin --profile web add <dir>` 挂载
 - **Node half**：`/api/plugin-console/repositories`（repository 插件）+ `/api/plugin-console/ui-plugins`（UI 插件）——GET 读 / POST 写
 - **client half**：设置页「插件」面板（`settings.section` 插槽），两个管理区
 - **生效**：web 默认无运行中 HMR（官方 TODO），写后提示重启；官方启用 web hmr 后自动换代

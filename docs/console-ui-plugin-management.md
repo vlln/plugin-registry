@@ -1,14 +1,14 @@
-# 设计：薄控制台扩展——统一管理 UI 插件（dshClient 包）
+# 设计：薄控制台扩展——统一管理 UI 插件（dsh.client 包）
 
-状态：**设计稿（暂未实现）**。目的：薄控制台当前只管理 repository 插件（`.dsh-plugin`，config repositories），不管理 dshClient UI 插件（bundle）。本文设计扩展：让薄控制台同时管理两类插件，职责归位「插件管理 = 薄控制台」。
+状态：**设计稿（暂未实现）**。目的：薄控制台当前只管理 repository 插件（`.dsh-plugin`，config repositories），不管理 dsh.client UI 插件（bundle）。本文设计扩展：让薄控制台同时管理两类插件，职责归位「插件管理 = 薄控制台」。
 
 ## 背景：两类插件的管理机制不同
 
 官方 0809 有两类插件，管理机制分属两个通道：
 
-| 维度 | repository 插件（`.dsh-plugin`） | dshClient UI 插件（bundle） |
+| 维度 | repository 插件（`.dsh-plugin`） | dsh.client UI 插件（bundle） |
 |---|---|---|
-| 形态 | 仓库目录 + `dsh.entry`（Node） | 独立 npm 包 + `dshClient` 声明（`exports["./client"]`） |
+| 形态 | 仓库目录 + `dsh.entry`（Node） | 独立 npm 包 + `dsh.client` 声明（`exports["./client"]`） |
 | 安装 | config `repositories` 加 GitHub 源 | `dsh plugin --profile add <bundle>`（pnpm 依赖） |
 | 加载 | RepositoryCache（config 驱动，事务性换代） | Loader 树（client-modules 扫描 → `__DSH_BOOT__`） |
 | **启用/禁用** | **写 `repositories` 列表（增删行）** | **写 `<id>: disabled: true/false`（官方 Loader 树 patch 语义）** |
@@ -20,7 +20,7 @@
 
 `packages/plugin/console` 当前：
 - 读写 `$DSH_HOME/cordis.patch.yml` 的 `repository-plugins.repositories`（增删行 = 装/卸 repository 插件）
-- 不管理 dshClient UI 插件（它们经 `dsh plugin add` 装进 profile，薄控制台无 UI 管理入口）
+- 不管理 dsh.client UI 插件（它们经 `dsh plugin add` 装进 profile，薄控制台无 UI 管理入口）
 
 ## 设计：薄控制台统一管理两类插件
 
@@ -48,10 +48,10 @@
 
 面板加「UI 插件」区：列出 bundles，启停按钮（写 disabled），与 Repository 区并列。
 
-## 已迁移的示例（dshClient 通道，供 UI 插件区管理）
+## 已迁移的示例（dsh.client 通道，供 UI 插件区管理）
 
-三个示例已迁为独立 dshClient 插件包（`dsh-external/dsh-{task-status,loop,navbar}`）：
-- bundle 形态（`dsh.bundle.patch` + `dshClient` 双声明），`dsh plugin add` 挂载
+三个示例已迁为独立 dsh.client 插件包（`dsh-external/dsh-{task-status,loop,navbar}`）：
+- bundle 形态（`dsh.bundle.patch` + `dsh.client` 双声明），`dsh plugin add` 挂载
 - client half 走官方 `__ModuleLoader__` 通道（boot graph 自动含）
 - 端到端验证：boot graph 含 client + `/plugins/<id>/client.js` 200 + Node 数据路由工作
 
