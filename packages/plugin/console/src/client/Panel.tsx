@@ -40,8 +40,9 @@ const versionTextStyle: React.CSSProperties = {
 }
 
 /** 版本行：v当前 · latest（可更新时高亮）；本地/非 registry 包无 latest。 */
-function versionText(plugin: LoadedPluginRow, latest: string | null): { text: string; canUpdate: boolean } {
+function versionText(plugin: LoadedPluginRow, latest: string | null, checked: boolean): { text: string; canUpdate: boolean } {
   const current = plugin.version === undefined ? '?' : `v${plugin.version}`
+  if (!checked) return { text: `${current} · 待检查`, canUpdate: false }
   if (latest === null) return { text: `${current} · 本地`, canUpdate: false }
   if (latest === plugin.version) return { text: `${current} · 已最新`, canUpdate: false }
   return { text: `${current} → v${latest}`, canUpdate: true }
@@ -107,6 +108,8 @@ export function ConsolePanel(): React.ReactNode {
   const [bundleBusy, setBundleBusy] = useState(false)
   const [bundleMsg, setBundleMsg] = useState<string | undefined>(undefined)
   const [versions, setVersions] = useState<Record<string, string | null>>({})
+  const [versionChecked, setVersionChecked] = useState<Record<string, boolean>>({})
+  const [versionBusy, setVersionBusy] = useState(false)
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -117,12 +120,17 @@ export function ConsolePanel(): React.ReactNode {
       ])
       const repoBody = (await repoRes.json()) as RepositoryState & { ok?: boolean }
       const installedBody = (await installedRes.json()) as { plugins?: LoadedPluginRow[]; ok?: boolean }
-      const versionsBody = (await versionsRes.json()) as { versions?: { name: string; latest: string | null }[]; ok?: boolean }
+      const versionsBody = (await versionsRes.json()) as { versions?: { name: string; latest: string | null; checked?: boolean }[]; ok?: boolean }
       setState({ repositories: repoBody.repositories ?? [], present: repoBody.present ?? false })
       setInstalled(installedBody.plugins ?? [])
       const map: Record<string, string | null> = {}
-      for (const row of versionsBody.versions ?? []) map[row.name] = row.latest
+      const checkedMap: Record<string, boolean> = {}
+      for (const row of versionsBody.versions ?? []) {
+        map[row.name] = row.latest
+        checkedMap[row.name] = row.checked === true
+      }
       setVersions(map)
+      setVersionChecked(checkedMap)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught))
     } finally {
@@ -244,6 +252,28 @@ export function ConsolePanel(): React.ReactNode {
     }
   }, [bundleInput])
 
+  /** 手动检查最新版本（POST refresh，Node half 30s 防抖）。 */
+  const refreshVersions = useCallback(async (): Promise<void> => {
+    setVersionBusy(true)
+    setError(undefined)
+    try {
+      const response = await fetch('/api/plugin-console/versions/refresh', { method: 'POST', headers: { accept: 'application/json' } })
+      const body = (await response.json()) as { versions?: { name: string; latest: string | null; checked?: boolean }[]; message?: string }
+      const map: Record<string, string | null> = {}
+      const checkedMap: Record<string, boolean> = {}
+      for (const row of body.versions ?? []) {
+        map[row.name] = row.latest
+        checkedMap[row.name] = row.checked === true
+      }
+      setVersions(map)
+      setVersionChecked(checkedMap)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught))
+    } finally {
+      setVersionBusy(false)
+    }
+  }, [])
+
   /** bundle 更新（pnpm update <name>，拉取最新版本）。 */
   const updateBundle = useCallback(async (name: string): Promise<void> => {
     setBundleBusy(true)
@@ -284,17 +314,22 @@ export function ConsolePanel(): React.ReactNode {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <div>
             <h3 style={sectionTitleStyle}>已加载插件（{user.length} 用户 / {official.length} 内置）</h3>
-            <p style={hintStyle}>启停立即生效（loader 树运行时应用）并写入 profile 配置持久化。</p>
+            <p style={hintStyle}>启停立即生效并持久化；版本经启动预扫描 + 手动检查缓存（不频繁打 registry）。</p>
           </div>
-          {official.length > 0 ? (
-            <Button size="sm" variant="ghost" onClick={() => { setShowAll(v => !v) }}>
-              {showAll ? '只看用户插件' : `查看所有（${installed.length}）`}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button size="sm" variant="ghost" disabled={versionBusy} onClick={() => { void refreshVersions() }}>
+              {versionBusy ? '检查中…' : '检查最新版本'}
             </Button>
-          ) : null}
+            {official.length > 0 ? (
+              <Button size="sm" variant="ghost" onClick={() => { setShowAll(v => !v) }}>
+                {showAll ? '只看用户插件' : `查看所有（${installed.length}）`}
+              </Button>
+            ) : null}
+          </div>
         </div>
         {shown.map(plugin => {
           const latest = versions[plugin.name] ?? null
-          const version = versionText(plugin, latest)
+          const version = versionText(plugin, latest, versionChecked[plugin.name] === true)
           return (
             <div key={plugin.id} style={rowStyle}>
               <span style={rowTitleStyle}>

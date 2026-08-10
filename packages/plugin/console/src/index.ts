@@ -386,16 +386,19 @@ interface LoadedEntryRow {
   version?: string
 }
 
-/** 版本检查缓存：name -> { latest, checkedAt }（10 分钟 TTL，进程内存）。 */
+/**
+ * 版本检查缓存：name -> { latest, checkedAt }（进程内存）。
+ * 防 registry 请求风暴策略：
+ * - 面板 GET /versions **只读缓存**（零网络）；
+ * - 进程启动后延迟预扫描（apply 里 setTimeout 30s）填充缓存；
+ * - 手动 POST /versions/refresh 强制查（30 秒最小间隔防抖）。
+ */
 const versionCache = new Map<string, { latest: string | null; checkedAt: number }>()
-const VERSION_CACHE_TTL_MS = 10 * 60 * 1000
+const VERSION_REFRESH_MIN_MS = 30 * 1000
+let lastVersionRefreshAt = 0
 
-/** npm view <name> version（registry 最新版）；失败/非 registry 包返回 null。结果缓存 10 分钟。 */
-function npmLatestVersion(name: string): string | null {
-  const cached = versionCache.get(name)
-  if (cached !== undefined && Date.now() - cached.checkedAt < VERSION_CACHE_TTL_MS) {
-    return cached.latest
-  }
+/** npm view <name> version（registry 最新版）；失败/非 registry 包返回 null。 */
+function npmViewLatest(name: string): string | null {
   let latest: string | null = null
   try {
     const result = spawnSync('npm', ['view', name, 'version'], { encoding: 'utf8', timeout: 15_000, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -408,6 +411,26 @@ function npmLatestVersion(name: string): string | null {
   }
   versionCache.set(name, { latest, checkedAt: Date.now() })
   return latest
+}
+
+/** 用户插件名列表（排除官方命名空间）。 */
+function userPluginNames(ctx: ConsoleCtx): string[] {
+  return [...new Set(collectLoaderEntries(ctx).map(row => row.name)
+    .filter(name => !name.startsWith('@deepseek-ai/') && !name.startsWith('@cordisjs/') && !name.startsWith('cordis:')))]
+}
+
+/**
+ * 批量强制刷新版本缓存（可选 force；手动检查时用）。
+ * @returns 是否实际执行了查询（false = 距上次刷新 < 最小间隔，直接返回缓存）。
+ */
+function refreshVersions(ctx: ConsoleCtx, force: boolean): boolean {
+  const now = Date.now()
+  if (!force && now - lastVersionRefreshAt < VERSION_REFRESH_MIN_MS) return false
+  lastVersionRefreshAt = now
+  for (const name of userPluginNames(ctx)) {
+    void npmViewLatest(name)
+  }
+  return true
 }
 
 /** 读已安装包版本（profile node_modules/<name>/package.json）；未装返回 undefined。 */
@@ -451,7 +474,16 @@ export function apply(ctx: ConsoleCtx): void {
   ctx.effect(() => {
     const httpServer = ctx.httpServer
     if (httpServer === undefined) return () => {}
-    return httpServer.register({
+    // 启动延迟预扫描：web 起来 30 秒后批量查一次 registry 版本，填充缓存
+    // （此后面板 GET /versions 零网络，直到用户手动刷新）。
+    const prescanTimer = setTimeout(() => {
+      try {
+        refreshVersions(ctx, false)
+      } catch (error) {
+        console.log(`[plugin-console] version prescan failed: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }, 30_000)
+    const disposeRoutes = httpServer.register({
       kind: 'prefix',
       path: '/api/plugin-console',
       handler: async (req, res) => {
@@ -536,20 +568,24 @@ export function apply(ctx: ConsoleCtx): void {
             json(200, { ok: true, plugins: collectLoaderEntries(ctx) })
             return
           }
-          // bundle 版本检查：对每个包查 registry 最新版（npm view，缓存 10 分钟）
+          // bundle 版本：只读缓存（零网络——registry 查询由启动延迟预扫描 +
+          // 手动刷新触发，避免面板每次打开打 registry）
           if (method === 'GET' && (path === '/api/plugin-console/versions' || path === '/api/plugin-console/versions/')) {
-            void (async () => {
-              try {
-                const names = [...new Set(collectLoaderEntries(ctx).map(row => row.name).filter(name => !name.startsWith('@deepseek-ai/') && !name.startsWith('@cordisjs/') && !name.startsWith('cordis:')))]
-                const versions = names.map(name => ({
-                  name,
-                  latest: npmLatestVersion(name),
-                }))
-                json(200, { ok: true, versions })
-              } catch (error) {
-                json(500, { ok: false, message: error instanceof Error ? error.message : String(error) })
-              }
-            })()
+            const versions = userPluginNames(ctx).map(name => {
+              const cached = versionCache.get(name)
+              return { name, latest: cached?.latest ?? null, checked: cached !== undefined }
+            })
+            json(200, { ok: true, versions })
+            return
+          }
+          // 手动检查最新版本（POST /versions/refresh，30s 最小间隔防抖）
+          if (method === 'POST' && (path === '/api/plugin-console/versions/refresh' || path === '/api/plugin-console/versions/refresh/')) {
+            const did = refreshVersions(ctx, false)
+            const versions = userPluginNames(ctx).map(name => {
+              const cached = versionCache.get(name)
+              return { name, latest: cached?.latest ?? null, checked: cached !== undefined }
+            })
+            json(200, { ok: true, refreshed: did, versions })
             return
           }
           // 已加载插件：运行时启停 + 写 profile patch 持久化
@@ -644,5 +680,9 @@ export function apply(ctx: ConsoleCtx): void {
         }
       },
     })
+    return () => {
+      clearTimeout(prescanTimer)
+      disposeRoutes()
+    }
   }, 'plugin-console: config read/write route')
 }
