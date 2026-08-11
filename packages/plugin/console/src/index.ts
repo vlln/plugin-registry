@@ -230,6 +230,8 @@ interface UpdateCheckRow {
   refKind: 'sha' | 'branch'
   latestSha: string | null
   hasUpdate: boolean
+  /** 源对应的插件名（cache manifest；未准备/不可读为 undefined）——面板按名 join 进已加载区。 */
+  pluginName?: string
   error?: string
 }
 
@@ -330,15 +332,17 @@ function runPnpm(args: string[]): { ok: boolean; names: string[]; output: string
 async function checkUpdates(sources: string[]): Promise<UpdateCheckRow[]> {
   const rows: UpdateCheckRow[] = []
   for (const source of sources) {
+    const pluginName = repositoryManifestName(source)
     const parsed = parseSource(source)
     if (parsed === null) {
-      rows.push({ source, ref: '', refKind: 'sha', latestSha: null, hasUpdate: false, error: 'unsupported source (expected github:owner/repo#ref)' })
+      rows.push({ source, pluginName, ref: '', refKind: 'sha', latestSha: null, hasUpdate: false, error: 'unsupported source (expected github:owner/repo#ref)' })
       continue
     }
     const result = await gitRemoteCommit(parsed.owner, parsed.repo, parsed.ref)
     if (result.sha === null) {
       rows.push({
         source,
+        pluginName,
         ref: parsed.ref,
         refKind: isCommitSha(parsed.ref) ? 'sha' : 'branch',
         latestSha: null,
@@ -349,6 +353,7 @@ async function checkUpdates(sources: string[]): Promise<UpdateCheckRow[]> {
     }
     rows.push({
       source,
+      pluginName,
       ref: parsed.ref,
       refKind: isCommitSha(parsed.ref) ? 'sha' : 'branch',
       latestSha: result.sha,
@@ -388,6 +393,10 @@ interface LoadedEntryRow {
   version?: string
   /** 来源：loader 树条目（bundle/内置）或 repository 插件（RepositoryCache 挂载）。 */
   kind?: 'loader' | 'repository'
+  /** repository 插件：config 行解析出的 ref（commit 或分支名）。 */
+  ref?: string
+  /** repository 插件：ref 类型（固定 commit / 分支）。 */
+  refKind?: 'sha' | 'branch'
 }
 
 /**
@@ -506,35 +515,83 @@ function repositoryManifestName(specifier: string): string | undefined {
   }
 }
 
+/** repository 插件的 cache 包目录（与 manifest wrapper 同目录）。 */
+function repositoryCacheDir(specifier: string): string {
+  const key = createHash('sha256').update(specifier).digest('hex')
+  return join(resolveDshHome(), 'cache', 'repository-plugins', key, 'node_modules', 'repository')
+}
+
+/** 读 repository 插件 cache 包的 version（package.json）；未准备/不可读返回 undefined。 */
+function readRepositoryVersion(specifier: string): string | undefined {
+  try {
+    const manifest = JSON.parse(readFileSync(join(repositoryCacheDir(specifier), 'package.json'), 'utf8')) as {
+      version?: string
+    }
+    return typeof manifest.version === 'string' ? manifest.version : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** repository 插件行附加信息（specifier → 插件名 + 版本 + ref 面）。 */
+interface RepositoryMeta {
+  pluginName?: string
+  version?: string
+  ref?: string
+  refKind?: 'sha' | 'branch'
+}
+
+/** 从 config 源列表构建 specifier → 插件元信息（version/ref 本地零网络）。 */
+function repositoryMetaMap(repositories: string[]): Map<string, RepositoryMeta> {
+  const map = new Map<string, RepositoryMeta>()
+  for (const source of repositories) {
+    const parsed = parseSource(source)
+    map.set(source, {
+      pluginName: repositoryManifestName(source),
+      version: readRepositoryVersion(source),
+      ref: parsed?.ref,
+      refKind: parsed !== null && isCommitSha(parsed.ref) ? 'sha' : (parsed !== null ? 'branch' : undefined),
+    })
+  }
+  return map
+}
+
 /**
  * 枚举 RepositoryCache 挂载的 repository 插件（并入「已加载插件」）。
  *
  * 识别：config 的每个 repository 源（specifier）经 cache 的 wrapper manifest
  * 得到插件名；`ctx.registry` 里 runtime.name 命中该集合的即 repository 插件
  * （wrapper 挂载的 runtime），运行状态 = 任一 fiber active。不依赖 fiber 父
- * 链（cordis 拦截 ctx.parent 访问）。
+ * 链（cordis 拦截 ctx.parent 访问）。版本/ref 从 cache 包与 config 行取（零网络）。
  */
 function collectRepositoryPlugins(ctx: ConsoleCtx): LoadedEntryRow[] {
-  const expected = new Set(readRepositories().repositories.map(repositoryManifestName).filter((n): n is string => n !== undefined))
-  if (expected.size === 0) return []
-  const registry = (ctx as unknown as { registry?: { entries?(): Iterable<[unknown, RuntimeFace]> } }).registry
-  if (registry?.entries === undefined) return []
-  // registry 对同一插件可能存多个 runtime（wrapper 挂载的多个 fiber）——
-  // 按名去重，保留任一 active 即视为运行中。
+  const metaBySpec = repositoryMetaMap(readRepositories().repositories)
   const byName = new Map<string, LoadedEntryRow>()
+  for (const [source, meta] of metaBySpec.entries()) {
+    if (meta.pluginName === undefined) continue
+    byName.set(meta.pluginName, {
+      id: meta.pluginName,
+      name: meta.pluginName,
+      disabled: true, // 默认未挂载；registry 命中后按 fiber 状态覆盖
+      version: meta.version,
+      kind: 'repository',
+      ref: meta.ref,
+      refKind: meta.refKind,
+      source,
+    })
+  }
+  if (byName.size === 0) return []
+  const registry = (ctx as unknown as { registry?: { entries?(): Iterable<[unknown, RuntimeFace]> } }).registry
+  if (registry?.entries === undefined) return [...byName.values()]
+  // registry 对同一插件可能存多个 runtime（wrapper 挂载的多个 fiber）——
+  // 按名去重，任一 active 即视为运行中。
   for (const [, runtime] of registry.entries()) {
     const name = runtime.name
-    if (typeof name !== 'string' || !expected.has(name)) continue
+    if (typeof name !== 'string' || !byName.has(name)) continue
     const fibers = [...(runtime.fibers ?? [])] as Array<{ state?: number }>
-    const row: LoadedEntryRow = {
-      id: name,
-      name,
-      disabled: !fibers.some(f => f.state === FIBER_ACTIVE),
-      kind: 'repository',
-    }
-    const prev = byName.get(name)
-    if (prev === undefined || (prev.disabled === true && row.disabled === false)) {
-      byName.set(name, row)
+    const row = byName.get(name)!
+    if (fibers.some(f => f.state === FIBER_ACTIVE)) {
+      row.disabled = false
     }
   }
   return [...byName.values()]
@@ -592,7 +649,25 @@ export function apply(ctx: ConsoleCtx): void {
         const path = url.split('?')[0] ?? '/'
         try {
           if (method === 'GET' && (path === '/api/plugin-console/repositories' || path === '/api/plugin-console/repositories/')) {
-            json(200, { ok: true, ...readRepositories() })
+            // 结构化源行：源字符串 + 解析 + 插件名/版本（cache）+ ref 面 + 挂载态。
+            // 未挂载源（cache 未准备/刚添加未换代）也成行，pluginName 缺失时挂载态未知。
+            const sources = readRepositories().repositories
+            const meta = repositoryMetaMap(sources)
+            const mountedNames = new Set(collectRepositoryPlugins(ctx).filter(r => !r.disabled).map(r => r.name))
+            const rows = sources.map((source) => {
+              const m = meta.get(source)
+              const parsed = parseSource(source)
+              return {
+                source,
+                parsed: parsed ?? undefined,
+                pluginName: m?.pluginName,
+                version: m?.version,
+                ref: m?.ref,
+                refKind: m?.refKind,
+                mounted: m?.pluginName !== undefined && mountedNames.has(m.pluginName),
+              }
+            })
+            json(200, { ok: true, repositories: rows, present: rows.length > 0 })
             return
           }
           if (method === 'POST' && (path === '/api/plugin-console/repositories' || path === '/api/plugin-console/repositories/')) {
@@ -731,7 +806,7 @@ export function apply(ctx: ConsoleCtx): void {
             })
             return
           }
-          // bundle 插件安装/更新（POST /bundles，body {action: 'install'|'update', source?|name?}）
+          // bundle 插件安装/更新/卸载（POST /bundles，body {action: 'install'|'update'|'remove', source?|name?}）
           if (method === 'POST' && (path === '/api/plugin-console/bundles' || path === '/api/plugin-console/bundles/')) {
             let body = ''
             ;(req as { on?: (e: string, cb: (c: Buffer) => void) => void })?.on?.('data', (c: Buffer) => { body += c.toString('utf8') })
@@ -767,7 +842,27 @@ export function apply(ctx: ConsoleCtx): void {
                     json(200, { ok: true, action: 'update', name, names: result.names, needsRestart: true })
                     return
                   }
-                  json(400, { ok: false, message: 'action must be install or update' })
+                  if (parsed.action === 'remove') {
+                    const name = (parsed.name ?? '').trim()
+                    if (name.length === 0) {
+                      json(400, { ok: false, message: 'remove needs a package name' })
+                      return
+                    }
+                    // 管理工具自身不可卸载（同 disable 自毁防护）。
+                    if (name === '@dsh-external/plugin-console') {
+                      json(409, { ok: false, message: '管理工具自身不可卸载' })
+                      return
+                    }
+                    const result = runPnpm(['remove', name])
+                    if (!result.ok) {
+                      json(502, { ok: false, message: `pnpm remove failed: ${result.output}` })
+                      return
+                    }
+                    // 依赖移除后 reconcile 自动把该 bundle 移出层栈（机制与 install 对称）。
+                    json(200, { ok: true, action: 'remove', name, needsRestart: true })
+                    return
+                  }
+                  json(400, { ok: false, message: 'action must be install, update, or remove' })
                 } catch (error) {
                   json(500, { ok: false, message: error instanceof Error ? error.message : String(error) })
                 }

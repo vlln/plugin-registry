@@ -11,8 +11,19 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Input, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
 
+/** repository 源行（Node half /repositories 结构化）。 */
+interface RepoSourceRow {
+  source: string
+  parsed?: { owner: string; repo: string; ref: string; tail: string }
+  pluginName?: string
+  version?: string
+  ref?: string
+  refKind?: 'sha' | 'branch'
+  mounted: boolean
+}
+
 interface RepositoryState {
-  repositories: string[]
+  repositories: RepoSourceRow[]
   present: boolean
 }
 
@@ -23,6 +34,8 @@ interface UpdateRow {
   refKind: 'sha' | 'branch'
   latestSha: string | null
   hasUpdate: boolean
+  /** 源对应的插件名（cache manifest）——面板按名 join 进已加载区。 */
+  pluginName?: string
   error?: string
 }
 
@@ -34,6 +47,12 @@ interface LoadedPluginRow {
   version?: string
   /** 来源：loader 树条目（bundle/内置）或 repository 插件（RepositoryCache 挂载）。 */
   kind?: 'loader' | 'repository'
+  /** repository 插件：config 行解析出的 ref（commit 或分支名）。 */
+  ref?: string
+  /** repository 插件：ref 类型（固定 commit / 分支）。 */
+  refKind?: 'sha' | 'branch'
+  /** repository 插件：config 源字符串（更新 = 写回该源固定 ref）。 */
+  source?: string
 }
 
 /* ---- 官方「模型」页设计语言（ModelsSection.module.css 对齐） ---- */
@@ -100,7 +119,25 @@ function versionText(plugin: LoadedPluginRow, latest: string | null, checked: bo
   return { text: `${current} → v${latest}`, canUpdate: true }
 }
 
-/** repository 源行的更新状态文本。 */
+/**
+ * repository 插件版本行：cache 版本 + git 远端状态（join /updates 结果）。
+ * 「没有更新按钮」由文案自己回答：已最新 / 分支 / 无法检查 / 待检查。
+ * 分支 ref 天然最新（每次换代取远端头），不提供「更新」按钮。
+ */
+function repositoryVersionText(plugin: LoadedPluginRow, upd: UpdateRow | undefined): { text: string; canUpdate: boolean } {
+  const current = plugin.version === undefined ? '?' : `v${plugin.version}`
+  const ref7 = plugin.ref === undefined ? '' : shortSha(plugin.ref)
+  if (upd === undefined) return { text: `${current} @${ref7} · 待检查`, canUpdate: false }
+  if (upd.error !== undefined) return { text: `${current} @${ref7} · 无法检查`, canUpdate: false }
+  if (upd.latestSha === null) return { text: `${current} @${ref7} · 未知`, canUpdate: false }
+  if (upd.refKind === 'branch') {
+    return { text: `${current} · 分支 ${upd.ref}@${shortSha(upd.latestSha)}`, canUpdate: false }
+  }
+  if (!upd.hasUpdate) return { text: `${current} · 已最新 ${ref7}`, canUpdate: false }
+  return { text: `${current} · 有更新 ${ref7}→${shortSha(upd.latestSha)}`, canUpdate: true }
+}
+
+/** repository 源行的更新状态文本（区 B 源行）。 */
 function updateText(row: UpdateRow): string {
   if (row.error !== undefined) return '无法检查'
   if (row.latestSha === null) return '未知'
@@ -125,7 +162,7 @@ export function ConsolePanel(): React.ReactNode {
   const [bundleMsg, setBundleMsg] = useState<string | undefined>(undefined)
   const [versions, setVersions] = useState<Record<string, string | null>>({})
   const [versionChecked, setVersionChecked] = useState<Record<string, boolean>>({})
-  const [versionBusy, setVersionBusy] = useState(false)
+
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -134,7 +171,7 @@ export function ConsolePanel(): React.ReactNode {
         fetch('/api/plugin-console/installed', { headers: { accept: 'application/json' } }),
         fetch('/api/plugin-console/versions', { headers: { accept: 'application/json' } }),
       ])
-      const repoBody = (await repoRes.json()) as RepositoryState & { ok?: boolean }
+      const repoBody = (await repoRes.json()) as { repositories?: RepoSourceRow[]; present?: boolean; ok?: boolean }
       const installedBody = (await installedRes.json()) as { plugins?: LoadedPluginRow[]; ok?: boolean }
       const versionsBody = (await versionsRes.json()) as { versions?: { name: string; latest: string | null; checked?: boolean }[]; ok?: boolean }
       setState({ repositories: repoBody.repositories ?? [], present: repoBody.present ?? false })
@@ -193,15 +230,27 @@ export function ConsolePanel(): React.ReactNode {
     }
   }, [refresh])
 
-  /** 检查全部 repository 源的远端更新状态。 */
-  const checkUpdates = useCallback(async (): Promise<void> => {
+  /** 统一检查更新：npm 版本批量查 + repository 远端 commit 批量查（结果共享区 A/B）。 */
+  const checkAll = useCallback(async (): Promise<void> => {
     setChecking(true)
     setError(undefined)
     try {
-      const response = await fetch('/api/plugin-console/updates', { headers: { accept: 'application/json' } })
-      const body = (await response.json()) as { ok?: boolean; updates?: UpdateRow[]; message?: string }
-      if (body.ok !== true) throw new Error(body.message ?? 'check failed')
-      setUpdates(body.updates ?? [])
+      const [versionRes, updatesRes] = await Promise.all([
+        fetch('/api/plugin-console/versions/refresh', { method: 'POST', headers: { accept: 'application/json' } }),
+        fetch('/api/plugin-console/updates', { headers: { accept: 'application/json' } }),
+      ])
+      const versionBody = (await versionRes.json()) as { versions?: { name: string; latest: string | null; checked?: boolean }[] }
+      const updatesBody = (await updatesRes.json()) as { ok?: boolean; updates?: UpdateRow[]; message?: string }
+      if (updatesBody.ok !== true) throw new Error(updatesBody.message ?? 'check failed')
+      const map: Record<string, string | null> = {}
+      const checkedMap: Record<string, boolean> = {}
+      for (const row of versionBody.versions ?? []) {
+        map[row.name] = row.latest
+        checkedMap[row.name] = row.checked === true
+      }
+      setVersions(map)
+      setVersionChecked(checkedMap)
+      setUpdates(updatesBody.updates ?? [])
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught))
     } finally {
@@ -222,49 +271,29 @@ export function ConsolePanel(): React.ReactNode {
       const body = (await response.json()) as { ok?: boolean; message?: string }
       if (body.ok !== true) throw new Error(body.message ?? 'update failed')
       await refresh()
-      await checkUpdates()
+      await checkAll()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught))
     } finally {
       setBusy(false)
     }
-  }, [refresh, checkUpdates])
+  }, [refresh, checkAll])
 
   const add = useCallback(async (): Promise<void> => {
     const value = input.trim()
     if (value.length === 0) return
-    if (!state.repositories.includes(value)) {
-      await save([...state.repositories, value])
+    if (!state.repositories.some(r => r.source === value)) {
+      await save([...state.repositories.map(r => r.source), value])
       setUpdates(undefined)
     }
     setInput('')
   }, [input, state.repositories, save])
 
-  const remove = useCallback((id: string): void => {
-    void save(state.repositories.filter(r => r !== id))
+  const remove = useCallback((source: string): void => {
+    void save(state.repositories.map(r => r.source).filter(r => r !== source))
   }, [state.repositories, save])
 
-  /** 手动检查最新版本（POST refresh，Node half 30s 防抖）。 */
-  const refreshVersions = useCallback(async (): Promise<void> => {
-    setVersionBusy(true)
-    setError(undefined)
-    try {
-      const response = await fetch('/api/plugin-console/versions/refresh', { method: 'POST', headers: { accept: 'application/json' } })
-      const body = (await response.json()) as { versions?: { name: string; latest: string | null; checked?: boolean }[]; message?: string }
-      const map: Record<string, string | null> = {}
-      const checkedMap: Record<string, boolean> = {}
-      for (const row of body.versions ?? []) {
-        map[row.name] = row.latest
-        checkedMap[row.name] = row.checked === true
-      }
-      setVersions(map)
-      setVersionChecked(checkedMap)
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught))
-    } finally {
-      setVersionBusy(false)
-    }
-  }, [])
+
 
   /** bundle 安装（profile 目录 pnpm add + reconcile 层栈）。 */
   const installBundle = useCallback(async (): Promise<void> => {
@@ -311,13 +340,38 @@ export function ConsolePanel(): React.ReactNode {
     }
   }, [])
 
+  /** bundle 卸载（pnpm remove + 层栈 reconcile；确认弹窗防误触；重启生效）。 */
+  const removeBundle = useCallback(async (name: string): Promise<void> => {
+    if (!window.confirm(`卸载 bundle 插件 ${name}？将从 profile 移除依赖与层栈（重启 web 生效）。`)) return
+    setBundleBusy(true)
+    setBundleMsg(undefined)
+    setError(undefined)
+    try {
+      const response = await fetch('/api/plugin-console/bundles', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'remove', name }),
+      })
+      const body = (await response.json()) as { ok?: boolean; message?: string }
+      if (body.ok !== true) throw new Error(body.message ?? 'remove failed')
+      setBundleMsg(`${name} 已卸载（重启 web 生效）`)
+      await refresh()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught))
+    } finally {
+      setBundleBusy(false)
+    }
+  }, [refresh])
+
   useEffect(() => { void refresh() }, [refresh])
 
   if (loading) return <p style={{ color: 'var(--dsw-alias-label-tertiary)' }}>加载中…</p>
 
   // 区分产品内置（@deepseek-ai/*、@cordisjs/*、cordis: 组合）与用户添加。
+  // repository 插件永不进内置分类（其名可能撞官方命名空间，且来源独立）。
   const isOfficial = (p: LoadedPluginRow): boolean =>
-    p.name.startsWith('@deepseek-ai/') || p.name.startsWith('@cordisjs/') || p.name.startsWith('cordis:')
+    p.kind !== 'repository'
+    && (p.name.startsWith('@deepseek-ai/') || p.name.startsWith('@cordisjs/') || p.name.startsWith('cordis:'))
   // 管理工具自身：禁用会卸载本面板（管理入口消失），不可停用。
   const isSelf = (p: LoadedPluginRow): boolean => p.name === '@dsh-external/plugin-console'
   const official = installed.filter(isOfficial)
@@ -335,13 +389,13 @@ export function ConsolePanel(): React.ReactNode {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 720, color: 'var(--dsw-alias-label-primary)' }}>
       {error !== undefined ? <p style={errorStyle}>{error}</p> : null}
 
-      {/* 已加载插件 */}
+      {/* 已加载插件：统一行（bundle + repository + 内置），状态/生命周期 */}
       <section style={sectionStyle}>
         {sectionHeader(
           `已加载插件（${user.length} 用户 / ${official.length} 内置）`,
           <div style={{ display: 'flex', gap: 8 }}>
-            <Button size="sm" variant="outline" disabled={versionBusy} onClick={() => { void refreshVersions() }}>
-              {versionBusy ? '检查中' : '检查更新'}
+            <Button size="sm" variant="outline" disabled={checking} onClick={() => { void checkAll() }}>
+              {checking ? '检查中' : '检查更新'}
             </Button>
             {official.length > 0 ? (
               <Button size="sm" variant="outline" onClick={() => { setShowAll(v => !v) }}>
@@ -352,8 +406,13 @@ export function ConsolePanel(): React.ReactNode {
         )}
         <div style={rowsStyle}>
           {shown.map(plugin => {
-            const latest = versions[plugin.name] ?? null
-            const version = versionText(plugin, latest, versionChecked[plugin.name] === true)
+            const isRepo = plugin.kind === 'repository'
+            const upd = isRepo ? updates?.find(u => u.pluginName === plugin.name) : undefined
+            const version = isRepo
+              ? repositoryVersionText(plugin, upd)
+              : versionText(plugin, versions[plugin.name] ?? null, versionChecked[plugin.name] === true)
+            const isUserBundle = !isRepo && !official.includes(plugin) && !isSelf(plugin)
+            const repoCanUpdate = isRepo && upd?.refKind === 'sha' && upd.hasUpdate === true
             return (
               <div key={showAll ? `a${plugin.id}` : `u${plugin.id}`} style={rowCardStyle}>
                 <div style={rowHeadStyle}>
@@ -361,20 +420,23 @@ export function ConsolePanel(): React.ReactNode {
                     <span style={nameStyle}>{plugin.name}</span>
                   </span>
                   <span style={actionsStyle}>
-                    {/* repository 插件：config 行管理（repository 区增删/更新），此处只读状态 */}
-                    {plugin.kind !== 'repository' && !official.includes(plugin) && version.canUpdate ? (
+                    {isUserBundle && version.canUpdate ? (
                       <Button size="sm" variant="outline" disabled={busy || bundleBusy} onClick={() => { void updateBundle(plugin.name) }}>更新</Button>
                     ) : null}
-                    {/* 内置插件不可停用（官方组合层）；管理工具自身不可停用（自毁）；repository 插件走 config 行管理；仅其他用户插件可启停 */}
-                    {plugin.kind !== 'repository' && !official.includes(plugin) && !isSelf(plugin) ? (
+                    {repoCanUpdate && plugin.source !== undefined ? (
+                      <Button size="sm" variant="outline" disabled={busy} onClick={() => { void applyUpdate(plugin.source!) }}>更新</Button>
+                    ) : null}
+                    {isUserBundle ? (
                       <Button size="sm" variant="outline" disabled={busy} onClick={() => { void togglePlugin(plugin.id, !plugin.disabled) }}>
                         {plugin.disabled ? '启用' : '停用'}
                       </Button>
                     ) : null}
-                    {/* 状态 Pill 贴右缘（名称左、按钮中、Pill 右） */}
+                    {isUserBundle ? (
+                      <Button size="sm" variant="outline" disabled={busy || bundleBusy} onClick={() => { void removeBundle(plugin.name) }}>卸载</Button>
+                    ) : null}
                     {official.includes(plugin) ? <Pill>内置</Pill> : null}
                     {isSelf(plugin) ? <Pill>管理工具</Pill> : null}
-                    {plugin.kind === 'repository' ? <Pill>repository</Pill> : null}
+                    {isRepo ? <Pill>repository</Pill> : null}
                     <Pill active={!plugin.disabled}>{plugin.disabled ? '已停用' : '运行中'}</Pill>
                   </span>
                 </div>
@@ -385,34 +447,34 @@ export function ConsolePanel(): React.ReactNode {
         </div>
       </section>
 
-      {/* repository 插件 */}
+      {/* repository 插件源：源注册表（增删行 = 装/卸）+ 被动远端状态（检查在区 A 统一触发） */}
       <section style={sectionStyle}>
-        {sectionHeader(
-          'repository 插件',
-          <Button size="sm" variant="outline" disabled={busy || checking} onClick={() => { void checkUpdates() }}>
-            {checking ? '检查中' : '检查更新'}
-          </Button>,
-        )}
-        <p style={introStyle}>`.dsh-plugin` 包源列表；增删行 = 装/卸，更新 = 固定到远端最新 commit（改完即生效，无需重启）。</p>
+        {sectionHeader('repository 插件源')}
+        <p style={introStyle}>`.dsh-plugin` 包源列表；添加/移除行 = 装/卸，更新 = 固定到远端最新 commit（改完即生效，无需重启）。未挂载源（刚添加/准备失败）也在此显示状态。</p>
         {state.repositories.length === 0 ? (
           <p style={{ ...introStyle, fontSize: 12, lineHeight: '18px' }}>未配置 repository 插件源。</p>
         ) : null}
         <div style={rowsStyle}>
-          {state.repositories.map(id => {
-            const upd = updates?.find(u => u.source === id)
-            const canUpdate = upd !== undefined && (upd.hasUpdate || upd.refKind === 'branch') && upd.latestSha !== null
+          {state.repositories.map(row => {
+            const upd = updates?.find(u => u.source === row.source)
+            const canUpdate = upd !== undefined && upd.refKind === 'sha' && upd.hasUpdate === true
             return (
-              <div key={id} style={rowCardStyle}>
+              <div key={row.source} style={rowCardStyle}>
                 <div style={rowHeadStyle}>
                   <span style={{ ...identityStyle, flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
-                    <span style={{ ...nameStyle, fontFamily: 'ui-monospace, monospace', fontSize: 13 }}>{id}</span>
-                    {upd !== undefined ? <span style={versionLineStyle}>{updateText(upd)}</span> : null}
+                    <span style={{ ...nameStyle, fontFamily: 'ui-monospace, monospace', fontSize: 13 }}>{row.source}</span>
+                    <span style={versionLineStyle}>
+                      {row.pluginName !== undefined ? `${row.pluginName} · ` : ''}
+                      {row.version !== undefined ? `v${row.version} · ` : ''}
+                      {row.mounted ? '已挂载' : '未挂载'}
+                      {upd !== undefined ? ` · ${updateText(upd)}` : ''}
+                    </span>
                   </span>
                   <span style={actionsStyle}>
                     {canUpdate ? (
-                      <Button size="sm" variant="outline" disabled={busy} onClick={() => { void applyUpdate(id) }}>更新</Button>
+                      <Button size="sm" variant="outline" disabled={busy} onClick={() => { void applyUpdate(row.source) }}>更新</Button>
                     ) : null}
-                    <Button size="sm" variant="outline" disabled={busy} onClick={() => { remove(id) }}>移除</Button>
+                    <Button size="sm" variant="outline" disabled={busy} onClick={() => { remove(row.source) }}>移除</Button>
                   </span>
                 </div>
               </div>

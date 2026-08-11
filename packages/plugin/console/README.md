@@ -16,12 +16,13 @@
 ## 这是什么
 
 官方 **bundle 插件**（`dsh.bundle` + `dsh.client` 声明）：Node half 注册
-`/api/plugin-console` 路由，client half 在设置页注册「插件」面板。面板管理两类插件：
+`/api/plugin-console` 路由，client half 在设置页注册「插件」面板。面板三个管理区：
 
-| 管理区 | 插件类型 | 操作 | 写入文件 |
+| 管理区 | 职责 | 操作 | 写入文件 |
 |---|---|---|---|
-| **repository 插件** | `.dsh-plugin` 包（skill/mcp/tool） | `repositories` 列表增删（装/卸）+ 检查更新 | home 级 `$DSH_HOME/cordis.patch.yml`（跨 profile 用户配置层） |
-| **UI 插件** | bundle 插件（`dsh.client` 包，如 dsh-loop/navbar/task-status） | Loader 树行 `disabled` 标记（停/启） | profile 级 `$DSH_HOME/profiles/web/cordis.patch.yml`（当前 profile） |
+| **已加载插件** | 查看所有已加载插件（bundle + repository + 内置）状态 | 更新（两类各自语义）、停用/启用（用户 bundle）、卸载（用户 bundle）；repository 行无启停（移除在源区） | profile 级 `$DSH_HOME/profiles/web/cordis.patch.yml`（bundle 启停/持久化） |
+| **repository 插件源** | 源注册表：注册/移除 git 源（增删行 = 装/卸）+ 被动远端状态 | 添加/移除行、更新（sha ref 固定到远端最新 commit） | home 级 `$DSH_HOME/cordis.patch.yml`（跨 profile 用户配置层） |
+| **安装 bundle 插件** | bundle 安装入口（pnpm add 到 profile 层栈） | 安装（重启生效） | profile 依赖 + 层栈 |
 
 两类插件写入目标不同：repository 配置在 home 级，UI 插件启停覆盖在 profile 级。背景与转向决策见
 [官方 0809 覆盖度](../../../docs/official-0809-coverage.md)。
@@ -51,10 +52,9 @@ dsh plugin --profile web add .   # 当前目录即 bundle 包子目录（dsh 锚
 
 ## 使用
 
-- **repository 插件区**：增删 `repositories` 源列表行（`github:owner/repo#<ref>&path:/.dsh-plugin`），
-  每行可「检查更新」——固定到远端最新 commit（写配置后即时换代，无需重启）
-- **UI 插件区**：已加载 bundle 列表（用户 + 内置），行内「停用/启用」切换 Loader 树 `disabled` 标记；
-  「安装 bundle 插件」经 `pnpm add` 把新 bundle 加进 profile 层栈
+- **已加载插件区**：统一行显示所有已加载插件（bundle + repository + 内置），行含来源 Pill（内置 / 管理工具 / repository）+ 版本行（npm 或 git 通道各自语义）+ 更新 / 启停 / 卸载（用户 bundle）；repository 行显示 cache 版本与 git 远端状态，无启停（移除在源区）
+- **repository 插件源区**：增删 `repositories` 源列表行（`github:owner/repo#<ref>&path:/.dsh-plugin`），每行显示解析源 + 插件名 + 版本 + 挂载态 + 远端状态；更新 = 固定到远端最新 commit（写配置后即时换代，无需重启）；未挂载源（刚添加/准备失败）也在此显示
+- **安装 bundle 插件区**：`pnpm add` 把新 bundle 加进 profile 层栈（重启生效）
 
 ## AI 插件管理工具（agent 面）
 
