@@ -23,7 +23,7 @@ repository 插件（`.dsh-plugin`）的 `devDependencies` 必含 `@deepseek-ai/d
 
 **过渡方案（实测链路，whale-girl 范本）**：预填充 RepositoryCache 让 loader 跳过 `pnpm install`：
 
-1. **wrapper 入库**：本地在可用官方包的环境跑 `dsh-plugin-prepare` 生成 `dsh-plugin.mjs` + `dsh-plugin-assets/`，提交入库（官方建议生成物不入库，过渡期例外；`files` 已声明则只需取消 gitignore）。
+1. **wrapper 入库**：本地在可用官方包的环境跑 `dsh-plugin-prepare` 生成 `dsh-plugin.mjs` + `dsh-plugin-assets/`，提交入库（官方默认 prepack 生成，产物入库后 git 安装免构建直接可用；`files` 已声明则只需取消 gitignore）。
 2. **预填充 cache**（whale-girl 的 `scripts/prepare-cache.mjs` 可复刻）：cache 目录 = `$DSH_HOME/cache/repository-plugins/<sha256(specifier)>`（specifier = `github:owner/repo#<ref>&path:/.dsh-plugin` 全文）；拷贝 `.dsh-plugin` 到 `node_modules/repository/`；**临时摘除 devDependencies** 后 `npm install`（只装 runtime 依赖，避开官方包 404），**恢复原始 package.json**（loader metadata 校验需要 prepack/devDep 声明）；写 `.repository-cache.json` = `{"specifier": "<完整 specifier>"}`（loader `readCached` 精确匹配）。
 3. loader 命中缓存后跳过 `pnpm install`、校验 metadata、加载 wrapper。
 
@@ -33,7 +33,8 @@ repository 插件（`.dsh-plugin`）的 `devDependencies` 必含 `@deepseek-ai/d
 
 `dsh plugin --profile web add github:owner/repo#<ref>&path:/<子目录>`（或 `git+https://...`）安装 git 依赖时，pnpm ≥10 默认**阻止其 prepare（build）脚本执行**——dsh 的 `plugin` 命令失败时会提示把 pnpm 打印的 key 加入 profile 的 `pnpm-workspace.yaml` 的 `allowBuilds` 后重跑。两条出路：
 
-- **prepare 现场构建**（产物不入库的标准做法，实测链路）：bundle 的 `package.json` 带 `prepare` 脚本（如 `"prepare": "tsdown --config tsdown.config.ts"`，**别用 `pnpm run build`**——pnpm 在 npm 装的目录会触发 deps status check 循环失败），pnpm ≥10 阻止时按 dsh 提示在 `$DSH_HOME/profiles/<name>/pnpm-workspace.yaml` 的 `allowBuilds` 白名单加入该依赖后重跑。**allowBuilds 的 key 含冒号，写入 yaml 必须加引号**（无引号 YAML 解析失败）。
+- **产物入库（推荐，真一行）**：`lib/` 提交进仓库、无 prepare——git 源安装不触发构建，`dsh plugin --profile web add "github:...#&path:/..."` 一行直接装（console 已按此改造，实测 14s 装 + 挂载通过）。
+- **prepare 现场构建（备选，产物不入库时）**：bundle 的 `package.json` 带 `prepare` 脚本（如 `"prepare": "tsdown --config tsdown.config.ts"`，**别用 `pnpm run build`**——pnpm 在 npm 装的目录会触发 deps status check 循环失败），pnpm ≥10 阻止时按 dsh 提示在 `$DSH_HOME/profiles/<name>/pnpm-workspace.yaml` 的 `allowBuilds` 白名单加入该依赖后重跑。**allowBuilds 的 key 含冒号，写入 yaml 必须加引号**（无引号 YAML 解析失败）。
 - **构建产物已入库**（`lib/` 提交进仓库，无 prepare 或 prepare 非必需）——不受影响，git 源直接可用。
 
 另两个 git 安装实测坑：monorepo 子目录语法是 `#<ref>&path:/<子目录>`（`path:` 前缀 + 前导 `/`，漏写或写成 `&path=dir` 都解析失败）；bundle 的 peer **不要声明 `@deepseek-ai/*` 官方包**——git 安装时 prepare 的 `npm install` 会解析 peer 404 失败（见 1）。

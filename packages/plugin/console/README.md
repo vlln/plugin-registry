@@ -37,15 +37,14 @@
 dsh plugin --profile web add "github:dsh-external/plugin-registry#main&path:/packages/plugin/console"
 ```
 
-pnpm ≥10 会阻止安装时的构建脚本（prepare）：按 dsh 提示把 `allowBuilds` 的精确 key（**加引号**）写入 `$DSH_HOME/profiles/web/pnpm-workspace.yaml`，然后重跑。
+构建产物已入库（git 源安装不触发构建），一行命令直接装（实测约 15 秒）。
 
-**本地目录安装**（无 pnpm ≥10 阻碍）：
+**本地目录安装**（有源码时）：
 
 ```sh
 git clone https://github.com/dsh-external/plugin-registry.git
 cd plugin-registry/packages/plugin/console
-pnpm install && pnpm run build   # 构建 lib/（产物不入库）
-dsh plugin --profile web add .   # 当前目录即 bundle 包子目录（dsh 锚定 . 为绝对路径）
+dsh plugin --profile web add .   # 产物已入库，无需构建；当前目录即 bundle 包子目录（dsh 锚定 . 为绝对路径）
 ```
 
 挂载后刷新 Web 页面，设置页出现「插件」面板（`settings.section` 插槽）。
