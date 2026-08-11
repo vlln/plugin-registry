@@ -32,12 +32,7 @@ repository-plugins:
 
 ## 管理面板：薄控制台
 
-已装插件用薄控制台（`packages/plugin/console`）管理——读写作 `$DSH_HOME/cordis.patch.yml`，浏览器面板增删/启停：
-
-```sh
-dsh plugin --profile web add <本仓库>/packages/plugin/console
-# 设置页出现「插件」面板：repository 区 + UI 插件区
-```
+已装插件用薄控制台（`packages/plugin/console`）管理——浏览器面板增删/启停（读写作 `$DSH_HOME/cordis.patch.yml`）。安装命令见 [根 README「安装」](../README.md)。
 
 ## 开发新插件
 

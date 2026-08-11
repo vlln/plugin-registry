@@ -24,36 +24,24 @@
 | **repository 插件源** | 源注册表：注册/移除 git 源（增删行 = 装/卸）+ 被动远端状态 | 添加/移除行、更新（sha ref 固定到远端最新 commit） | home 级 `$DSH_HOME/cordis.patch.yml`（跨 profile 用户配置层） |
 | **安装 bundle 插件** | bundle 安装入口（pnpm add 到 profile 层栈） | 安装（重启生效） | profile 依赖 + 层栈 |
 
-两类插件写入目标不同：repository 配置在 home 级，UI 插件启停覆盖在 profile 级。背景与转向决策见
-[官方 0809 覆盖度](../../../docs/official-0809-coverage.md)。
+背景与转向决策见 [官方 0809 覆盖度](../../../docs/official-0809-coverage.md)。
 
 ![插件面板](../../../screenshots/console-panel.png)
 
 ## 安装
 
-**git 源直接安装（推荐）**：
+安装命令与方式（git 源真一行 / 本地目录）见仓库根 [README「安装」章节](../../../README.md)。构建产物已入库，git 源一行命令直接装（实测约 15 秒）：
 
 ```sh
 dsh plugin --profile web add "github:dsh-external/plugin-registry#main&path:/packages/plugin/console"
-```
-
-构建产物已入库（git 源安装不触发构建），一行命令直接装（实测约 15 秒）。
-
-**本地目录安装**（有源码时）：
-
-```sh
-git clone https://github.com/dsh-external/plugin-registry.git
-cd plugin-registry/packages/plugin/console
-dsh plugin --profile web add .   # 产物已入库，无需构建；当前目录即 bundle 包子目录（dsh 锚定 . 为绝对路径）
 ```
 
 挂载后刷新 Web 页面，设置页出现「插件」面板（`settings.section` 插槽）。
 
 ## 使用
 
-- **已加载插件区**：统一行显示所有已加载插件（bundle + repository + 内置），行含来源 Pill（内置 / 管理工具 / repository）+ 版本行（npm 或 git 通道各自语义）+ 更新 / 启停 / 卸载（用户 bundle）；repository 行显示 cache 版本与 git 远端状态，无启停（移除在源区）
-- **repository 插件源区**：增删 `repositories` 源列表行（`github:owner/repo#<ref>&path:/.dsh-plugin`），每行显示解析源 + 插件名 + 版本 + 挂载态 + 远端状态；更新 = 固定到远端最新 commit（写配置后即时换代，无需重启）；未挂载源（刚添加/准备失败）也在此显示
-- **安装 bundle 插件区**：`pnpm add` 把新 bundle 加进 profile 层栈（重启生效）
+- **已加载插件区**：统一行渲染（来源 Pill：内置 / 管理工具 / repository），版本行按通道取 npm 或 git 远端状态
+- **repository 插件源区**：未挂载源（刚添加/准备失败）也在此显示状态——已加载区只列出挂载成功的插件
 
 ## AI 插件管理工具（agent 面）
 

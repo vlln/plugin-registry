@@ -19,10 +19,10 @@
 
 ## 定位
 
-DeepSeek Harness 官方机制管「插件是什么、怎么跑」；本仓库补两件事：
+DeepSeek Harness 官方机制管「插件是什么、怎么跑」；本仓库补两件事（面板结构见 [console README](packages/plugin/console/README.md)，开发引导见下文）：
 
-1. **薄控制台**（`packages/plugin/console`）——管理已装官方 repository 插件与 UI 插件的浏览器面板（读写作 `$DSH_HOME/cordis.patch.yml`）
-2. **开发规范和引导**——`make-dsh-plugin` skill + cookbook，指导创建官方 repository-plugin（0809 格式）
+1. **薄控制台**（`packages/plugin/console`）——管理已装官方 repository 插件与 UI 插件的浏览器面板
+2. **开发规范和引导**——`make-dsh-plugin` skill + cookbook，指导创建官方 repository-plugin
 
 ## 生态关系（谁能干什么）
 
@@ -72,15 +72,11 @@ dsh plugin --profile web add .   # 产物已入库，无需构建；当前目录
 
 ## 开发前须知（踩过的坑）
 
-- **官方包未发布到公共 npm**：`@deepseek-ai/dsh-tools` 等 `npm install` 会失败——正式分发由官方环境经 github: 源解析，本地验证需 symlink 至 monorepo 产物或 mock registry。**不要改依赖声明**。bundle 插件同坑但更隐蔽：`dependencies` 为空是设计，依赖由 profile 的 pnpm 闭包挂载时注入。
-- **改已挂载插件的 Node half 需重启 web**：ESM 缓存按 URL 永久缓存，disable/enable 不生效，只能重启。
-- **宿主可能覆盖注入的 CSS**：关键 UI 样式用 JS 内联，勿依赖 CSS class。
-
-完整坑清单见 [skill references/gotchas](skills/make-dsh-plugin/references/gotchas.md)。
+关键坑（官方包未发布、Node half 改动需重启、宿主 CSS 覆盖等）与完整清单见 [skill references/gotchas](skills/make-dsh-plugin/references/gotchas.md)——**开发前先读**。
 
 ## 旧用户迁移（旧机制插件 → 官方形态）
 
-plugin-registry 旧机制（`dsh.plugin.json` / `dsh registry` / `__ModuleLoader__`）已移除——旧插件需迁移到官方 0809 形态：
+旧机制已移除（见上方转向说明），旧插件迁移到官方形态：
 
 | 旧插件现状 | 迁移到 | 方式 |
 |---|---|---|
