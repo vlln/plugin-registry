@@ -6,15 +6,20 @@
 
 `@deepseek-ai/dsh-tools`、`@deepseek-ai/dsh-repository-plugin`、`schemastery` 等依赖**在公共 npm 不存在**（官方包未发布）。`npm install` 直接失败。
 
+**现状（2026-08-11 实测）**：官方 `@deepseek-ai` **私有 rc 库**已发布（`0.0.1-rc.1`，NPM_TOKEN 访问，`.npmrc` 配 `//registry.npmjs.org/:_authToken=${NPM_TOKEN}`）——`@deepseek-ai/dsh`、`@deepseek-ai/dsh-tools` 等可见；**`@deepseek-ai/dsh-repository-plugin` 仍缺失（私有库 404）**。两个衍生坑：
+
+- **semver 预发布**：私有库版本是 `0.0.1-rc.N`（预发布），依赖声明 `0.0.1`/`^0.0.1` **匹配不到 rc 版本**（npm 预发布规则）——声明官方包须用 `0.0.1-rc.*`（或 `>=0.0.1-0`）形态。
+- **token 不入库**：`.npmrc` 用 `${NPM_TOKEN}` 变量引用（不要写真实令牌、不提交）。
+
 - **正式分发**：走 `github:owner/repo#<ref>` 源，依赖由**官方发布环境解析**——不需要也不应该自己发布或改依赖。
 - **本地验证**：symlink 至官方 monorepo 构建产物（`@deepseek-ai/dsh-tools` → 0809 monorepo 产物）或 mock npm registry（21 包闭包）——预置缓存是本地验证手段，非分发形态。
 - **判断**：本地 `npm i` 失败不是你的错——不要改依赖声明，确认分发走 github: 源。
 
 **bundle 插件同坑、更隐蔽**：bundle（dsh.client 包，如 loop/task-status）同样 import `@deepseek-ai/dsh-tools`/`dsh-llm`，但 **`dependencies` 声明为空**——官方包由 profile 的 pnpm 闭包（`dsh plugin --profile web add` 挂载环境）注入。**插件不该自己声明这些依赖**：声明了公共 npm 解析不到反而失败；依赖由挂载环境提供是设计。本地装 bundle 同样需官方 monorepo 构建产物 link 进 profile。
 
-### 1a. repository 插件分发期断点：安装 404（官方未发布）
+### 1a. repository 插件分发期断点：安装 404（dsh-repository-plugin 未发布）
 
-repository 插件（`.dsh-plugin`）的 `devDependencies` 必含 `@deepseek-ai/dsh-repository-plugin`（`dsh-plugin-prepare` 提供者，官方 `installedPackageSchema` 硬校验：prepack 必须调 `dsh-plugin-prepare` + devDep 必须声明）——而该包 `private: true` 未发布，RepositoryCache 安装时在 `.dsh-plugin/` 跑 `pnpm install` 直接 404。**声明必须、安装必败**，不能通过移除 devDep 绕过（loader 拒绝加载）。这是官方发布前的分发期断点，任何按官方格式开发的第三方插件在真实环境都装不上（官方 e2e 用本地 registry 模拟发布，真实用户撞 404）。
+repository 插件（`.dsh-plugin`）的 `devDependencies` 必含 `@deepseek-ai/dsh-repository-plugin`（`dsh-plugin-prepare` 提供者，官方 `installedPackageSchema` 硬校验：prepack 必须调 `dsh-plugin-prepare` + devDep 必须声明）——而该包**公共 npm 与私有 rc 库均不存在（404）**，RepositoryCache 安装时在 `.dsh-plugin/` 跑 `pnpm install` 直接 404。**声明必须、安装必败**，不能通过移除 devDep 绕过（loader 拒绝加载）。这是分发期断点：任何按官方格式开发的第三方插件在真实环境都装不上（官方 e2e 用本地 registry 模拟发布，真实用户撞 404；NPM_TOKEN 内测用户同样撞 404）。
 
 **过渡方案（实测链路，whale-girl 范本）**：预填充 RepositoryCache 让 loader 跳过 `pnpm install`：
 
@@ -22,7 +27,7 @@ repository 插件（`.dsh-plugin`）的 `devDependencies` 必含 `@deepseek-ai/d
 2. **预填充 cache**（whale-girl 的 `scripts/prepare-cache.mjs` 可复刻）：cache 目录 = `$DSH_HOME/cache/repository-plugins/<sha256(specifier)>`（specifier = `github:owner/repo#<ref>&path:/.dsh-plugin` 全文）；拷贝 `.dsh-plugin` 到 `node_modules/repository/`；**临时摘除 devDependencies** 后 `npm install`（只装 runtime 依赖，避开官方包 404），**恢复原始 package.json**（loader metadata 校验需要 prepack/devDep 声明）；写 `.repository-cache.json` = `{"specifier": "<完整 specifier>"}`（loader `readCached` 精确匹配）。
 3. loader 命中缓存后跳过 `pnpm install`、校验 metadata、加载 wrapper。
 
-**未来**：官方发布 `@deepseek-ai/dsh-repository-plugin` 后此过渡方案废弃（正常安装跑 prepack 生成 wrapper），仓库应移除桥脚本与入库 wrapper。
+**废弃条件**：`@deepseek-ai/dsh-repository-plugin` 在私有库可见（`npm view` 非 404）后正常安装即可，移除桥脚本与入库 wrapper。
 
 ## 1c. git 源装 bundle：pnpm ≥10 阻止 prepare 脚本（allowBuilds）
 
