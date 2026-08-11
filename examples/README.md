@@ -7,16 +7,11 @@
 loop / task-status / navbar 等 UI 插件是 bundle 形态（`dsh.bundle` + `dsh.client`），经官方 profile 管理：
 
 ```sh
-dsh plugin --profile web add <插件仓库或包路径>   # 挂载进当前 profile 的 bundle 层
+dsh plugin --profile web add "github:dsh-external/dsh-task-status#main"   # 推荐：git 源一行（产物已入库）
+# 或本地目录：dsh plugin --profile web add <dsh-task-status 本地路径>
 ```
 
-示例：安装 `task-status`（后台任务状态条）：
-
-```sh
-cd <dsh checkout>
-dsh plugin --profile web add ~/Project/dsh-plugins/dsh-task-status
-dsh web    # 重启后设置页/对话页出现插件效果
-```
+装完 **重启 web**（bundle 挂载在启动时合成），设置页/对话页出现插件效果。
 
 ## 路径二：repository 插件（.dsh-plugin）
 
