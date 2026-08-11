@@ -9,10 +9,11 @@ window.__ModuleLoader__.load({
 		//#region src/client/Panel.tsx
 		/**
 		* 薄控制台面板（0811 适配，UI 对齐官方「模型」设置页设计语言）：
-		* - 已加载插件：loader 树条目（启停 + 版本 + 更新/卸载）
-		* - 已挂载 insert 插件：profile patch 的 insert 行（非 bundle 插件，
-		*   配置 HMR 实时挂载——添加/移除即时生效，无需重启）
-		* - 安装 bundle 插件：pnpm add + reconcile 层栈（重启生效）
+		* - 已加载插件：loader 树条目（用户可管理项默认展示，官方内置折叠），
+		*   状态三态——运行中 / 预设挂载（host 停用但 agent preset 挂载，0811
+		*   preset 通道）/ 已停用
+		* - 安装插件：统一入口——输入包名自动 pnpm add + 按 dsh.bundle 声明分流
+		*   （bundle → 层栈重启生效；非 bundle → insert 行配置 HMR 实时挂载）
 		* 全部 token 走 --dsw-alias-*；零 CSS 依赖（inline 样式）。
 		*/
 		const sectionStyle = {
@@ -138,34 +139,38 @@ window.__ModuleLoader__.load({
 				canUpdate: true
 			};
 		}
+		/**
+		* 状态 Pill 三态（0811 preset 通道修正）：
+		* - host 挂载 → 运行中
+		* - host 停用 + preset 挂载 → 预设挂载（不是「已停用」——模型实际有这工具）
+		* - host 停用 + preset 无 → 已停用
+		*/
+		function statePill(plugin) {
+			if (!plugin.disabled) return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Pill, {
+				active: true,
+				children: "运行中"
+			});
+			if (plugin.presetMounted === true) return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Pill, { children: "预设挂载" });
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Pill, { children: "已停用" });
+		}
 		/** 设置页面板主体（对齐官方「模型」设置页）。 */
 		function ConsolePanel() {
 			const [installed, setInstalled] = (0, react.useState)([]);
-			const [inserts, setInserts] = (0, react.useState)([]);
 			const [showAll, setShowAll] = (0, react.useState)(false);
 			const [error, setError] = (0, react.useState)(void 0);
 			const [busy, setBusy] = (0, react.useState)(false);
 			const [loading, setLoading] = (0, react.useState)(true);
-			const [insertInput, setInsertInput] = (0, react.useState)("");
-			const [insertBusy, setInsertBusy] = (0, react.useState)(false);
-			const [insertMsg, setInsertMsg] = (0, react.useState)(void 0);
-			const [bundleInput, setBundleInput] = (0, react.useState)("");
-			const [bundleBusy, setBundleBusy] = (0, react.useState)(false);
-			const [bundleMsg, setBundleMsg] = (0, react.useState)(void 0);
+			const [installInput, setInstallInput] = (0, react.useState)("");
+			const [installBusy, setInstallBusy] = (0, react.useState)(false);
+			const [installMsg, setInstallMsg] = (0, react.useState)(void 0);
 			const [versions, setVersions] = (0, react.useState)({});
 			const [versionChecked, setVersionChecked] = (0, react.useState)({});
 			const refresh = (0, react.useCallback)(async () => {
 				try {
-					const [installedRes, versionsRes, insertsRes] = await Promise.all([
-						fetch("/api/plugin-console/installed", { headers: { accept: "application/json" } }),
-						fetch("/api/plugin-console/versions", { headers: { accept: "application/json" } }),
-						fetch("/api/plugin-console/inserts", { headers: { accept: "application/json" } })
-					]);
+					const [installedRes, versionsRes] = await Promise.all([fetch("/api/plugin-console/installed", { headers: { accept: "application/json" } }), fetch("/api/plugin-console/versions", { headers: { accept: "application/json" } })]);
 					const installedBody = await installedRes.json();
 					const versionsBody = await versionsRes.json();
-					const insertsBody = await insertsRes.json();
 					setInstalled(installedBody.plugins ?? []);
-					setInserts(insertsBody.inserts ?? []);
 					const map = {};
 					const checkedMap = {};
 					for (const row of versionsBody.versions ?? []) {
@@ -221,80 +226,32 @@ window.__ModuleLoader__.load({
 					setBusy(false);
 				}
 			}, []);
-			/** insert 插件：写行（配置 HMR 实时挂载）。 */
-			const addInsert = (0, react.useCallback)(async () => {
-				const name = insertInput.trim();
-				if (name.length === 0) return;
-				setInsertBusy(true);
-				setInsertMsg(void 0);
-				setError(void 0);
-				try {
-					const id = name.replace(/^@/, "").replace(/[^a-z0-9-]/gi, "-").toLowerCase();
-					const body = await (await fetch(`/api/plugin-console/inserts/${encodeURIComponent(id)}`, {
-						method: "POST",
-						headers: { "content-type": "application/json" },
-						body: JSON.stringify({ name })
-					})).json();
-					if (body.ok !== true) throw new Error(body.message ?? "insert failed");
-					setInsertMsg(`已挂载 ${name}（配置 HMR 实时生效，无需重启）`);
-					setInsertInput("");
-					await refresh();
-				} catch (caught) {
-					setError(caught instanceof Error ? caught.message : String(caught));
-				} finally {
-					setInsertBusy(false);
-				}
-			}, [insertInput, refresh]);
-			/** insert 插件：移除行（配置 HMR 实时卸载）。 */
-			const removeInsert = (0, react.useCallback)(async (id, name) => {
-				if (!window.confirm(`移除插件 ${name}？将从 profile patch 删除其 insert 行（配置 HMR 实时生效）。`)) return;
-				setInsertBusy(true);
-				setInsertMsg(void 0);
-				setError(void 0);
-				try {
-					const body = await (await fetch(`/api/plugin-console/inserts/${encodeURIComponent(id)}`, {
-						method: "POST",
-						headers: { "content-type": "application/json" },
-						body: JSON.stringify({ remove: true })
-					})).json();
-					if (body.ok !== true) throw new Error(body.message ?? "remove failed");
-					setInsertMsg(`${name} 已移除（配置 HMR 实时生效）`);
-					await refresh();
-				} catch (caught) {
-					setError(caught instanceof Error ? caught.message : String(caught));
-				} finally {
-					setInsertBusy(false);
-				}
-			}, [refresh]);
-			/** bundle 安装（profile 目录 pnpm add + reconcile 层栈）。 */
-			const installBundle = (0, react.useCallback)(async () => {
-				const source = bundleInput.trim();
+			/** 统一安装：输入包名 → pnpm add → 按 dsh.bundle 分流（bundle 层栈 / insert 行实时）。 */
+			const installPlugin = (0, react.useCallback)(async () => {
+				const source = installInput.trim();
 				if (source.length === 0) return;
-				setBundleBusy(true);
-				setBundleMsg(void 0);
+				setInstallBusy(true);
+				setInstallMsg(void 0);
 				setError(void 0);
 				try {
-					const body = await (await fetch("/api/plugin-console/bundles", {
+					const body = await (await fetch("/api/plugin-console/install", {
 						method: "POST",
 						headers: { "content-type": "application/json" },
-						body: JSON.stringify({
-							action: "install",
-							source
-						})
+						body: JSON.stringify({ source })
 					})).json();
 					if (body.ok !== true) throw new Error(body.message ?? "install failed");
-					setBundleMsg(`已安装并加入层栈：${(body.names ?? []).join(", ") || source}（重启 web 生效）`);
-					setBundleInput("");
+					setInstallMsg(body.message ?? "已安装");
+					setInstallInput("");
+					await refresh();
 				} catch (caught) {
 					setError(caught instanceof Error ? caught.message : String(caught));
 				} finally {
-					setBundleBusy(false);
+					setInstallBusy(false);
 				}
-			}, [bundleInput]);
+			}, [installInput, refresh]);
 			/** bundle 更新（pnpm update <name>，拉取最新版本）。 */
 			const updateBundle = (0, react.useCallback)(async (name) => {
-				setBundleBusy(true);
-				setBundleMsg(void 0);
+				setBusy(true);
 				setError(void 0);
 				try {
 					const body = await (await fetch("/api/plugin-console/bundles", {
@@ -306,18 +263,17 @@ window.__ModuleLoader__.load({
 						})
 					})).json();
 					if (body.ok !== true) throw new Error(body.message ?? "update failed");
-					setBundleMsg(`${name} 已更新（重启 web 生效）`);
+					await refresh();
 				} catch (caught) {
 					setError(caught instanceof Error ? caught.message : String(caught));
 				} finally {
-					setBundleBusy(false);
+					setBusy(false);
 				}
-			}, []);
+			}, [refresh]);
 			/** bundle 卸载（pnpm remove + 层栈 reconcile；确认弹窗防误触；重启生效）。 */
 			const removeBundle = (0, react.useCallback)(async (name) => {
 				if (!window.confirm(`卸载 bundle 插件 ${name}？将从 profile 移除依赖与层栈（重启 web 生效）。`)) return;
-				setBundleBusy(true);
-				setBundleMsg(void 0);
+				setBusy(true);
 				setError(void 0);
 				try {
 					const body = await (await fetch("/api/plugin-console/bundles", {
@@ -329,12 +285,11 @@ window.__ModuleLoader__.load({
 						})
 					})).json();
 					if (body.ok !== true) throw new Error(body.message ?? "remove failed");
-					setBundleMsg(`${name} 已卸载（重启 web 生效）`);
 					await refresh();
 				} catch (caught) {
 					setError(caught instanceof Error ? caught.message : String(caught));
 				} finally {
-					setBundleBusy(false);
+					setBusy(false);
 				}
 			}, [refresh]);
 			(0, react.useEffect)(() => {
@@ -346,9 +301,9 @@ window.__ModuleLoader__.load({
 			});
 			const isOfficial = (p) => p.name.startsWith("@deepseek-ai/") || p.name.startsWith("@cordisjs/") || p.name.startsWith("cordis:");
 			const isSelf = (p) => p.name === "@dsh-external/plugin-console";
-			const official = installed.filter(isOfficial);
-			const user = installed.filter((p) => !isOfficial(p));
-			const shown = showAll ? installed : user;
+			const userRows = installed.filter((p) => !isOfficial(p) && !isSelf(p));
+			const officialRows = installed.filter((p) => isOfficial(p));
+			const shown = showAll ? installed : userRows;
 			const sectionHeader = (title, actions) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				style: {
 					display: "flex",
@@ -379,7 +334,50 @@ window.__ModuleLoader__.load({
 					}) : null,
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
 						style: sectionStyle,
-						children: [sectionHeader(`已加载插件（${user.length} 用户 / ${official.length} 内置）`, /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						children: [
+							sectionHeader("安装插件"),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+								style: introStyle,
+								children: "输入 npm 包名或源——自动安装并挂载：bundle 插件（声明 dsh.bundle）加入层栈（重启生效）；非 bundle 插件写 insert 行（配置 HMR 实时挂载，无需重启）。"
+							}),
+							installMsg !== void 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+								style: savedStyle,
+								children: installMsg
+							}) : null,
+							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+								style: editorStyle,
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+									style: fieldStyle,
+									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("label", {
+										style: fieldLabelStyle,
+										htmlFor: "console-install-source",
+										children: "包名 / 源"
+									}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
+										id: "console-install-source",
+										value: installInput,
+										placeholder: "@dsh-external/dsh-loop 或 git 源",
+										onChange: (e) => {
+											setInstallInput(e.target.value);
+										}
+									})]
+								}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+									style: editorActionsStyle,
+									children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+										size: "sm",
+										variant: "outline",
+										disabled: installBusy,
+										onClick: () => {
+											installPlugin();
+										},
+										children: installBusy ? "安装中" : "安装"
+									})
+								})]
+							})
+						]
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+						style: sectionStyle,
+						children: [sectionHeader(`已加载插件（${userRows.length} 用户 / ${officialRows.length} 内置）`, /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 							style: {
 								display: "flex",
 								gap: 8
@@ -392,7 +390,7 @@ window.__ModuleLoader__.load({
 									checkAll();
 								},
 								children: busy ? "检查中" : "检查更新"
-							}), official.length > 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+							}), officialRows.length > 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
 								size: "sm",
 								variant: "outline",
 								onClick: () => {
@@ -400,11 +398,11 @@ window.__ModuleLoader__.load({
 								},
 								children: showAll ? "只看用户" : `查看全部（${installed.length}）`
 							}) : null]
-						})), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+						})), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 							style: rowsStyle,
-							children: shown.map((plugin) => {
+							children: [shown.map((plugin) => {
 								const version = versionText(plugin, versions[plugin.name] ?? null, versionChecked[plugin.name] === true);
-								const isUserBundle = !official.includes(plugin) && !isSelf(plugin);
+								const isUserRow = !isOfficial(plugin) && !isSelf(plugin);
 								return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 									style: rowCardStyle,
 									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
@@ -418,16 +416,16 @@ window.__ModuleLoader__.load({
 										}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
 											style: actionsStyle,
 											children: [
-												isUserBundle && version.canUpdate ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+												isUserRow && version.canUpdate ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
 													size: "sm",
 													variant: "outline",
-													disabled: busy || bundleBusy,
+													disabled: busy,
 													onClick: () => {
 														updateBundle(plugin.name);
 													},
 													children: "更新"
 												}) : null,
-												isUserBundle ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+												isUserRow && plugin.insertRow !== true ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
 													size: "sm",
 													variant: "outline",
 													disabled: busy,
@@ -436,21 +434,18 @@ window.__ModuleLoader__.load({
 													},
 													children: plugin.disabled ? "启用" : "停用"
 												}) : null,
-												isUserBundle ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+												isUserRow && plugin.insertRow !== true ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
 													size: "sm",
 													variant: "outline",
-													disabled: busy || bundleBusy,
+													disabled: busy,
 													onClick: () => {
 														removeBundle(plugin.name);
 													},
 													children: "卸载"
 												}) : null,
-												official.includes(plugin) ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Pill, { children: "内置" }) : null,
 												isSelf(plugin) ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Pill, { children: "管理工具" }) : null,
-												/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Pill, {
-													active: !plugin.disabled,
-													children: plugin.disabled ? "已停用" : "运行中"
-												})
+												plugin.insertRow === true ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Pill, { children: "insert" }) : null,
+												statePill(plugin)
 											]
 										})]
 									}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
@@ -458,143 +453,14 @@ window.__ModuleLoader__.load({
 										children: version.text
 									})]
 								}, showAll ? `a${plugin.id}` : `u${plugin.id}`);
-							})
-						})]
-					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
-						style: sectionStyle,
-						children: [
-							sectionHeader(`insert 插件（${inserts.length}）`),
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-								style: introStyle,
-								children: "profile `cordis.patch.yml` 的 insert 行——非 bundle 插件的安装形态。写行/删行由配置 HMR 实时挂载/卸载，无需重启。插件包需先在 profile 中可解析（bundle 安装区或 pnpm add）。"
-							}),
-							inserts.length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+							}), shown.length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 								style: {
 									...introStyle,
-									fontSize: 12,
-									lineHeight: "18px"
+									fontSize: 12
 								},
-								children: "未挂载 insert 插件。"
-							}) : null,
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-								style: rowsStyle,
-								children: inserts.map((row) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-									style: rowCardStyle,
-									children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-										style: rowHeadStyle,
-										children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-											style: identityStyle,
-											children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-												style: {
-													...nameStyle,
-													fontFamily: "ui-monospace, monospace",
-													fontSize: 13
-												},
-												children: row.name
-											}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-												style: versionLineStyle,
-												children: [
-													"insert id: ",
-													row.id,
-													" · 实时挂载"
-												]
-											})]
-										}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-											style: actionsStyle,
-											children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-												size: "sm",
-												variant: "outline",
-												disabled: insertBusy,
-												onClick: () => {
-													removeInsert(row.id, row.name);
-												},
-												children: "移除"
-											})
-										})]
-									})
-								}, row.id))
-							}),
-							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-								style: editorStyle,
-								children: [
-									/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-										style: fieldStyle,
-										children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("label", {
-											style: fieldLabelStyle,
-											htmlFor: "console-insert-name",
-											children: "插件包名（npm 包）"
-										}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
-											id: "console-insert-name",
-											value: insertInput,
-											placeholder: "@dsh-external/dsh-loop",
-											onChange: (e) => {
-												setInsertInput(e.target.value);
-											}
-										})]
-									}),
-									insertMsg !== void 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-										style: savedStyle,
-										children: insertMsg
-									}) : null,
-									/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-										style: editorActionsStyle,
-										children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-											size: "sm",
-											variant: "outline",
-											disabled: insertBusy,
-											onClick: () => {
-												addInsert();
-											},
-											children: insertBusy ? "挂载中" : "挂载"
-										})
-									})
-								]
-							})
-						]
-					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
-						style: sectionStyle,
-						children: [
-							sectionHeader("安装 bundle 插件"),
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-								style: introStyle,
-								children: "pnpm add 到 profile 并加入层栈；安装/更新/卸载后重启 web 生效。"
-							}),
-							bundleMsg !== void 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-								style: savedStyle,
-								children: bundleMsg
-							}) : null,
-							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-								style: editorStyle,
-								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-									style: fieldStyle,
-									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("label", {
-										style: fieldLabelStyle,
-										htmlFor: "console-bundle-source",
-										children: "包源"
-									}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
-										id: "console-bundle-source",
-										value: bundleInput,
-										placeholder: "git+file:///path/to/plugin 或 registry 包名",
-										onChange: (e) => {
-											setBundleInput(e.target.value);
-										}
-									})]
-								}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-									style: editorActionsStyle,
-									children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-										size: "sm",
-										variant: "outline",
-										disabled: busy || bundleBusy,
-										onClick: () => {
-											installBundle();
-										},
-										children: bundleBusy ? "安装中" : "安装"
-									})
-								})]
-							})
-						]
+								children: "未加载任何插件。"
+							}) : null]
+						})]
 					})
 				]
 			});

@@ -822,6 +822,17 @@ function readProfileManifest() {
 function writeProfileManifest(manifest) {
 	writeFileSync(join(profileWebDir(), "package.json"), `${JSON.stringify(manifest, void 0, 2)}\n`);
 }
+/**
+* 解析 pnpm add 后 profile 依赖里的真实包名：源串可能是指向路径/git 的
+* 安装源（`/path/to/pkg`、`github:o/r#ref`），而依赖 key 才是包名
+* （pnpm 按包的真实 name 写入 package.json）。先精确匹配，再回退到
+* 依赖值包含源串的 key。找不到返回 null。
+*/
+function resolveInstalledName(source) {
+	const deps = readProfileManifest().dependencies ?? {};
+	if (typeof deps[source] === "string") return source;
+	return Object.keys(deps).find((key) => deps[key] === source || deps[key]?.includes(source)) ?? null;
+}
 /** 已安装包是否声明 dsh.bundle（profile 层候选）。 */
 function exportsBundlePatch(packageName) {
 	try {
@@ -908,11 +919,46 @@ function readInstalledVersion(name) {
 		return;
 	}
 }
+/** 解析一个 preset 组合文件的全部行 id（agent.cordis.yml 顶层行 + insert 子行）。 */
+function presetRowIdsFromFile(file) {
+	const ids = /* @__PURE__ */ new Set();
+	let content;
+	try {
+		content = readFileSync(file, "utf8");
+	} catch {
+		return ids;
+	}
+	for (const line of content.split("\n")) {
+		const m = /- id:\s*([^\s]+)/.exec(line.trim());
+		if (m !== null) ids.add(m[1]);
+	}
+	return ids;
+}
+/**
+* 全部 agent preset 组合的行 id 并集（0811 起模型面工具由 preset 挂载）。
+* 经 `ctx.agentPresets.list()`（官方服务）拿 preset 目录，再读组合文件。
+* 服务不可用/读取失败 → 空集（面板退化为无「预设挂载」标注）。
+*/
+async function collectPresetRowIds(ctx) {
+	const presets = ctx.agentPresets;
+	const ids = /* @__PURE__ */ new Set();
+	if (presets?.list === void 0) return ids;
+	try {
+		const list = await presets.list();
+		for (const preset of list) {
+			if (typeof preset.path !== "string") continue;
+			for (const id of presetRowIdsFromFile(preset.path)) ids.add(id);
+		}
+	} catch {}
+	return ids;
+}
 /** 遍历 loader 树收集全部条目（含嵌套子树），id 取短 id（options.id）。 */
-function collectLoaderEntries(ctx) {
+async function collectLoaderEntries(ctx) {
 	const loader = ctx.loader;
 	if (loader?.entries === void 0) return [];
 	const byId = /* @__PURE__ */ new Map();
+	const insertRows = new Set(readInsertRows().map((r) => r.id));
+	const presetIds = await collectPresetRowIds(ctx);
 	for (const raw of loader.entries()) {
 		const entry = raw;
 		const id = entry.options?.id ?? entry.id;
@@ -923,11 +969,13 @@ function collectLoaderEntries(ctx) {
 			name,
 			disabled: entry.disabled === true,
 			version: readInstalledVersion(name),
-			kind: "loader"
+			kind: "loader",
+			insertRow: insertRows.has(id)
 		};
 		const prev = byId.get(id);
 		if (prev === void 0 || prev.disabled === true && row.disabled === false) byId.set(id, row);
 	}
+	for (const row of byId.values()) if (row.disabled && presetIds.has(row.id)) row.presetMounted = true;
 	return [...byId.values()];
 }
 /** 版本检查缓存：name -> { latest, checkedAt }（进程内存）。 */
@@ -961,24 +1009,26 @@ function npmViewLatest(name) {
 	return latest;
 }
 /** 用户插件名列表（排除官方命名空间）。 */
-function userPluginNames(ctx) {
-	return [...new Set(collectLoaderEntries(ctx).map((row) => row.name).filter((name) => !name.startsWith("@deepseek-ai/") && !name.startsWith("@cordisjs/") && !name.startsWith("cordis:")))];
+async function userPluginNames(ctx) {
+	const entries = await collectLoaderEntries(ctx);
+	return [...new Set(entries.map((row) => row.name).filter((name) => !name.startsWith("@deepseek-ai/") && !name.startsWith("@cordisjs/") && !name.startsWith("cordis:")))];
 }
 /** 批量强制刷新版本缓存（可选 force）。 */
-function refreshVersions(ctx, force) {
+async function refreshVersions(ctx, force) {
 	const now = Date.now();
 	if (!force && now - lastVersionRefreshAt < VERSION_REFRESH_MIN_MS) return false;
 	lastVersionRefreshAt = now;
-	for (const name of userPluginNames(ctx)) npmViewLatest(name);
+	for (const name of await userPluginNames(ctx)) npmViewLatest(name);
 	return true;
 }
 /** Cordis 插件名。 */
 const name = "plugin-console";
-/** 需要宿主 web server（web 组合）+ loader（读/改 loader 树条目）+ tools（注册 plugin_* 管理工具）。 */
+/** 需要宿主 web server（web 组合）+ loader（读/改 loader 树条目）+ tools（注册 plugin_* 管理工具）+ agentPresets（预设挂载标注）。 */
 const inject = [
 	"httpServer",
 	"loader",
-	"tools"
+	"tools",
+	"agentPresets"
 ];
 /** 注册控制台路由：GET 读列表，POST 写列表。 */
 function apply(ctx) {
@@ -1011,11 +1061,9 @@ function apply(ctx) {
 			for (const dispose of disposeTools) dispose();
 		};
 		const prescanTimer = setTimeout(() => {
-			try {
-				refreshVersions(ctx, false);
-			} catch (error) {
+			refreshVersions(ctx, false).catch((error) => {
 				console.log(`[plugin-console] version prescan failed: ${error instanceof Error ? error.message : String(error)}`);
-			}
+			});
 		}, 3e4);
 		const disposeRoutes = httpServer.register({
 			kind: "prefix",
@@ -1081,14 +1129,14 @@ function apply(ctx) {
 					if (method === "GET" && (path === "/api/plugin-console/installed" || path === "/api/plugin-console/installed/")) {
 						json(200, {
 							ok: true,
-							plugins: collectLoaderEntries(ctx)
+							plugins: await collectLoaderEntries(ctx)
 						});
 						return;
 					}
 					if (method === "GET" && (path === "/api/plugin-console/versions" || path === "/api/plugin-console/versions/")) {
 						json(200, {
 							ok: true,
-							versions: userPluginNames(ctx).map((name) => {
+							versions: (await userPluginNames(ctx)).map((name) => {
 								const cached = versionCache.get(name);
 								return {
 									name,
@@ -1102,8 +1150,8 @@ function apply(ctx) {
 					if (method === "POST" && (path === "/api/plugin-console/versions/refresh" || path === "/api/plugin-console/versions/refresh/")) {
 						json(200, {
 							ok: true,
-							refreshed: refreshVersions(ctx, false),
-							versions: userPluginNames(ctx).map((name) => {
+							refreshed: await refreshVersions(ctx, false),
+							versions: (await userPluginNames(ctx)).map((name) => {
 								const cached = versionCache.get(name);
 								return {
 									name,
@@ -1111,6 +1159,68 @@ function apply(ctx) {
 									checked: cached !== void 0
 								};
 							})
+						});
+						return;
+					}
+					if (method === "POST" && (path === "/api/plugin-console/install" || path === "/api/plugin-console/install/")) {
+						let body = "";
+						req?.on?.("data", (c) => {
+							body += c.toString("utf8");
+						});
+						req?.on?.("end", () => {
+							(async () => {
+								try {
+									const source = (JSON.parse(body).source ?? "").trim();
+									if (source.length === 0) {
+										json(400, {
+											ok: false,
+											message: "install needs a source"
+										});
+										return;
+									}
+									const result = runPnpm(["add", source]);
+									if (!result.ok) {
+										json(502, {
+											ok: false,
+											message: `pnpm add failed: ${result.output}`
+										});
+										return;
+									}
+									const installedName = resolveInstalledName(source);
+									if (installedName === null) {
+										json(502, {
+											ok: false,
+											message: `pnpm add succeeded but ${source} is not in the profile dependencies`
+										});
+										return;
+									}
+									if (isBundlePackage(installedName)) {
+										json(200, {
+											ok: true,
+											kind: "bundle",
+											name: installedName,
+											needsRestart: true,
+											message: `bundle ${installedName} 已加入层栈——重启 web 生效`
+										});
+										return;
+									}
+									const id = installedName.replace(/^@/, "").replace(/[^a-z0-9-]/gi, "-").toLowerCase();
+									writeInsertRow(id, installedName);
+									json(200, {
+										ok: true,
+										kind: "plugin",
+										name: installedName,
+										id,
+										needsRestart: false,
+										message: `插件 ${installedName} 已挂载（insert 行 ${id}，配置 HMR 实时生效）`
+									});
+								} catch (error) {
+									json(500, {
+										ok: false,
+										message: error instanceof Error ? error.message : String(error)
+									});
+								}
+							})();
 						});
 						return;
 					}

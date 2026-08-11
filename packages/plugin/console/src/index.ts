@@ -317,6 +317,20 @@ function writeProfileManifest(manifest: unknown): void {
   writeFileSync(join(profileWebDir(), 'package.json'), `${JSON.stringify(manifest, undefined, 2)}\n`)
 }
 
+/**
+ * 解析 pnpm add 后 profile 依赖里的真实包名：源串可能是指向路径/git 的
+ * 安装源（`/path/to/pkg`、`github:o/r#ref`），而依赖 key 才是包名
+ * （pnpm 按包的真实 name 写入 package.json）。先精确匹配，再回退到
+ * 依赖值包含源串的 key。找不到返回 null。
+ */
+function resolveInstalledName(source: string): string | null {
+  const manifest = readProfileManifest() as { dependencies?: Record<string, string> }
+  const deps = manifest.dependencies ?? {}
+  if (typeof deps[source] === 'string') return source
+  const hit = Object.keys(deps).find(key => deps[key] === source || deps[key]?.includes(source))
+  return hit ?? null
+}
+
 /** 已安装包是否声明 dsh.bundle（profile 层候选）。 */
 function exportsBundlePatch(packageName: string): boolean {
   try {
@@ -413,6 +427,13 @@ interface LoadedEntryRow {
   version?: string
   /** 来源：loader 树条目（bundle/内置）。 */
   kind?: 'loader'
+  /**
+   * host 树停用但由 agent preset 挂载（0811 起模型面工具搬进 preset 通道）。
+   * 面板据此显示「预设挂载」而非误导性的「已停用」。
+   */
+  presetMounted?: boolean
+  /** 是否由 profile patch 的 insert 行挂载（非 bundle 插件安装态）。 */
+  insertRow?: boolean
 }
 
 /** 读已安装包版本（profile node_modules/<name>/package.json）；未装返回 undefined。 */
@@ -427,13 +448,52 @@ function readInstalledVersion(name: string): string | undefined {
   }
 }
 
+/** 解析一个 preset 组合文件的全部行 id（agent.cordis.yml 顶层行 + insert 子行）。 */
+function presetRowIdsFromFile(file: string): Set<string> {
+  const ids = new Set<string>()
+  let content: string
+  try {
+    content = readFileSync(file, 'utf8')
+  } catch {
+    return ids
+  }
+  for (const line of content.split('\n')) {
+    const m = /- id:\s*([^\s]+)/.exec(line.trim())
+    if (m !== null) ids.add(m[1]!)
+  }
+  return ids
+}
+
+/**
+ * 全部 agent preset 组合的行 id 并集（0811 起模型面工具由 preset 挂载）。
+ * 经 `ctx.agentPresets.list()`（官方服务）拿 preset 目录，再读组合文件。
+ * 服务不可用/读取失败 → 空集（面板退化为无「预设挂载」标注）。
+ */
+async function collectPresetRowIds(ctx: ConsoleCtx): Promise<Set<string>> {
+  const presets = (ctx as unknown as { agentPresets?: { list?(): Promise<Array<{ path?: string }>> } }).agentPresets
+  const ids = new Set<string>()
+  if (presets?.list === undefined) return ids
+  try {
+    const list = await presets.list()
+    for (const preset of list) {
+      if (typeof preset.path !== 'string') continue
+      for (const id of presetRowIdsFromFile(preset.path)) ids.add(id)
+    }
+  } catch {
+    // 预设读取失败不阻塞面板。
+  }
+  return ids
+}
+
 /** 遍历 loader 树收集全部条目（含嵌套子树），id 取短 id（options.id）。 */
-function collectLoaderEntries(ctx: ConsoleCtx): LoadedEntryRow[] {
+async function collectLoaderEntries(ctx: ConsoleCtx): Promise<LoadedEntryRow[]> {
   const loader = (ctx as unknown as { loader?: { entries?(): Generator<unknown> } }).loader
   if (loader?.entries === undefined) return []
   // 0810 的 loader 树存在同 id 双条目（一条禁用一条启用）——按 id 去重，
   // 优先保留启用条目，避免 React key 冲突。
   const byId = new Map<string, LoadedEntryRow>()
+  const insertRows = new Set(readInsertRows().map(r => r.id))
+  const presetIds = await collectPresetRowIds(ctx)
   for (const raw of loader.entries()) {
     const entry = raw as { id?: string; options?: { id?: string; name?: string }; disabled?: boolean }
     const id = entry.options?.id ?? entry.id
@@ -445,11 +505,16 @@ function collectLoaderEntries(ctx: ConsoleCtx): LoadedEntryRow[] {
       disabled: entry.disabled === true,
       version: readInstalledVersion(name),
       kind: 'loader',
+      insertRow: insertRows.has(id),
     }
     const prev = byId.get(id)
     if (prev === undefined || (prev.disabled === true && row.disabled === false)) {
       byId.set(id, row)
     }
+  }
+  // 停用的行：标注是否由 preset 挂载（区分「预设挂载」与真「已停用」）。
+  for (const row of byId.values()) {
+    if (row.disabled && presetIds.has(row.id)) row.presetMounted = true
   }
   return [...byId.values()]
 }
@@ -478,17 +543,18 @@ function npmViewLatest(name: string): string | null {
 }
 
 /** 用户插件名列表（排除官方命名空间）。 */
-function userPluginNames(ctx: ConsoleCtx): string[] {
-  return [...new Set(collectLoaderEntries(ctx).map(row => row.name)
+async function userPluginNames(ctx: ConsoleCtx): Promise<string[]> {
+  const entries = await collectLoaderEntries(ctx)
+  return [...new Set(entries.map(row => row.name)
     .filter(name => !name.startsWith('@deepseek-ai/') && !name.startsWith('@cordisjs/') && !name.startsWith('cordis:')))]
 }
 
 /** 批量强制刷新版本缓存（可选 force）。 */
-function refreshVersions(ctx: ConsoleCtx, force: boolean): boolean {
+async function refreshVersions(ctx: ConsoleCtx, force: boolean): Promise<boolean> {
   const now = Date.now()
   if (!force && now - lastVersionRefreshAt < VERSION_REFRESH_MIN_MS) return false
   lastVersionRefreshAt = now
-  for (const name of userPluginNames(ctx)) {
+  for (const name of await userPluginNames(ctx)) {
     void npmViewLatest(name)
   }
   return true
@@ -507,8 +573,8 @@ interface WebServerLike {
 /** Cordis 插件名。 */
 export const name = 'plugin-console'
 
-/** 需要宿主 web server（web 组合）+ loader（读/改 loader 树条目）+ tools（注册 plugin_* 管理工具）。 */
-export const inject = ['httpServer', 'loader', 'tools']
+/** 需要宿主 web server（web 组合）+ loader（读/改 loader 树条目）+ tools（注册 plugin_* 管理工具）+ agentPresets（预设挂载标注）。 */
+export const inject = ['httpServer', 'loader', 'tools', 'agentPresets']
 
 interface ConsoleCtx extends Context {
   httpServer?: WebServerLike
@@ -548,11 +614,9 @@ export function apply(ctx: ConsoleCtx): void {
     // 启动延迟预扫描：web 起来 30 秒后批量查一次 registry 版本，填充缓存
     // （此后面板 GET /versions 零网络，直到用户手动刷新）。
     const prescanTimer = setTimeout(() => {
-      try {
-        refreshVersions(ctx, false)
-      } catch (error) {
+      void refreshVersions(ctx, false).catch(error => {
         console.log(`[plugin-console] version prescan failed: ${error instanceof Error ? error.message : String(error)}`)
-      }
+      })
     }, 30_000)
     const disposeRoutes = httpServer.register({
       kind: 'prefix',
@@ -601,15 +665,16 @@ export function apply(ctx: ConsoleCtx): void {
             })
             return
           }
-          // 已加载插件：读 loader 树（实时，含运行时启停后的状态）
+          // 已加载插件：读 loader 树（实时，含运行时启停后的状态 +
+          // preset 挂载标注，区分「预设挂载」与真「已停用」）
           if (method === 'GET' && (path === '/api/plugin-console/installed' || path === '/api/plugin-console/installed/')) {
-            json(200, { ok: true, plugins: collectLoaderEntries(ctx) })
+            json(200, { ok: true, plugins: await collectLoaderEntries(ctx) })
             return
           }
           // bundle 版本：只读缓存（零网络——registry 查询由启动延迟预扫描 +
           // 手动刷新触发，避免面板每次打开打 registry）
           if (method === 'GET' && (path === '/api/plugin-console/versions' || path === '/api/plugin-console/versions/')) {
-            const versions = userPluginNames(ctx).map(name => {
+            const versions = (await userPluginNames(ctx)).map(name => {
               const cached = versionCache.get(name)
               return { name, latest: cached?.latest ?? null, checked: cached !== undefined }
             })
@@ -618,12 +683,52 @@ export function apply(ctx: ConsoleCtx): void {
           }
           // 手动检查最新版本（POST /versions/refresh，30s 最小间隔防抖）
           if (method === 'POST' && (path === '/api/plugin-console/versions/refresh' || path === '/api/plugin-console/versions/refresh/')) {
-            const did = refreshVersions(ctx, false)
-            const versions = userPluginNames(ctx).map(name => {
+            const did = await refreshVersions(ctx, false)
+            const versions = (await userPluginNames(ctx)).map(name => {
               const cached = versionCache.get(name)
               return { name, latest: cached?.latest ?? null, checked: cached !== undefined }
             })
             json(200, { ok: true, refreshed: did, versions })
+            return
+          }
+          // 统一安装入口（POST /install，body {source}）：pnpm add →
+          // 判 dsh.bundle → bundle 进层栈（重启生效）/ 非 bundle 写 insert 行（实时挂载）
+          if (method === 'POST' && (path === '/api/plugin-console/install' || path === '/api/plugin-console/install/')) {
+            let body = ''
+            ;(req as { on?: (e: string, cb: (c: Buffer) => void) => void })?.on?.('data', (c: Buffer) => { body += c.toString('utf8') })
+            ;(req as { on?: (e: string, cb: () => void) => void })?.on?.('end', () => {
+              void (async () => {
+                try {
+                  const parsed = JSON.parse(body) as { source?: string }
+                  const source = (parsed.source ?? '').trim()
+                  if (source.length === 0) {
+                    json(400, { ok: false, message: 'install needs a source' })
+                    return
+                  }
+                  const result = runPnpm(['add', source])
+                  if (!result.ok) {
+                    json(502, { ok: false, message: `pnpm add failed: ${result.output}` })
+                    return
+                  }
+                  // 路径/git 源装完实际包名 ≠ 源串：从 profile 依赖解析真实包名
+                  // （pnpm 已把依赖写进 package.json，key 即包名）。
+                  const installedName = resolveInstalledName(source)
+                  if (installedName === null) {
+                    json(502, { ok: false, message: `pnpm add succeeded but ${source} is not in the profile dependencies` })
+                    return
+                  }
+                  if (isBundlePackage(installedName)) {
+                    json(200, { ok: true, kind: 'bundle', name: installedName, needsRestart: true, message: `bundle ${installedName} 已加入层栈——重启 web 生效` })
+                    return
+                  }
+                  const id = installedName.replace(/^@/, '').replace(/[^a-z0-9-]/gi, '-').toLowerCase()
+                  writeInsertRow(id, installedName)
+                  json(200, { ok: true, kind: 'plugin', name: installedName, id, needsRestart: false, message: `插件 ${installedName} 已挂载（insert 行 ${id}，配置 HMR 实时生效）` })
+                } catch (error) {
+                  json(500, { ok: false, message: error instanceof Error ? error.message : String(error) })
+                }
+              })()
+            })
             return
           }
           // 已加载插件：运行时启停 + 写 profile patch 持久化

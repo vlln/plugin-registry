@@ -1,9 +1,10 @@
 /**
  * 薄控制台面板（0811 适配，UI 对齐官方「模型」设置页设计语言）：
- * - 已加载插件：loader 树条目（启停 + 版本 + 更新/卸载）
- * - 已挂载 insert 插件：profile patch 的 insert 行（非 bundle 插件，
- *   配置 HMR 实时挂载——添加/移除即时生效，无需重启）
- * - 安装 bundle 插件：pnpm add + reconcile 层栈（重启生效）
+ * - 已加载插件：loader 树条目（用户可管理项默认展示，官方内置折叠），
+ *   状态三态——运行中 / 预设挂载（host 停用但 agent preset 挂载，0811
+ *   preset 通道）/ 已停用
+ * - 安装插件：统一入口——输入包名自动 pnpm add + 按 dsh.bundle 声明分流
+ *   （bundle → 层栈重启生效；非 bundle → insert 行配置 HMR 实时挂载）
  * 全部 token 走 --dsw-alias-*；零 CSS 依赖（inline 样式）。
  */
 import { useCallback, useEffect, useState } from 'react'
@@ -16,6 +17,10 @@ interface LoadedPluginRow {
   disabled: boolean
   version?: string
   kind?: 'loader'
+  /** host 停用但由 agent preset 挂载（0811 preset 通道）。 */
+  presetMounted?: boolean
+  /** 是否由 profile patch insert 行挂载（非 bundle 插件）。 */
+  insertRow?: boolean
 }
 
 /** profile patch insert 行（非 bundle 插件安装态）。 */
@@ -84,35 +89,40 @@ function versionText(plugin: LoadedPluginRow, latest: string | null, checked: bo
   return { text: `${current} → v${latest}`, canUpdate: true }
 }
 
+/**
+ * 状态 Pill 三态（0811 preset 通道修正）：
+ * - host 挂载 → 运行中
+ * - host 停用 + preset 挂载 → 预设挂载（不是「已停用」——模型实际有这工具）
+ * - host 停用 + preset 无 → 已停用
+ */
+function statePill(plugin: LoadedPluginRow): React.ReactNode {
+  if (!plugin.disabled) return <Pill active>运行中</Pill>
+  if (plugin.presetMounted === true) return <Pill>预设挂载</Pill>
+  return <Pill>已停用</Pill>
+}
+
 /** 设置页面板主体（对齐官方「模型」设置页）。 */
 export function ConsolePanel(): React.ReactNode {
   const [installed, setInstalled] = useState<LoadedPluginRow[]>([])
-  const [inserts, setInserts] = useState<InsertRow[]>([])
   const [showAll, setShowAll] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [insertInput, setInsertInput] = useState('')
-  const [insertBusy, setInsertBusy] = useState(false)
-  const [insertMsg, setInsertMsg] = useState<string | undefined>(undefined)
-  const [bundleInput, setBundleInput] = useState('')
-  const [bundleBusy, setBundleBusy] = useState(false)
-  const [bundleMsg, setBundleMsg] = useState<string | undefined>(undefined)
+  const [installInput, setInstallInput] = useState('')
+  const [installBusy, setInstallBusy] = useState(false)
+  const [installMsg, setInstallMsg] = useState<string | undefined>(undefined)
   const [versions, setVersions] = useState<Record<string, string | null>>({})
   const [versionChecked, setVersionChecked] = useState<Record<string, boolean>>({})
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
-      const [installedRes, versionsRes, insertsRes] = await Promise.all([
+      const [installedRes, versionsRes] = await Promise.all([
         fetch('/api/plugin-console/installed', { headers: { accept: 'application/json' } }),
         fetch('/api/plugin-console/versions', { headers: { accept: 'application/json' } }),
-        fetch('/api/plugin-console/inserts', { headers: { accept: 'application/json' } }),
       ])
       const installedBody = (await installedRes.json()) as { plugins?: LoadedPluginRow[]; ok?: boolean }
       const versionsBody = (await versionsRes.json()) as { versions?: { name: string; latest: string | null; checked?: boolean }[]; ok?: boolean }
-      const insertsBody = (await insertsRes.json()) as { inserts?: InsertRow[]; ok?: boolean }
       setInstalled(installedBody.plugins ?? [])
-      setInserts(insertsBody.inserts ?? [])
       const map: Record<string, string | null> = {}
       const checkedMap: Record<string, boolean> = {}
       for (const row of versionsBody.versions ?? []) {
@@ -170,83 +180,34 @@ export function ConsolePanel(): React.ReactNode {
     }
   }, [])
 
-  /** insert 插件：写行（配置 HMR 实时挂载）。 */
-  const addInsert = useCallback(async (): Promise<void> => {
-    const name = insertInput.trim()
-    if (name.length === 0) return
-    setInsertBusy(true)
-    setInsertMsg(undefined)
-    setError(undefined)
-    try {
-      const id = name.replace(/^@/, '').replace(/[^a-z0-9-]/gi, '-').toLowerCase()
-      const response = await fetch(`/api/plugin-console/inserts/${encodeURIComponent(id)}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name }),
-      })
-      const body = (await response.json()) as { ok?: boolean; message?: string }
-      if (body.ok !== true) throw new Error(body.message ?? 'insert failed')
-      setInsertMsg(`已挂载 ${name}（配置 HMR 实时生效，无需重启）`)
-      setInsertInput('')
-      await refresh()
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught))
-    } finally {
-      setInsertBusy(false)
-    }
-  }, [insertInput, refresh])
-
-  /** insert 插件：移除行（配置 HMR 实时卸载）。 */
-  const removeInsert = useCallback(async (id: string, name: string): Promise<void> => {
-    if (!window.confirm(`移除插件 ${name}？将从 profile patch 删除其 insert 行（配置 HMR 实时生效）。`)) return
-    setInsertBusy(true)
-    setInsertMsg(undefined)
-    setError(undefined)
-    try {
-      const response = await fetch(`/api/plugin-console/inserts/${encodeURIComponent(id)}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ remove: true }),
-      })
-      const body = (await response.json()) as { ok?: boolean; message?: string }
-      if (body.ok !== true) throw new Error(body.message ?? 'remove failed')
-      setInsertMsg(`${name} 已移除（配置 HMR 实时生效）`)
-      await refresh()
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught))
-    } finally {
-      setInsertBusy(false)
-    }
-  }, [refresh])
-
-  /** bundle 安装（profile 目录 pnpm add + reconcile 层栈）。 */
-  const installBundle = useCallback(async (): Promise<void> => {
-    const source = bundleInput.trim()
+  /** 统一安装：输入包名 → pnpm add → 按 dsh.bundle 分流（bundle 层栈 / insert 行实时）。 */
+  const installPlugin = useCallback(async (): Promise<void> => {
+    const source = installInput.trim()
     if (source.length === 0) return
-    setBundleBusy(true)
-    setBundleMsg(undefined)
+    setInstallBusy(true)
+    setInstallMsg(undefined)
     setError(undefined)
     try {
-      const response = await fetch('/api/plugin-console/bundles', {
+      const response = await fetch('/api/plugin-console/install', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'install', source }),
+        body: JSON.stringify({ source }),
       })
-      const body = (await response.json()) as { ok?: boolean; names?: string[]; message?: string }
+      const body = (await response.json()) as { ok?: boolean; kind?: string; name?: string; needsRestart?: boolean; message?: string }
       if (body.ok !== true) throw new Error(body.message ?? 'install failed')
-      setBundleMsg(`已安装并加入层栈：${(body.names ?? []).join(', ') || source}（重启 web 生效）`)
-      setBundleInput('')
+      setInstallMsg(body.message ?? '已安装')
+      setInstallInput('')
+      await refresh()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught))
     } finally {
-      setBundleBusy(false)
+      setInstallBusy(false)
     }
-  }, [bundleInput])
+  }, [installInput, refresh])
 
   /** bundle 更新（pnpm update <name>，拉取最新版本）。 */
   const updateBundle = useCallback(async (name: string): Promise<void> => {
-    setBundleBusy(true)
-    setBundleMsg(undefined)
+    setBusy(true)
     setError(undefined)
     try {
       const response = await fetch('/api/plugin-console/bundles', {
@@ -256,19 +217,18 @@ export function ConsolePanel(): React.ReactNode {
       })
       const body = (await response.json()) as { ok?: boolean; message?: string }
       if (body.ok !== true) throw new Error(body.message ?? 'update failed')
-      setBundleMsg(`${name} 已更新（重启 web 生效）`)
+      await refresh()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught))
     } finally {
-      setBundleBusy(false)
+      setBusy(false)
     }
-  }, [])
+  }, [refresh])
 
   /** bundle 卸载（pnpm remove + 层栈 reconcile；确认弹窗防误触；重启生效）。 */
   const removeBundle = useCallback(async (name: string): Promise<void> => {
     if (!window.confirm(`卸载 bundle 插件 ${name}？将从 profile 移除依赖与层栈（重启 web 生效）。`)) return
-    setBundleBusy(true)
-    setBundleMsg(undefined)
+    setBusy(true)
     setError(undefined)
     try {
       const response = await fetch('/api/plugin-console/bundles', {
@@ -278,12 +238,11 @@ export function ConsolePanel(): React.ReactNode {
       })
       const body = (await response.json()) as { ok?: boolean; message?: string }
       if (body.ok !== true) throw new Error(body.message ?? 'remove failed')
-      setBundleMsg(`${name} 已卸载（重启 web 生效）`)
       await refresh()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught))
     } finally {
-      setBundleBusy(false)
+      setBusy(false)
     }
   }, [refresh])
 
@@ -296,9 +255,10 @@ export function ConsolePanel(): React.ReactNode {
     p.name.startsWith('@deepseek-ai/') || p.name.startsWith('@cordisjs/') || p.name.startsWith('cordis:')
   // 管理工具自身：禁用会卸载本面板（管理入口消失），不可停用。
   const isSelf = (p: LoadedPluginRow): boolean => p.name === '@dsh-external/plugin-console'
-  const official = installed.filter(isOfficial)
-  const user = installed.filter(p => !isOfficial(p))
-  const shown = showAll ? installed : user
+  // 用户可管理项：非官方 + 非管理工具自身；默认展示（官方 124 个折叠）。
+  const userRows = installed.filter(p => !isOfficial(p) && !isSelf(p))
+  const officialRows = installed.filter(p => isOfficial(p))
+  const shown = showAll ? installed : userRows
 
   const sectionHeader = (title: string, actions?: React.ReactNode): React.ReactNode => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -311,15 +271,38 @@ export function ConsolePanel(): React.ReactNode {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 720, color: 'var(--dsw-alias-label-primary)' }}>
       {error !== undefined ? <p style={errorStyle}>{error}</p> : null}
 
-      {/* 已加载插件：统一行（bundle + 内置），状态/生命周期 */}
+      {/* 安装插件：统一入口（自动 pnpm add + 按形态分流） */}
+      <section style={sectionStyle}>
+        {sectionHeader('安装插件')}
+        <p style={introStyle}>输入 npm 包名或源——自动安装并挂载：bundle 插件（声明 dsh.bundle）加入层栈（重启生效）；非 bundle 插件写 insert 行（配置 HMR 实时挂载，无需重启）。</p>
+        {installMsg !== undefined ? <p style={savedStyle}>{installMsg}</p> : null}
+        <div style={editorStyle}>
+          <div style={fieldStyle}>
+            <label style={fieldLabelStyle} htmlFor="console-install-source">包名 / 源</label>
+            <Input
+              id="console-install-source"
+              value={installInput}
+              placeholder="@dsh-external/dsh-loop 或 git 源"
+              onChange={(e) => { setInstallInput(e.target.value) }}
+            />
+          </div>
+          <div style={editorActionsStyle}>
+            <Button size="sm" variant="outline" disabled={installBusy} onClick={() => { void installPlugin() }}>
+              {installBusy ? '安装中' : '安装'}
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* 已加载插件：默认用户可管理项，官方内置折叠 */}
       <section style={sectionStyle}>
         {sectionHeader(
-          `已加载插件（${user.length} 用户 / ${official.length} 内置）`,
+          `已加载插件（${userRows.length} 用户 / ${officialRows.length} 内置）`,
           <div style={{ display: 'flex', gap: 8 }}>
             <Button size="sm" variant="outline" disabled={busy} onClick={() => { void checkAll() }}>
               {busy ? '检查中' : '检查更新'}
             </Button>
-            {official.length > 0 ? (
+            {officialRows.length > 0 ? (
               <Button size="sm" variant="outline" onClick={() => { setShowAll(v => !v) }}>
                 {showAll ? '只看用户' : `查看全部（${installed.length}）`}
               </Button>
@@ -329,7 +312,7 @@ export function ConsolePanel(): React.ReactNode {
         <div style={rowsStyle}>
           {shown.map(plugin => {
             const version = versionText(plugin, versions[plugin.name] ?? null, versionChecked[plugin.name] === true)
-            const isUserBundle = !official.includes(plugin) && !isSelf(plugin)
+            const isUserRow = !isOfficial(plugin) && !isSelf(plugin)
             return (
               <div key={showAll ? `a${plugin.id}` : `u${plugin.id}`} style={rowCardStyle}>
                 <div style={rowHeadStyle}>
@@ -337,90 +320,27 @@ export function ConsolePanel(): React.ReactNode {
                     <span style={nameStyle}>{plugin.name}</span>
                   </span>
                   <span style={actionsStyle}>
-                    {isUserBundle && version.canUpdate ? (
-                      <Button size="sm" variant="outline" disabled={busy || bundleBusy} onClick={() => { void updateBundle(plugin.name) }}>更新</Button>
+                    {isUserRow && version.canUpdate ? (
+                      <Button size="sm" variant="outline" disabled={busy} onClick={() => { void updateBundle(plugin.name) }}>更新</Button>
                     ) : null}
-                    {isUserBundle ? (
+                    {isUserRow && plugin.insertRow !== true ? (
                       <Button size="sm" variant="outline" disabled={busy} onClick={() => { void togglePlugin(plugin.id, !plugin.disabled) }}>
                         {plugin.disabled ? '启用' : '停用'}
                       </Button>
                     ) : null}
-                    {isUserBundle ? (
-                      <Button size="sm" variant="outline" disabled={busy || bundleBusy} onClick={() => { void removeBundle(plugin.name) }}>卸载</Button>
+                    {isUserRow && plugin.insertRow !== true ? (
+                      <Button size="sm" variant="outline" disabled={busy} onClick={() => { void removeBundle(plugin.name) }}>卸载</Button>
                     ) : null}
-                    {official.includes(plugin) ? <Pill>内置</Pill> : null}
                     {isSelf(plugin) ? <Pill>管理工具</Pill> : null}
-                    <Pill active={!plugin.disabled}>{plugin.disabled ? '已停用' : '运行中'}</Pill>
+                    {plugin.insertRow === true ? <Pill>insert</Pill> : null}
+                    {statePill(plugin)}
                   </span>
                 </div>
                 <span style={versionLineStyle}>{version.text}</span>
               </div>
             )
           })}
-        </div>
-      </section>
-
-      {/* 已挂载 insert 插件（profile patch insert 行，配置 HMR 实时） */}
-      <section style={sectionStyle}>
-        {sectionHeader(`insert 插件（${inserts.length}）`)}
-        <p style={introStyle}>profile `cordis.patch.yml` 的 insert 行——非 bundle 插件的安装形态。写行/删行由配置 HMR 实时挂载/卸载，无需重启。插件包需先在 profile 中可解析（bundle 安装区或 pnpm add）。</p>
-        {inserts.length === 0 ? (
-          <p style={{ ...introStyle, fontSize: 12, lineHeight: '18px' }}>未挂载 insert 插件。</p>
-        ) : null}
-        <div style={rowsStyle}>
-          {inserts.map(row => (
-            <div key={row.id} style={rowCardStyle}>
-              <div style={rowHeadStyle}>
-                <span style={identityStyle}>
-                  <span style={{ ...nameStyle, fontFamily: 'ui-monospace, monospace', fontSize: 13 }}>{row.name}</span>
-                  <span style={versionLineStyle}>insert id: {row.id} · 实时挂载</span>
-                </span>
-                <span style={actionsStyle}>
-                  <Button size="sm" variant="outline" disabled={insertBusy} onClick={() => { void removeInsert(row.id, row.name) }}>移除</Button>
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={editorStyle}>
-          <div style={fieldStyle}>
-            <label style={fieldLabelStyle} htmlFor="console-insert-name">插件包名（npm 包）</label>
-            <Input
-              id="console-insert-name"
-              value={insertInput}
-              placeholder="@dsh-external/dsh-loop"
-              onChange={(e) => { setInsertInput(e.target.value) }}
-            />
-          </div>
-          {insertMsg !== undefined ? <p style={savedStyle}>{insertMsg}</p> : null}
-          <div style={editorActionsStyle}>
-            <Button size="sm" variant="outline" disabled={insertBusy} onClick={() => { void addInsert() }}>
-              {insertBusy ? '挂载中' : '挂载'}
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* 安装 bundle 插件 */}
-      <section style={sectionStyle}>
-        {sectionHeader('安装 bundle 插件')}
-        <p style={introStyle}>pnpm add 到 profile 并加入层栈；安装/更新/卸载后重启 web 生效。</p>
-        {bundleMsg !== undefined ? <p style={savedStyle}>{bundleMsg}</p> : null}
-        <div style={editorStyle}>
-          <div style={fieldStyle}>
-            <label style={fieldLabelStyle} htmlFor="console-bundle-source">包源</label>
-            <Input
-              id="console-bundle-source"
-              value={bundleInput}
-              placeholder="git+file:///path/to/plugin 或 registry 包名"
-              onChange={(e) => { setBundleInput(e.target.value) }}
-            />
-          </div>
-          <div style={editorActionsStyle}>
-            <Button size="sm" variant="outline" disabled={busy || bundleBusy} onClick={() => { void installBundle() }}>
-              {bundleBusy ? '安装中' : '安装'}
-            </Button>
-          </div>
+          {shown.length === 0 ? <p style={{ ...introStyle, fontSize: 12 }}>未加载任何插件。</p> : null}
         </div>
       </section>
     </div>
