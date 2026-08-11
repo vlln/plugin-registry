@@ -2,8 +2,8 @@
 
 <p align="center">
   <strong>薄控制台——DSH Web 设置页内的插件管理面板</strong><br/>
-  0 patch 管理官方 repository 插件与 UI 插件：浏览器面板增删/启停，
-  读写 `$DSH_HOME/cordis.patch.yml`，无需手改配置、不引入任何补丁。
+  0 patch 管理 profile 插件安装态：bundle 层栈 + insert 行 + 启停，
+  读写 profile 安装态，无需手改配置、不引入任何补丁。
 </p>
 
 <p align="center">
@@ -18,13 +18,15 @@
 官方 **bundle 插件**（`dsh.bundle` + `dsh.client` 声明）：Node half 注册
 `/api/plugin-console` 路由，client half 在设置页注册「插件」面板。面板三个管理区：
 
-| 管理区 | 职责 | 操作 | 写入文件 |
+| 管理区 | 职责 | 操作 | 写入位置 |
 |---|---|---|---|
-| **已加载插件** | 查看所有已加载插件（bundle + repository + 内置）状态 | 更新（两类各自语义）、停用/启用（用户 bundle）、卸载（用户 bundle）；repository 行无启停（移除在源区） | profile 级 `$DSH_HOME/profiles/web/cordis.patch.yml`（bundle 启停/持久化） |
-| **repository 插件源** | 源注册表：注册/移除 git 源（增删行 = 装/卸）+ 被动远端状态 | 添加/移除行、更新（sha ref 固定到远端最新 commit） | home 级 `$DSH_HOME/cordis.patch.yml`（跨 profile 用户配置层） |
-| **安装 bundle 插件** | bundle 安装入口（pnpm add 到 profile 层栈） | 安装（重启生效） | profile 依赖 + 层栈 |
+| **insert 插件** | 非 bundle 插件（纯 cordis 包）的安装态 | 包名输入挂载/移除（**配置 HMR 实时生效，零重启**） | profile `$DSH_HOME/profiles/web/cordis.patch.yml` 的 insert 行 |
+| **已加载插件** | 查看所有已加载插件（bundle + 内置）状态 | 更新（用户 bundle）、停用/启用（用户 bundle）、卸载（用户 bundle） | profile `cordis.patch.yml` 的 `disabled` 标记（持久化） |
+| **安装 bundle 插件** | bundle 安装入口（pnpm add 到 profile 层栈） | 安装/更新/卸载（重启生效） | profile `package.json` 依赖 + `dsh.profile.bundles` 层栈 |
 
-背景与转向决策见 [官方 0809 覆盖度](../../../docs/official-0809-coverage.md)。
+**0811 背景**：官方移除 repository-plugins 机制（`vendor/loader/src/repository.ts` 删除），外部插件
+统一经 web profile 安装。0811 保留配置级 HMR（web-app 禁用模块级 hmr 时 profile-boot 主动挂载
+watch-only 实例）——profile `cordis.patch.yml` 编辑实时生效，insert 行写入**无需重启即挂载**（已实测）。
 
 ![插件面板](../../../screenshots/console-panel.png)
 
@@ -40,8 +42,9 @@ dsh plugin --profile web add "github:dsh-external/plugin-registry#main&path:/pac
 
 ## 使用
 
-- **已加载插件区**：统一行渲染（来源 Pill：内置 / 管理工具 / repository），版本行按通道取 npm 或 git 远端状态
-- **repository 插件源区**：未挂载源（刚添加/准备失败）也在此显示状态——已加载区只列出挂载成功的插件
+- **insert 插件区**：输入 npm 包名挂载——写 profile patch insert 行 → 配置 HMR 实时挂载（包需先在 profile 可解析，如 `dsh plugin --profile web add <包>`）；移除行实时卸载
+- **已加载插件区**：统一行渲染（来源 Pill：内置 / 管理工具），启停即时生效并持久化到 profile patch
+- **bundle 安装区**：pnpm add 到 profile 层栈，重启 web 生效
 
 ## AI 插件管理工具（agent 面）
 
@@ -49,32 +52,30 @@ dsh plugin --profile web add "github:dsh-external/plugin-registry#main&path:/pac
 
 | 工具 | 参数 | 行为 |
 |---|---|---|
-| `plugin_search` | `query?`, `source?`, `refresh?` | 搜源集合（缓存枚举）；`source` 给定新源（`github:owner/repo#ref`、索引 JSON 文件/URL、npm bundle）→ 懒加载探测并记住 |
-| `plugin_install` | `source` | 官方格式源直装；已装则更新 ref；repository 走 `repositories` 行（禁裸分支，需精确 ref），bundle 走 `pnpm add` |
-| `plugin_uninstall` | `id` | 删安装态行（短 id 或 `owner/repo` 均可；清单保留可再装） |
+| `plugin_search` | `query?`, `source?`, `refresh?` | 搜源集合（缓存枚举）；默认 hub catalog（`dsh-external/hub` 的 catalog.json）；`source` 给定新索引 JSON 文件/URL → 懒加载探测并记住 |
+| `plugin_install` | `source` | npm 包直装：声明 `dsh.bundle` → pnpm add + 层栈（重启生效）；纯 cordis 包 → pnpm add + insert 行（**实时挂载**） |
+| `plugin_uninstall` | `id` | 删 insert 行（实时）或 bundle 依赖（重启生效）；清单保留可再装 |
 | `plugin_status` | `id?` | 无参 list 已装；有参单查（含 TOFU resolved ref） |
 
 发现层存储（协议见 [plugin-discovery-design](../../../docs/plugin-discovery-design.md)）：
 
 ```
 $DSH_HOME/plugin-sources/
-├── sources.yml      # 源集合（用户可编辑；index/manifest/single 三类型 + trust 层级）
-├── lock.yml         # TOFU：canonical → resolved commit + 内容哈希
-└── cache/<源id>/    # 每源枚举快照（TTL 6h；single 探测 1h，防 GitHub 限流）
+├── sources.yml      # 索引源集合（hub catalog；用户可编辑 + trust 层级）
+├── lock.yml         # TOFU：canonical → resolved ref + 内容哈希
+└── cache/<源id>/    # 每源枚举快照（TTL 6h）
 ```
 
-index 源支持本地文件（`file://…/plugins.json`）——私有 hub 仓库匿名 raw 不可达时读本地 clone。
+index 源支持本地文件（`file://…/catalog.json`）——私有 hub 仓库匿名 raw 不可达时读本地 clone。
 web 面板刷新即见 agent 写入结果（同文件，不实时推送）。
 
 ## 生效方式
 
-- **repository 插件**：增删/更新写 `cordis.patch.yml` 后 **官方 config HMR 即时换代**（默认 web 生效，无需重启；远端克隆失败自动回滚旧代）
-- **UI（bundle）插件**：安装/更新/启停需**重启 web**（层栈/ESM 缓存）；已挂载 bundle 的运行时启停即时生效并持久化
+- **insert 插件（非 bundle）**：写行/删行后 **配置 HMR 实时生效**（无需重启——0811 profile-boot 挂载 watch-only HMR）
+- **bundle 插件**：安装/更新/卸载需**重启 web**（层栈在 boot 合成）；已挂载 bundle 的运行时启停即时生效并持久化
 - **Node half 改动**需重启 web（ESM 缓存）；**client 面板改动**重装 + 刷新页面即可
 
 ## 开发插件（引导）
 
-创建官方 repository-plugin 的完整契约见
-[cookbook/creating-a-repository-plugin](../../../docs/cookbook/creating-a-repository-plugin.md)；
-agent 工作流引导见 [make-dsh-plugin skill](../../../skills/make-dsh-plugin/SKILL.md)。
-参考实现：`whale-girl`。
+创建官方 bundle 插件 / 纯 cordis 插件的契约见
+[make-dsh-plugin skill](../../../skills/make-dsh-plugin/SKILL.md)。参考实现：`whale-girl`。

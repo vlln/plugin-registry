@@ -1,30 +1,23 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { createHash } from "node:crypto";
-import { execFile, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { defineTool } from "@deepseek-ai/dsh-tools";
 import { parse, stringify } from "yaml";
 //#region src/discovery/store.ts
 /**
-* 发现层存储：`$DSH_HOME/plugin-sources/` 域根读写——sources.yml（源集合，
-* 用户唯一配置入口）＋lock.yml（TOFU：resolved commit + 内容哈希）＋
-* cache/<source-id>/（每源枚举快照，派生数据）。配置与派生分离（apt 同构：
-* sources.list 配置 / var/lib/apt/lists 快照）。
+* 发现层存储（0811 适配）：`$DSH_HOME/plugin-sources/` 域根读写——
+* sources.yml（索引源集合，唯一配置入口）＋lock.yml（TOFU：resolved
+* 引用）＋cache/<source-id>/（每源枚举快照，派生数据）。配置与派生分离。
 *
 * 命名 `plugin-sources/` 而非 `plugins/`：后者与旧 registry 的
 * `~/.dsh/plugins/` 安装目录同名易混。删目录即重置发现层，不影响安装态
-* （cordis.patch.yml 在域根之外，官方位置）。
+* （安装态在 profile 的 package.json bundles 与 cordis.patch.yml）。
 */
 const DISCOVERY_ROOT = "plugin-sources";
 const SOURCES_FILE = "sources.yml";
 const LOCK_FILE = "lock.yml";
 const CACHE_DIR = "cache";
 const ENTRIES_FILE = "entries.json";
-const SOURCE_KINDS = /* @__PURE__ */ new Set([
-	"index",
-	"manifest",
-	"single"
-]);
 const TRUST_LEVELS = /* @__PURE__ */ new Set([
 	"official",
 	"community",
@@ -68,16 +61,16 @@ function readSources(dshHome) {
 	if (!Array.isArray(root)) throw new Error(`plugin-sources: ${SOURCES_FILE} must be a YAML object with a "sources" list`);
 	return root.map((raw, i) => normalizeSource(raw, i));
 }
-/** 校验并规整一个源条目。 */
+/** 校验并规整一个源条目（0811 仅 index 一种）。 */
 function normalizeSource(raw, index) {
 	const r = raw ?? {};
 	if (typeof r.id !== "string" || r.id.trim() === "") throw new Error(`plugin-sources: sources[${index}] missing string "id"`);
-	if (typeof r.kind !== "string" || !SOURCE_KINDS.has(r.kind)) throw new Error(`plugin-sources: sources[${index}] ("${r.id}") kind must be one of index|manifest|single`);
+	if (r.kind !== void 0 && r.kind !== "index") throw new Error(`plugin-sources: sources[${index}] ("${r.id}") kind must be index (repository sources removed in 0811)`);
 	if (typeof r.locator !== "string" || r.locator.trim() === "") throw new Error(`plugin-sources: sources[${index}] ("${r.id}") missing string "locator"`);
 	if (r.trust !== void 0 && (typeof r.trust !== "string" || !TRUST_LEVELS.has(r.trust))) throw new Error(`plugin-sources: sources[${index}] ("${r.id}") trust must be one of official|community|untrusted`);
 	return {
 		id: r.id.trim(),
-		kind: r.kind,
+		kind: "index",
 		locator: r.locator.trim(),
 		trust: r.trust ?? "community"
 	};
@@ -118,7 +111,7 @@ function readLock(dshHome) {
 	return root.map((raw, i) => {
 		const r = raw ?? {};
 		if (typeof r.canonical !== "string" || r.canonical.trim() === "") throw new Error(`plugin-sources: locks[${i}] missing string "canonical"`);
-		if (r.kind !== "repository" && r.kind !== "bundle") throw new Error(`plugin-sources: locks[${i}] ("${r.canonical}") kind must be repository|bundle`);
+		if (r.kind !== "bundle" && r.kind !== "plugin") throw new Error(`plugin-sources: locks[${i}] ("${r.canonical}") kind must be bundle|plugin`);
 		if (typeof r.ref !== "string" || r.ref.trim() === "") throw new Error(`plugin-sources: locks[${i}] ("${r.canonical}") missing string "ref"`);
 		return {
 			canonical: r.canonical.trim(),
@@ -175,32 +168,6 @@ function parseGithubUrl(url) {
 		repo: m[2].replace(/\.git$/, "")
 	};
 }
-/** 解析官方 repository 源串（github:owner/repo#ref&path:...）→ 各部分。 */
-function parseRepositorySource(source) {
-	const m = /^github:([^/]+)\/([^#&]+?)(?:#([^&]+))?(?:&path:(\/.*))?$/.exec(source.trim());
-	if (m === null) return null;
-	return {
-		owner: m[1],
-		repo: m[2],
-		ref: m[3] ?? null,
-		path: m[4] ?? null
-	};
-}
-/** canonical 身份（owner/repo 小写，跨源去重键）。 */
-function canonicalOfRepository(owner, repo) {
-	return `${owner.toLowerCase()}/${repo.toLowerCase()}`;
-}
-/** 从 package.json 的 dsh 字段派生能力面。 */
-function facesOfDsh(dsh) {
-	const faces = [];
-	const d = dsh ?? {};
-	if (d.entry !== void 0) faces.push("tool");
-	if (d.skills !== void 0) faces.push("skill");
-	if (d.mcpServers !== void 0) faces.push("mcp");
-	if (d.client !== void 0) faces.push("ui");
-	if (d.bundle !== void 0) faces.push("bundle");
-	return faces;
-}
 const defaultFetch = async (url, init) => {
 	const res = await fetch(url, init);
 	return {
@@ -211,38 +178,41 @@ const defaultFetch = async (url, init) => {
 		json: () => res.json()
 	};
 };
-/** index 源条目转换：hub 形态 → 统一条目。 */
-function hubEntryToPlugin(raw, sourceId) {
-	const id = typeof raw.id === "string" ? raw.id : null;
-	const url = typeof raw.source === "string" ? raw.source : null;
-	if (id === null || url === null) return null;
+/** hub catalog 仓库条目 → 统一插件条目。 */
+function hubRepoToPlugin(raw, sourceId) {
+	const name = typeof raw.name === "string" ? raw.name : null;
+	const url = typeof raw.url === "string" ? raw.url : null;
+	if (name === null || url === null) return null;
 	const gh = parseGithubUrl(url);
 	if (gh === null) return null;
 	const description = typeof raw.description === "string" ? raw.description : void 0;
+	const isBundle = raw.bundle === true;
+	const faces = [];
+	if (raw.skill === true) faces.push("skill");
+	if (isBundle) faces.push("bundle");
 	return {
-		id,
-		kind: "repository",
+		id: name,
+		kind: isBundle ? "bundle" : "plugin",
 		source: `github:${gh.owner}/${gh.repo}`,
-		refHint: null,
-		faces: [],
+		faces,
 		description,
 		sourceId
 	};
 }
 /**
-* index 源枚举：读索引 JSON（locator = URL 或本地文件路径），条目转换，
-* 写快照。有新鲜快照 → 直接返回（不网络）；过期 → 拉取（带 ETag 条件
-* 刷新，304 时保留 entries 仅更新 fetchedAt）。
+* index 源枚举：读 hub catalog JSON（locator = URL 或本地文件路径），
+* 条目转换，写快照。有新鲜快照 → 直接返回（不网络）；过期 → 拉取（带
+* ETag 条件刷新，304 时保留 entries 仅更新 fetchedAt）。
 *
-* locator 支持 file:///path 或裸本地路径（读文件，零网络——hub 私有仓库
-* 匿名 raw 404，本机经 hub clone 的 plugins.json 走此通道）。
+* locator 支持 file:///path 或裸本地路径（读文件，零网络——本机经 hub
+* clone 的 catalog.json 走此通道）。
 */
 async function enumerateIndex(dshHome, source, opts = {}) {
 	const now = opts.now ?? Date.now();
 	const cached = readSnapshot(dshHome, source.id);
 	if (cached !== null && !opts.refresh && snapshotFresh(cached, 216e5, now)) return cached;
 	const filePath = source.locator.replace(/^file:\/\//, "");
-	if (existsSync(filePath) && (source.locator.startsWith("file:") || !/^https?:/i.test(source.locator))) {
+	if (source.locator.startsWith("file:") || !/^https?:/i.test(source.locator) && existsSync(filePath)) {
 		const { readFileSync } = await import("node:fs");
 		let body;
 		try {
@@ -250,7 +220,7 @@ async function enumerateIndex(dshHome, source, opts = {}) {
 		} catch (error) {
 			throw new Error(`plugin-sources: index "${source.id}" local file unreadable (${filePath}): ${String(error)}`);
 		}
-		const entries = (Array.isArray(body.plugins) ? body.plugins : []).map((p) => hubEntryToPlugin(p ?? {}, source.id)).filter((e) => e !== null);
+		const entries = (Array.isArray(body.repos) ? body.repos : []).map((p) => hubRepoToPlugin(p ?? {}, source.id)).filter((e) => e !== null);
 		const snapshot = {
 			fetchedAt: new Date(now).toISOString(),
 			entries
@@ -273,7 +243,7 @@ async function enumerateIndex(dshHome, source, opts = {}) {
 	}
 	if (!res.ok) throw new Error(`plugin-sources: index "${source.id}" fetch failed (${res.status}): ${source.locator}`);
 	const body = await res.json();
-	const entries = (Array.isArray(body.plugins) ? body.plugins : []).map((p) => hubEntryToPlugin(p ?? {}, source.id)).filter((e) => e !== null);
+	const entries = (Array.isArray(body.repos) ? body.repos : []).map((p) => hubRepoToPlugin(p ?? {}, source.id)).filter((e) => e !== null);
 	const snapshot = {
 		fetchedAt: new Date(now).toISOString(),
 		etag: res.etag ?? void 0,
@@ -282,105 +252,25 @@ async function enumerateIndex(dshHome, source, opts = {}) {
 	writeSnapshot(dshHome, source.id, snapshot);
 	return snapshot;
 }
-/**
-* single 源探测：读仓库 package.json（先试 .dsh-plugin/，再试根），
-* 派生 faces/description，写该源快照。按仓库去重 + 1h TTL：同仓库在
-* 其它 single 源出现时复用本源缓存。
-*/
-async function enumerateSingle(dshHome, source, opts = {}) {
-	const now = opts.now ?? Date.now();
-	const cached = readSnapshot(dshHome, source.id);
-	if (cached !== null && !opts.refresh && snapshotFresh(cached, 36e5, now)) return cached;
-	const parsed = parseRepositorySource(source.locator);
-	if (parsed === null) throw new Error(`plugin-sources: single "${source.id}" locator must be github:owner/repo#ref[&path:/...]`);
-	const fetchImpl = opts.fetch ?? defaultFetch;
-	const { owner, repo } = parsed;
-	const probePaths = parsed.path !== null ? [`${parsed.path.replace(/^\/+/, "")}/package.json`] : [".dsh-plugin/package.json", "package.json"];
-	const ref = parsed.ref ?? "HEAD";
-	let pkg = null;
-	let usedPath = null;
-	for (const p of probePaths) {
-		const res = await fetchImpl(`https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${p}`);
-		if (res.ok) {
-			pkg = await res.json();
-			usedPath = p;
-			break;
-		}
-		if (res.status !== 404) break;
-	}
-	if (pkg === null) throw new Error(`plugin-sources: single "${source.id}" is not a plugin — no package.json at ${probePaths.join(" or ")} (${owner}/${repo}@${ref})`);
-	const id = typeof pkg.name === "string" ? pkg.name : `${owner}/${repo}`;
-	const description = typeof pkg.description === "string" ? pkg.description : void 0;
-	const dsh = pkg.dsh;
-	const faces = facesOfDsh(dsh);
-	const isBundle = dsh?.bundle !== void 0;
-	const pathTail = usedPath === ".dsh-plugin/package.json" ? "&path:/.dsh-plugin" : parsed.path ?? "";
-	const entry = {
-		id,
-		kind: isBundle ? "bundle" : "repository",
-		source: `github:${owner}/${repo}${parsed.ref !== null ? `#${parsed.ref}` : ""}${pathTail}`,
-		refHint: parsed.ref,
-		faces,
-		description,
-		sourceId: source.id
-	};
-	const snapshot = {
-		fetchedAt: new Date(now).toISOString(),
-		entries: [entry]
-	};
-	writeSnapshot(dshHome, source.id, snapshot);
-	return snapshot;
-}
-/** manifest 源枚举：读用户手写清单文件（每行一个官方源串，或 YAML 列表）。 */
-async function enumerateManifest(dshHome, source, opts = {}) {
-	const { readFileSync } = await import("node:fs");
-	let text;
-	try {
-		text = readFileSync(source.locator.replace(/^file:\/\//, ""), "utf8");
-	} catch (error) {
-		throw new Error(`plugin-sources: manifest "${source.id}" unreadable (${source.locator}): ${String(error)}`);
-	}
-	const entries = text.split("\n").map((line) => line.trim()).filter((line) => line !== "" && !line.startsWith("#")).map((sourceStr) => {
-		const parsed = parseRepositorySource(sourceStr);
-		if (parsed !== null) return {
-			id: `${parsed.owner}/${parsed.repo}`,
-			kind: "repository",
-			source: sourceStr,
-			refHint: parsed.ref,
-			faces: [],
-			sourceId: source.id
-		};
-		return {
-			id: sourceStr,
-			kind: "bundle",
-			source: sourceStr,
-			refHint: null,
-			faces: [],
-			sourceId: source.id
-		};
-	});
-	return {
-		fetchedAt: (/* @__PURE__ */ new Date()).toISOString(),
-		entries
-	};
-}
-/** 按源类型分发枚举。 */
+/** 按源类型分发枚举（0811 仅 index）。 */
 async function enumerateSource(dshHome, source, opts = {}) {
-	switch (source.kind) {
-		case "index": return enumerateIndex(dshHome, source, opts);
-		case "single": return enumerateSingle(dshHome, source, opts);
-		case "manifest": return enumerateManifest(dshHome, source, opts);
-	}
+	return enumerateIndex(dshHome, source, opts);
 }
 //#endregion
 //#region src/discovery/tools.ts
 /**
-* 插件管理工具（plugin_* ×4）：agent 的插件发现与安装面。
-* - plugin_search：搜源集合（给定新源 → 懒加载探测并入 sources.yml）
-* - plugin_install：官方格式源直装（已装则更新 ref）；repository 走
-*   cordis.patch.yml repositories 行，bundle 走 pnpm add；TOFU 固化
-*   resolved ref 到 lock.yml
-* - plugin_uninstall：删安装态行（清单保留，可再装）
+* 插件管理工具（plugin_* ×4）：agent 的插件发现与安装面（0811 适配）。
+* 0811 移除 repository-plugins 机制后，外部插件只有 profile bundle 一条
+* 官方路径，安装态 = profile 的 `dsh.profile.bundles`（bundle 插件，
+* pnpm add + reconcile）＋ profile `cordis.patch.yml` 的 insert 行
+* （非 bundle 插件，配置 HMR 实时挂载，无需重启）。
+*
+* - plugin_search：搜源集合（默认 hub catalog 索引；给定新源 → 懒加载
+*   探测并入 sources.yml）
+* - plugin_install：bundle 源 → pnpm add + reconcile bundles 层；
+*   非 bundle（npm 包）→ pnpm add + 写 profile patch insert 行（配置
+*   HMR 实时挂载）；TOFU 固化 resolved ref 到 lock.yml
+* - plugin_uninstall：删安装态行（bundle 移除依赖 + 层栈；insert 行移除）
 * - plugin_status：无参 list 安装态；有参单查（含 lock 固化 ref）
 *
 * first-index：安装源即身份，不跨源合并候选池。依赖注入（deps），
@@ -398,7 +288,7 @@ const PLUGIN_ITEM = {
 		kind: {
 			type: "string",
 			required: true,
-			enum: ["repository", "bundle"]
+			enum: ["bundle", "plugin"]
 		},
 		source: {
 			type: "string",
@@ -439,44 +329,24 @@ function renderPlugins(_args, value) {
 		text: lines.length > 0 ? lines.join("\n") : "(no plugins found)"
 	}];
 }
-/** 解析一个 repository 安装行 → 结构化。 */
-function parseInstalled(source) {
-	const parsed = parseRepositorySource(source);
-	if (parsed === null) return null;
-	return {
-		canonical: canonicalOfRepository(parsed.owner, parsed.repo),
-		ref: parsed.ref,
-		kind: "repository"
-	};
-}
-/** id 匹配：支持完整 canonical（owner/repo）或短仓库名。 */
+/** id 匹配：支持完整 canonical 或短仓库名。 */
 function matchesId(canonical, id) {
 	const key = id.trim().toLowerCase();
 	return canonical === key || canonical.endsWith(`/${key}`) || canonical.split("/").pop() === key;
 }
-/** 规范化 ref 检查：repository 源必须有精确 ref（禁裸分支）。 */
-function requireExactRef(source, parsed) {
-	if (parsed.ref === null || parsed.ref.trim() === "") throw new Error(`plugin_install: repository source needs an exact ref (commit sha or tag), got bare "${source}" — pin github:owner/repo#<sha|tag>`);
-}
 /** 从 search 的 source 参数推断源类型（新源懒加载）。 */
 function inferSource(arg) {
 	const id = `custom-${Date.now()}`;
-	if (/^file:\/\//.test(arg) || /^https?:\/\//i.test(arg)) return {
+	if (/^file:\/\//.test(arg) || /^https?:\/\//i.test(arg) || existsSync(arg)) return {
 		id,
 		kind: "index",
 		locator: arg,
 		trust: "community"
 	};
-	if (arg.startsWith("github:")) return {
-		id,
-		kind: "single",
-		locator: arg,
-		trust: "community"
-	};
 	return {
 		id,
-		kind: "manifest",
-		locator: `bundle:${arg}`,
+		kind: "index",
+		locator: "",
 		trust: "community"
 	};
 }
@@ -484,7 +354,7 @@ function createPluginTools(deps) {
 	return [
 		defineTool({
 			name: "plugin_search",
-			description: "Search installable DSH plugins. Without `source`, searches every registered source (sources at $DSH_HOME/plugin-sources/sources.yml, enumeration cached). With `source`, probes that source — a new official-format source (github:owner/repo#ref, an index file/URL, or an npm bundle) is probed lazily and remembered for later searches. Results carry the owning source and trust level.",
+			description: "Search installable DSH plugins. Without `source`, searches every registered source (sources at $DSH_HOME/plugin-sources/sources.yml, enumeration cached; the default source is the dsh-external hub catalog). With `source`, probes that source — an index JSON file/URL (hub catalog format: {\"repos\": [...]}) is probed lazily and remembered for later searches. Results carry the owning source and trust level.",
 			parameters: {
 				query: {
 					type: "string",
@@ -492,7 +362,7 @@ function createPluginTools(deps) {
 				},
 				source: {
 					type: "string",
-					description: "A registered source id, or a new source (github:owner/repo#ref, an index JSON file/URL, or an npm bundle) to probe and remember."
+					description: "A registered source id, or a new source (an index JSON file/URL) to probe and remember."
 				},
 				refresh: {
 					type: "boolean",
@@ -515,11 +385,10 @@ function createPluginTools(deps) {
 				const home = deps.dshHome();
 				const sources = readSources(home);
 				let snapshots = [];
-				let matched;
 				if (args.source !== void 0 && args.source !== "") {
-					matched = findSource(sources, args.source);
+					const matched = findSource(sources, args.source);
 					const target = matched ?? inferSource(args.source);
-					if (target.kind === "manifest" && target.locator.startsWith("bundle:")) {
+					if (target.locator === "") {
 						if (matched === void 0) writeSources(home, upsertSource(sources, {
 							...target,
 							locator: args.source
@@ -540,11 +409,11 @@ function createPluginTools(deps) {
 		}),
 		defineTool({
 			name: "plugin_install",
-			description: "Install a DSH plugin from an official-format source. Repository plugins (github:owner/repo#<sha|tag>[&path:/...]) are written to $DSH_HOME/cordis.patch.yml repository-plugins.repositories (official HMR applies them); bundle plugins (npm package with dsh.bundle) are added via pnpm to the web profile. Installing an already-installed plugin updates its ref. The resolved ref is recorded (TOFU) in $DSH_HOME/plugin-sources/lock.yml.",
+			description: "Install a DSH plugin. 0811 removed repository plugins; the only official path is the web profile. A bundle plugin (npm package whose manifest declares dsh.bundle) is added via pnpm to the profile and joins dsh.profile.bundles (takes effect on web restart). A non-bundle plugin (plain npm package with a cordis apply) is added via pnpm AND written as an insert row into the profile cordis.patch.yml, which the config HMR applies live — no restart needed. The resolved ref is recorded (TOFU) in $DSH_HOME/plugin-sources/lock.yml.",
 			parameters: { source: {
 				type: "string",
 				required: true,
-				description: "Official-format source: github:owner/repo#<sha|tag>[&path:/...] or an npm bundle name."
+				description: "Install source: an npm package name (bundle or plain plugin)."
 			} },
 			output: {
 				schema: {
@@ -559,7 +428,15 @@ function createPluginTools(deps) {
 							type: "string",
 							required: true
 						},
-						ref: { type: "string" },
+						kind: {
+							type: "string",
+							required: true,
+							enum: ["bundle", "plugin"]
+						},
+						needsRestart: {
+							type: "boolean",
+							required: true
+						},
 						message: {
 							type: "string",
 							required: true
@@ -573,50 +450,49 @@ function createPluginTools(deps) {
 			},
 			async execute(args) {
 				const home = deps.dshHome();
-				const repoParsed = parseRepositorySource(args.source);
-				if (repoParsed !== null) {
-					requireExactRef(args.source, repoParsed);
-					const canonical = canonicalOfRepository(repoParsed.owner, repoParsed.repo);
-					const next = [...deps.readRepositories().repositories];
-					const idx = next.findIndex((row) => parseInstalled(row)?.canonical === canonical);
-					if (idx !== -1) next[idx] = args.source;
-					else next.push(args.source);
-					deps.writeRepositories(next);
+				const source = args.source.trim();
+				if (source === "") throw new Error("plugin_install: source must be a non-empty package name");
+				if (deps.bundleInstall === void 0) throw new Error(`plugin_install: bundle install support unavailable (web profile required)`);
+				deps.bundleInstall(source);
+				if (deps.isBundlePackage?.(source) === true) {
 					writeLock(home, upsertLock(readLock(home), {
-						canonical,
-						kind: "repository",
-						ref: repoParsed.ref,
+						canonical: source,
+						kind: "bundle",
+						ref: source,
 						recordedAt: (/* @__PURE__ */ new Date()).toISOString()
 					}));
 					return {
 						ok: true,
-						canonical,
-						ref: repoParsed.ref,
-						message: `plugin_install: ${canonical}@${repoParsed.ref} ${idx !== -1 ? "updated" : "added"} — HMR will apply it; restart the web app if no live HMR.`
+						canonical: source,
+						kind: "bundle",
+						needsRestart: true,
+						message: `plugin_install: bundle ${source} added to the profile layer stack — restart the web app to load it.`
 					};
 				}
-				if (deps.bundleInstall === void 0) throw new Error(`plugin_install: bundle source "${args.source}" needs bundleInstall support (web profile)`);
-				const result = deps.bundleInstall(args.source);
+				const rowId = source.replace(/^@/, "").replace(/[^a-z0-9-]/gi, "-").toLowerCase();
+				deps.writeInsertRow(rowId, source);
 				writeLock(home, upsertLock(readLock(home), {
-					canonical: args.source,
-					kind: "bundle",
-					ref: args.source,
+					canonical: source,
+					kind: "plugin",
+					ref: source,
 					recordedAt: (/* @__PURE__ */ new Date()).toISOString()
 				}));
 				return {
 					ok: true,
-					canonical: args.source,
-					message: `plugin_install: bundle ${args.source} added${result !== null ? ` (${result.names.join(", ")})` : ""} — restart the web app to load it.`
+					canonical: source,
+					kind: "plugin",
+					needsRestart: false,
+					message: `plugin_install: plugin ${source} installed and mounted live (insert row ${rowId}) — config HMR applied it without a restart.`
 				};
 			}
 		}),
 		defineTool({
 			name: "plugin_uninstall",
-			description: "Remove an installed repository plugin from $DSH_HOME/cordis.patch.yml repository-plugins.repositories. The source stays in plugin-sources (it can be reinstalled); bundle plugins are not removed by this tool yet.",
+			description: "Remove an installed DSH plugin. A bundle plugin is removed from the profile dependencies (pnpm remove + layer-stack reconcile; takes effect on web restart). A non-bundle plugin is removed by deleting its insert row from the profile cordis.patch.yml (config HMR applies live). The source stays in plugin-sources (it can be reinstalled).",
 			parameters: { id: {
 				type: "string",
 				required: true,
-				description: "Plugin id or owner/repo to remove."
+				description: "Plugin id (npm package name or insert-row id) to remove."
 			} },
 			output: {
 				schema: {
@@ -639,25 +515,27 @@ function createPluginTools(deps) {
 				}]
 			},
 			async execute(args) {
-				const current = deps.readRepositories();
-				const remaining = current.repositories.filter((row) => {
-					const parsed = parseInstalled(row);
-					return parsed === null ? row !== args.id.trim() : !matchesId(parsed.canonical, args.id);
-				});
-				if (remaining.length === current.repositories.length) throw new Error(`plugin_uninstall: "${args.id}" is not an installed repository plugin`);
-				deps.writeRepositories(remaining);
-				return {
+				const id = args.id.trim();
+				if (deps.removeInsertRow(id)) return {
 					ok: true,
-					message: `plugin_uninstall: removed "${args.id}" (repositories now ${remaining.length})`
+					message: `plugin_uninstall: removed plugin insert row "${id}" (live via config HMR)`
 				};
+				if (deps.bundleRemove !== void 0) {
+					const result = deps.bundleRemove(id);
+					if (result !== null) return {
+						ok: true,
+						message: `plugin_uninstall: removed bundle "${id}" (${result.names.join(", ") || "dependencies removed"}) — restart the web app to fully unload it.`
+					};
+				}
+				throw new Error(`plugin_uninstall: "${id}" is not an installed plugin (no insert row, no bundle dependency)`);
 			}
 		}),
 		defineTool({
 			name: "plugin_status",
-			description: "Show installed DSH plugins. Without `id`, lists every installed repository plugin (from $DSH_HOME/cordis.patch.yml repository-plugins.repositories). With `id`, shows that plugin plus its TOFU-resolved ref from lock.yml.",
+			description: "Show installed DSH plugins. Lists every installed plugin: insert rows (from the profile cordis.patch.yml, live-mounted non-bundle plugins) plus profile bundle layers (from the web profile manifest dsh.profile.bundles), each with its TOFU-resolved ref from lock.yml.",
 			parameters: { id: {
 				type: "string",
-				description: "Plugin id or owner/repo to inspect."
+				description: "Plugin id or package name to inspect."
 			} },
 			output: {
 				schema: {
@@ -674,9 +552,13 @@ function createPluginTools(deps) {
 									type: "string",
 									required: true
 								},
+								kind: {
+									type: "string",
+									required: true,
+									enum: ["bundle", "plugin"]
+								},
 								ref: { type: "string" },
-								resolved: { type: "string" },
-								path: { type: "string" }
+								resolved: { type: "string" }
 							}
 						}
 					} }
@@ -685,30 +567,31 @@ function createPluginTools(deps) {
 					const lines = value.plugins.map((p) => {
 						const ref = p.ref !== void 0 ? `#${p.ref}` : "";
 						const resolved = p.resolved !== void 0 ? ` (resolved ${p.resolved})` : "";
-						return `- ${p.canonical}${ref}${resolved}`;
+						return `- ${p.canonical} (${p.kind})${ref}${resolved}`;
 					});
 					return [{
 						type: "text",
-						text: lines.length > 0 ? lines.join("\n") : "(no installed repository plugins)"
+						text: lines.length > 0 ? lines.join("\n") : "(no installed plugins)"
 					}];
 				}
 			},
 			async execute(args) {
 				const locks = readLock(deps.dshHome());
-				const view = deps.readRepositories().repositories.map((row) => parseInstalled(row)).filter((p) => p !== null).map((p) => {
-					const lock = findLock(locks, p.canonical);
-					return {
-						canonical: p.canonical,
-						...p.ref !== null ? { ref: p.ref } : {},
+				const rows = [];
+				for (const row of deps.readInsertRows()) {
+					const lock = findLock(locks, row.name);
+					rows.push({
+						canonical: row.name,
+						kind: "plugin",
 						...lock !== void 0 ? { resolved: lock.ref } : {}
-					};
-				});
+					});
+				}
 				if (args.id !== void 0 && args.id !== "") {
-					const hit = view.filter((p) => matchesId(p.canonical, args.id));
+					const hit = rows.filter((p) => matchesId(p.canonical, args.id));
 					if (hit.length === 0) throw new Error(`plugin_status: "${args.id}" is not installed`);
 					return { plugins: hit };
 				}
-				return { plugins: view };
+				return { plugins: rows };
 			}
 		})
 	];
@@ -716,79 +599,174 @@ function createPluginTools(deps) {
 //#endregion
 //#region src/index.ts
 /**
-* 薄控制台 Node half：读写 `$DSH_HOME/cordis.patch.yml` 的
-* `repository-plugins` 行（官方仓库插件的用户配置层，homePatchPath）。
+* 薄控制台 Node half（0811 适配）：读写 web profile 的安装态——
+* ① `dsh.profile.bundles`（bundle 插件，pnpm add/reconcile）；
+* ② profile `cordis.patch.yml` 的 insert 行（非 bundle 插件，配置 HMR
+* 实时挂载，无需重启）；③ 同文件的 disabled 标记（启停持久化）。
 * 经 httpServer 提供 `/api/plugin-console` 路由供浏览器面板调用。
 *
-* 0 patch：完全官方机制——glue 插件经 bundle 挂载，config 是官方
-* HMR-watched 的 home 级用户 patch 层。
+* 0 patch：完全官方机制——glue 插件经 bundle 挂载，安装态是官方
+* HMR-watched 的 profile 用户 patch 层 + 官方 bundle 层栈。
 */
 /** 解析 resolveDshHome（官方 dsh-paths）。 */
 function resolveDshHome() {
 	return process.env.DSH_HOME?.trim() !== "" && process.env.DSH_HOME !== void 0 ? process.env.DSH_HOME : join(process.env.HOME ?? "/tmp", ".dsh");
 }
-/** home 级用户 patch 文件（官方 homePatchPath）。 */
-function homePatchPath() {
-	return join(resolveDshHome(), "cordis.patch.yml");
+/** 当前 profile（web 默认）目录。 */
+function profileWebDir() {
+	return join(resolveDshHome(), "profiles", "web");
+}
+/** 当前 profile 的 cordis.patch.yml（用户 patch 层，配置 HMR watched）。 */
+function profilePatchPath() {
+	return join(profileWebDir(), "cordis.patch.yml");
 }
 /**
-* UI 插件（bundle 插件）的用户覆盖文件：当前 profile 的 cordis.patch.yml。
-* bundle 层的挂载行在此被用户的 `disabled: true/false` 覆盖（官方 patch
-* 语义：按 id 覆盖同名行）。当前 profile = 启动时的 profile（web 默认）。
+* 读 profile patch 的全部 insert 行：解析顶层 `- insert:` 块下的
+* `- id: <id>` / `name: <pkg>` 对（简化行级解析，与 0810 同策略）。
 */
-function profilePatchPath() {
-	return join(resolveDshHome(), "profiles", "web", "cordis.patch.yml");
-}
-/** 读当前 repositories 列表（解析 home cordis.patch.yml 的 repository-plugins 行）。 */
-function readRepositories() {
-	const file = homePatchPath();
+function readInsertRows() {
+	const file = profilePatchPath();
 	let content;
 	try {
 		content = readFileSync(file, "utf8");
 	} catch {
-		return {
-			repositories: [],
-			present: false
-		};
+		return [];
 	}
+	const rows = [];
 	const lines = content.split("\n");
-	const repos = [];
-	let inRepoBlock = false;
+	let inInsert = false;
 	for (let i = 0; i < lines.length; i += 1) {
 		const line = lines[i];
-		if (line.includes("id: repository-plugins")) {
-			inRepoBlock = true;
+		const trimmed = line.trim();
+		if (trimmed === "insert:" || trimmed.startsWith("- insert:")) {
+			inInsert = true;
 			continue;
 		}
-		if (inRepoBlock) {
-			if (line.trim().startsWith("repositories:")) {
-				for (let j = i + 1; j < lines.length; j += 1) {
-					const item = lines[j];
-					if (item.trimStart().startsWith("- ")) repos.push(item.trim().slice(2).trim());
-					else if (!item.trimStart().startsWith("#")) break;
-				}
+		if (!inInsert) continue;
+		if (/^- id:/.test(trimmed) && !line.startsWith("    ")) {
+			inInsert = false;
+			continue;
+		}
+		const idMatch = /^(\s*)- id:\s*([^\s]+)/.exec(line);
+		if (idMatch === null) continue;
+		let name;
+		for (let j = i + 1; j < lines.length; j += 1) {
+			const next = lines[j];
+			if (/^(\s*)- id:/.test(next) && !next.startsWith("    ")) break;
+			const nameMatch = /name:\s*(.+)/.exec(next.trim());
+			if (nameMatch !== null) {
+				name = nameMatch[1].trim().replace(/^['"]|['"]$/g, "");
 				break;
 			}
-			if (line.trim().startsWith("- id:")) break;
 		}
+		rows.push({
+			id: idMatch[2],
+			name: name ?? idMatch[2]
+		});
 	}
-	return {
-		repositories: repos,
-		present: inRepoBlock
-	};
+	return rows;
 }
-/** 写 repositories 列表（重建 home cordis.patch.yml 的 repository-plugins 行）。 */
-function writeRepositories(repositories) {
-	const file = homePatchPath();
-	const block = [
-		"# Home-level patch layer (HMR-watched). 薄控制台写入目标。",
-		"- id: repository-plugins",
-		"  config:",
-		...repositories.length === 0 ? ["    repositories: []"] : ["    repositories:", ...repositories.map((r) => `      - ${r}`)],
-		""
-	].join("\n");
-	writeFileSync(file, block);
-	console.log(`[plugin-console] wrote ${repositories.length} repositories to ${file}`);
+/**
+* 写一个 insert 行（新增或按 id 更新 name）。保留文件其余内容；
+* 文件为 `[]` 模板时重建为带 insert 块的列表。写后配置 HMR 实时挂载。
+*/
+function writeInsertRow(id, name) {
+	const file = profilePatchPath();
+	let content;
+	try {
+		content = readFileSync(file, "utf8");
+	} catch {
+		content = "[]\n";
+	}
+	const significant = content.split("\n").filter((l) => l.trim() !== "[]" && l.trim() !== "");
+	if (readInsertRows().some((r) => r.id === id)) {
+		let inInsert = false;
+		const out = [];
+		for (let i = 0; i < significant.length; i += 1) {
+			const line = significant[i];
+			const trimmed = line.trim();
+			if (trimmed === "insert:" || trimmed.startsWith("- insert:")) {
+				inInsert = true;
+				out.push(line);
+				continue;
+			}
+			if (inInsert && /^- id:/.test(trimmed) && !line.startsWith("    ")) inInsert = false;
+			const idMatch = inInsert ? /^(\s*)- id:\s*([^\s]+)/.exec(line) : null;
+			if (idMatch !== null && idMatch[2] === id) {
+				out.push(line);
+				const indent = idMatch[1];
+				let replaced = false;
+				for (let j = i + 1; j < significant.length; j += 1) {
+					const next = significant[j];
+					if (/^(\s*)- id:/.test(next.trim()) && !next.startsWith("    ")) break;
+					if (/name:/.test(next.trim())) {
+						out.push(`${indent}  name: '${name}'`);
+						replaced = true;
+						significant[j] = "";
+						break;
+					}
+				}
+				if (!replaced) out.push(`${indent}  name: '${name}'`);
+				continue;
+			}
+			out.push(line);
+		}
+		writeFileSync(file, `${out.filter((l) => l !== "").join("\n")}\n`);
+		return;
+	}
+	significant.push("", "- insert:");
+	significant.push(`    - id: ${id}`);
+	significant.push(`      name: '${name}'`);
+	writeFileSync(file, `${significant.join("\n")}\n`);
+	console.log(`[plugin-console] wrote insert row ${id} (${name}) to ${file}`);
+}
+/** 按 id 移除 insert 行；不存在返回 false。空掉的 insert 块一并删除。 */
+function removeInsertRow(id) {
+	const file = profilePatchPath();
+	let content;
+	try {
+		content = readFileSync(file, "utf8");
+	} catch {
+		return false;
+	}
+	if (!readInsertRows().some((r) => r.id === id)) return false;
+	const lines = content.split("\n");
+	const out = [];
+	let removed = false;
+	for (let i = 0; i < lines.length; i += 1) {
+		const line = lines[i];
+		const trimmed = line.trim();
+		if (trimmed === "insert:" || trimmed.startsWith("- insert:")) {
+			const block = [];
+			block.push(line);
+			i += 1;
+			for (; i < lines.length; i += 1) {
+				const next = lines[i];
+				if (/^(\s*)- id:/.test(next.trim()) && !next.startsWith("    ")) {
+					i -= 1;
+					break;
+				}
+				const idMatch = /^(\s*)- id:\s*([^\s]+)/.exec(next);
+				if (idMatch !== null && idMatch[2] === id) {
+					removed = true;
+					for (let j = i + 1; j < lines.length; j += 1) {
+						const after = lines[j];
+						if (/^(\s*)- id:/.test(after.trim()) && !after.startsWith("    ")) break;
+						i = j;
+					}
+					continue;
+				}
+				block.push(next);
+			}
+			if (block.some((l) => /^(\s*)- id:\s*/.test(l))) out.push(...block);
+			continue;
+		}
+		out.push(line);
+	}
+	const text = out.some((l) => /^- id:/.test(l.trim()) || /^- insert:/.test(l.trim()) || /^insert:/.test(l.trim())) ? `${out.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd()}\n` : "# Your patch layer for this dsh profile, applied after every bundle layer:\n# a top-level YAML array of loader patch entries (id-targeted config\n# overrides, disables, and insert lists; `!!js` expressions allowed).\n[]\n";
+	writeFileSync(file, text);
+	console.log(`[plugin-console] removed insert row ${id} from ${file}`);
+	return removed;
 }
 /**
 * 设置一个 Loader 树插件的 disabled 状态。保留其他行，只改目标行的
@@ -829,53 +807,8 @@ function writeUiPluginDisabled(id, disabled) {
 		if (disabledLine === -1) significant.splice(targetLine + 1, 0, `${targetIndent}  disabled: ${String(disabled)}`);
 		else significant[disabledLine] = `${targetIndent}  disabled: ${String(disabled)}`;
 	}
-	writeFileSync(file, significant.join("\n"));
+	writeFileSync(file, `${significant.join("\n").trimEnd()}\n`);
 	console.log(`[plugin-console] set ${id} disabled=${String(disabled)} in ${file}`);
-}
-/** 解析 `github:owner/repo#ref&path:...` 源为 {owner, repo, ref, tail}。 */
-function parseSource(source) {
-	const match = /^github:([^/\s#&]+)\/([^/\s#&]+)#([^\s#&]+)/.exec(source);
-	if (match === null) return null;
-	return {
-		owner: match[1],
-		repo: match[2],
-		ref: match[3],
-		tail: source.slice(match[0].length)
-	};
-}
-/** 40-hex commit（固定引用可对比）；分支/标签名则只能报告远端最新。 */
-function isCommitSha(value) {
-	return /^[0-9a-f]{40}$/.test(value);
-}
-/** git ls-remote 取远端 ref 指向的 commit；区分网络失败与远端无此 ref。 */
-function gitRemoteCommit(owner, repo, ref) {
-	return new Promise((resolve) => {
-		execFile("git", [
-			"ls-remote",
-			`https://github.com/${owner}/${repo}.git`,
-			ref
-		], { timeout: 15e3 }, (error, stdout) => {
-			if (error) {
-				resolve({
-					sha: null,
-					missing: false
-				});
-				return;
-			}
-			const sha = stdout.split("\n")[0]?.split("	")[0] ?? "";
-			resolve(isCommitSha(sha) ? {
-				sha,
-				missing: false
-			} : {
-				sha: null,
-				missing: true
-			});
-		});
-	});
-}
-/** 当前 profile 目录（bundle 安装/更新的 pnpm 工作目录）。 */
-function profileWebDir() {
-	return join(resolveDshHome(), "profiles", "web");
 }
 /** 读 profile 清单（package.json）。 */
 function readProfileManifest() {
@@ -937,10 +870,10 @@ function reconcileBundles(added, beforeManifest) {
 	return joined;
 }
 /**
-* bundle 安装/更新：在 profile 目录跑 pnpm add/update，然后 reconcile 层栈。
+* bundle 安装/更新/移除：在 profile 目录跑 pnpm 子命令，然后 reconcile 层栈。
 * 与官方 `dsh plugin <sub>`（pnpm forwarder + reconcile）同机制。
-* @param args - pnpm 子命令参数（add <source> 或 update <name>）。
-* @returns {names, output} 新增层名与 pnpm 输出（失败时 output 为错误信息）。
+* @param args - pnpm 子命令参数（add <source> / update <name> / remove <name>）。
+* @returns {ok, names, output} 新增层名与 pnpm 输出（失败时 output 为错误信息）。
 */
 function runPnpm(args) {
 	const dir = profileWebDir();
@@ -962,63 +895,42 @@ function runPnpm(args) {
 		output: output.slice(-500)
 	};
 }
-/** 检查全部已配置源的远端状态。 */
-async function checkUpdates(sources) {
-	const rows = [];
-	for (const source of sources) {
-		const pluginName = repositoryManifestName(source);
-		const parsed = parseSource(source);
-		if (parsed === null) {
-			rows.push({
-				source,
-				pluginName,
-				ref: "",
-				refKind: "sha",
-				latestSha: null,
-				hasUpdate: false,
-				error: "unsupported source (expected github:owner/repo#ref)"
-			});
-			continue;
-		}
-		const result = await gitRemoteCommit(parsed.owner, parsed.repo, parsed.ref);
-		if (result.sha === null) {
-			rows.push({
-				source,
-				pluginName,
-				ref: parsed.ref,
-				refKind: isCommitSha(parsed.ref) ? "sha" : "branch",
-				latestSha: null,
-				hasUpdate: false,
-				error: result.missing ? "remote has no such ref（未推送或已删除）" : "cannot reach remote (network/credentials)"
-			});
-			continue;
-		}
-		rows.push({
-			source,
-			pluginName,
-			ref: parsed.ref,
-			refKind: isCommitSha(parsed.ref) ? "sha" : "branch",
-			latestSha: result.sha,
-			hasUpdate: parsed.ref !== result.sha
-		});
-	}
-	return rows;
+/** 已安装包是否声明 dsh.bundle（tools 判别用；未装返回 false）。 */
+function isBundlePackage(packageName) {
+	return exportsBundlePatch(packageName);
 }
-/** Cordis 插件名。 */
-const name = "plugin-console";
-/** 需要宿主 web server（web 组合）+ loader（读/改 loader 树条目）+ tools（注册 plugin_* 管理工具）。 */
-const inject = [
-	"httpServer",
-	"loader",
-	"tools"
-];
-/**
-* 版本检查缓存：name -> { latest, checkedAt }（进程内存）。
-* 防 registry 请求风暴策略：
-* - 面板 GET /versions **只读缓存**（零网络）；
-* - 进程启动后延迟预扫描（apply 里 setTimeout 30s）填充缓存；
-* - 手动 POST /versions/refresh 强制查（30 秒最小间隔防抖）。
-*/
+/** 读已安装包版本（profile node_modules/<name>/package.json）；未装返回 undefined。 */
+function readInstalledVersion(name) {
+	try {
+		const manifest = JSON.parse(readFileSync(join(profileWebDir(), "node_modules", name, "package.json"), "utf8"));
+		return typeof manifest.version === "string" ? manifest.version : void 0;
+	} catch {
+		return;
+	}
+}
+/** 遍历 loader 树收集全部条目（含嵌套子树），id 取短 id（options.id）。 */
+function collectLoaderEntries(ctx) {
+	const loader = ctx.loader;
+	if (loader?.entries === void 0) return [];
+	const byId = /* @__PURE__ */ new Map();
+	for (const raw of loader.entries()) {
+		const entry = raw;
+		const id = entry.options?.id ?? entry.id;
+		if (typeof id !== "string" || id.length === 0) continue;
+		const name = entry.options?.name ?? id;
+		const row = {
+			id,
+			name,
+			disabled: entry.disabled === true,
+			version: readInstalledVersion(name),
+			kind: "loader"
+		};
+		const prev = byId.get(id);
+		if (prev === void 0 || prev.disabled === true && row.disabled === false) byId.set(id, row);
+	}
+	return [...byId.values()];
+}
+/** 版本检查缓存：name -> { latest, checkedAt }（进程内存）。 */
 const versionCache = /* @__PURE__ */ new Map();
 const VERSION_REFRESH_MIN_MS = 3e4;
 let lastVersionRefreshAt = 0;
@@ -1052,10 +964,7 @@ function npmViewLatest(name) {
 function userPluginNames(ctx) {
 	return [...new Set(collectLoaderEntries(ctx).map((row) => row.name).filter((name) => !name.startsWith("@deepseek-ai/") && !name.startsWith("@cordisjs/") && !name.startsWith("cordis:")))];
 }
-/**
-* 批量强制刷新版本缓存（可选 force；手动检查时用）。
-* @returns 是否实际执行了查询（false = 距上次刷新 < 最小间隔，直接返回缓存）。
-*/
+/** 批量强制刷新版本缓存（可选 force）。 */
 function refreshVersions(ctx, force) {
 	const now = Date.now();
 	if (!force && now - lastVersionRefreshAt < VERSION_REFRESH_MIN_MS) return false;
@@ -1063,130 +972,32 @@ function refreshVersions(ctx, force) {
 	for (const name of userPluginNames(ctx)) npmViewLatest(name);
 	return true;
 }
-/** 读已安装包版本（profile node_modules/<name>/package.json）；未装返回 undefined。 */
-function readInstalledVersion(name) {
-	try {
-		const manifest = JSON.parse(readFileSync(join(profileWebDir(), "node_modules", name, "package.json"), "utf8"));
-		return typeof manifest.version === "string" ? manifest.version : void 0;
-	} catch {
-		return;
-	}
-}
-/** 遍历 loader 树收集全部条目（含嵌套子树），id 取短 id（options.id）。 */
-function collectLoaderEntries(ctx) {
-	const loader = ctx.loader;
-	if (loader?.entries === void 0) return [];
-	const byId = /* @__PURE__ */ new Map();
-	for (const raw of loader.entries()) {
-		const entry = raw;
-		const id = entry.options?.id ?? entry.id;
-		if (typeof id !== "string" || id.length === 0) continue;
-		const name = entry.options?.name ?? id;
-		const row = {
-			id,
-			name,
-			disabled: entry.disabled === true,
-			version: readInstalledVersion(name),
-			kind: "loader"
-		};
-		const prev = byId.get(id);
-		if (prev === void 0 || prev.disabled === true && row.disabled === false) byId.set(id, row);
-	}
-	return [...byId.values()];
-}
-/** cordis FiberState.ACTIVE（wrapper 同款常量，保持对齐）。 */
-const FIBER_ACTIVE = 2;
-/**
-* 读 repository 插件的 manifest 名（wrapper 内嵌）：specifier →
-* cacheKey(sha256) → cache 的 dsh-plugin.mjs → manifest.name。
-* cache 未预填充/不可读时返回 undefined（插件未装，无从显示状态）。
-*/
-function repositoryManifestName(specifier) {
-	try {
-		const key = createHash("sha256").update(specifier).digest("hex");
-		const wrapper = join(resolveDshHome(), "cache", "repository-plugins", key, "node_modules", "repository", "dsh-plugin.mjs");
-		const text = readFileSync(wrapper, "utf8");
-		const match = /const manifest = (\{.*?\})/.exec(text);
-		if (match === null) return void 0;
-		const manifest = JSON.parse(match[1]);
-		return typeof manifest.name === "string" ? manifest.name : void 0;
-	} catch {
-		return;
-	}
-}
-/** repository 插件的 cache 包目录（与 manifest wrapper 同目录）。 */
-function repositoryCacheDir(specifier) {
-	const key = createHash("sha256").update(specifier).digest("hex");
-	return join(resolveDshHome(), "cache", "repository-plugins", key, "node_modules", "repository");
-}
-/** 读 repository 插件 cache 包的 version（package.json）；未准备/不可读返回 undefined。 */
-function readRepositoryVersion(specifier) {
-	try {
-		const manifest = JSON.parse(readFileSync(join(repositoryCacheDir(specifier), "package.json"), "utf8"));
-		return typeof manifest.version === "string" ? manifest.version : void 0;
-	} catch {
-		return;
-	}
-}
-/** 从 config 源列表构建 specifier → 插件元信息（version/ref 本地零网络）。 */
-function repositoryMetaMap(repositories) {
-	const map = /* @__PURE__ */ new Map();
-	for (const source of repositories) {
-		const parsed = parseSource(source);
-		map.set(source, {
-			pluginName: repositoryManifestName(source),
-			version: readRepositoryVersion(source),
-			ref: parsed?.ref,
-			refKind: parsed !== null && isCommitSha(parsed.ref) ? "sha" : parsed !== null ? "branch" : void 0
-		});
-	}
-	return map;
-}
-/**
-* 枚举 RepositoryCache 挂载的 repository 插件（并入「已加载插件」）。
-*
-* 识别：config 的每个 repository 源（specifier）经 cache 的 wrapper manifest
-* 得到插件名；`ctx.registry` 里 runtime.name 命中该集合的即 repository 插件
-* （wrapper 挂载的 runtime），运行状态 = 任一 fiber active。不依赖 fiber 父
-* 链（cordis 拦截 ctx.parent 访问）。版本/ref 从 cache 包与 config 行取（零网络）。
-*/
-function collectRepositoryPlugins(ctx) {
-	const metaBySpec = repositoryMetaMap(readRepositories().repositories);
-	const byName = /* @__PURE__ */ new Map();
-	for (const [source, meta] of metaBySpec.entries()) {
-		if (meta.pluginName === void 0) continue;
-		byName.set(meta.pluginName, {
-			id: meta.pluginName,
-			name: meta.pluginName,
-			disabled: true,
-			version: meta.version,
-			kind: "repository",
-			ref: meta.ref,
-			refKind: meta.refKind,
-			source
-		});
-	}
-	if (byName.size === 0) return [];
-	const registry = ctx.registry;
-	if (registry?.entries === void 0) return [...byName.values()];
-	for (const [, runtime] of registry.entries()) {
-		const name = runtime.name;
-		if (typeof name !== "string" || !byName.has(name)) continue;
-		const fibers = [...runtime.fibers ?? []];
-		const row = byName.get(name);
-		if (fibers.some((f) => f.state === FIBER_ACTIVE)) row.disabled = false;
-	}
-	return [...byName.values()];
-}
+/** Cordis 插件名。 */
+const name = "plugin-console";
+/** 需要宿主 web server（web 组合）+ loader（读/改 loader 树条目）+ tools（注册 plugin_* 管理工具）。 */
+const inject = [
+	"httpServer",
+	"loader",
+	"tools"
+];
 /** 注册控制台路由：GET 读列表，POST 写列表。 */
 function apply(ctx) {
 	ctx.effect(() => {
 		const pluginTools = createPluginTools({
 			dshHome: () => resolveDshHome(),
-			readRepositories,
-			writeRepositories,
+			isBundlePackage,
+			readInsertRows,
+			writeInsertRow,
+			removeInsertRow,
 			bundleInstall: (source) => {
 				const result = runPnpm(["add", source]);
+				return result.ok ? {
+					names: result.names,
+					output: result.output
+				} : null;
+			},
+			bundleRemove: (name) => {
+				const result = runPnpm(["remove", name]);
 				return result.ok ? {
 					names: result.names,
 					output: result.output
@@ -1219,58 +1030,16 @@ function apply(ctx) {
 				const method = req?.method ?? "GET";
 				const path = url.split("?")[0] ?? "/";
 				try {
-					if (method === "GET" && (path === "/api/plugin-console/repositories" || path === "/api/plugin-console/repositories/")) {
-						const sources = readRepositories().repositories;
-						const meta = repositoryMetaMap(sources);
-						const mountedNames = new Set(collectRepositoryPlugins(ctx).filter((r) => !r.disabled).map((r) => r.name));
-						const rows = sources.map((source) => {
-							const m = meta.get(source);
-							return {
-								source,
-								parsed: parseSource(source) ?? void 0,
-								pluginName: m?.pluginName,
-								version: m?.version,
-								ref: m?.ref,
-								refKind: m?.refKind,
-								mounted: m?.pluginName !== void 0 && mountedNames.has(m.pluginName)
-							};
-						});
+					if (method === "GET" && (path === "/api/plugin-console/inserts" || path === "/api/plugin-console/inserts/")) {
 						json(200, {
 							ok: true,
-							repositories: rows,
-							present: rows.length > 0
+							inserts: readInsertRows()
 						});
 						return;
 					}
-					if (method === "POST" && (path === "/api/plugin-console/repositories" || path === "/api/plugin-console/repositories/")) {
-						let body = "";
-						req?.on?.("data", (c) => {
-							body += c.toString("utf8");
-						});
-						req?.on?.("end", () => {
-							writeRepositories(JSON.parse(body).repositories ?? []);
-							json(200, { ok: true });
-						});
-						return;
-					}
-					if (method === "GET" && (path === "/api/plugin-console/updates" || path === "/api/plugin-console/updates/")) {
-						(async () => {
-							try {
-								const rows = await checkUpdates(readRepositories().repositories);
-								json(200, {
-									ok: true,
-									updates: rows
-								});
-							} catch (error) {
-								json(500, {
-									ok: false,
-									message: error instanceof Error ? error.message : String(error)
-								});
-							}
-						})();
-						return;
-					}
-					if (method === "POST" && (path === "/api/plugin-console/updates" || path === "/api/plugin-console/updates/")) {
+					const insertMatch = /^\/api\/plugin-console\/inserts\/([^/]+)$/.exec(path);
+					if (method === "POST" && insertMatch !== null) {
+						const id = decodeURIComponent(insertMatch[1]);
 						let body = "";
 						req?.on?.("data", (c) => {
 							body += c.toString("utf8");
@@ -1278,48 +1047,26 @@ function apply(ctx) {
 						req?.on?.("end", () => {
 							(async () => {
 								try {
-									const source = JSON.parse(body).source ?? "";
-									const current = readRepositories().repositories;
-									if (!current.includes(source)) {
-										json(404, {
-											ok: false,
-											message: `source not configured: ${source}`
-										});
+									const parsed = JSON.parse(body);
+									if (parsed.remove === true) {
+										const removed = removeInsertRow(id);
+										json(removed ? 200 : 404, { ok: removed });
 										return;
 									}
-									const parsedSource = parseSource(source);
-									if (parsedSource === null) {
+									const name = (parsed.name ?? "").trim();
+									if (name.length === 0) {
 										json(400, {
 											ok: false,
-											message: "unsupported source (expected github:owner/repo#ref)"
+											message: "insert row needs a name"
 										});
 										return;
 									}
-									const result = await gitRemoteCommit(parsedSource.owner, parsedSource.repo, parsedSource.ref);
-									if (result.sha === null) {
-										json(result.missing ? 400 : 502, {
-											ok: false,
-											message: result.missing ? "remote has no such ref（未推送或已删除）" : "cannot reach remote (network/credentials)"
-										});
-										return;
-									}
-									if (result.sha === parsedSource.ref) {
-										json(200, {
-											ok: true,
-											updated: false,
-											source,
-											latestSha: result.sha
-										});
-										return;
-									}
-									const updated = `github:${parsedSource.owner}/${parsedSource.repo}#${result.sha}${parsedSource.tail}`;
-									writeRepositories(current.map((item) => item === source ? updated : item));
+									writeInsertRow(id, name);
 									json(200, {
 										ok: true,
-										updated: true,
-										source,
-										from: parsedSource.ref,
-										to: latest
+										id,
+										name,
+										live: true
 									});
 								} catch (error) {
 									json(500, {
@@ -1334,7 +1081,7 @@ function apply(ctx) {
 					if (method === "GET" && (path === "/api/plugin-console/installed" || path === "/api/plugin-console/installed/")) {
 						json(200, {
 							ok: true,
-							plugins: [...collectLoaderEntries(ctx), ...collectRepositoryPlugins(ctx)]
+							plugins: collectLoaderEntries(ctx)
 						});
 						return;
 					}

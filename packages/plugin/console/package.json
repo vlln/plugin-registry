@@ -1,6 +1,6 @@
 {
   "name": "@dsh-external/plugin-console",
-  "description": "薄控制台：浏览器 UI 管理官方 repository-plugins（读/写 $DSH_HOME/cordis.patch.yml），0 patch",
+  "description": "薄控制台：浏览器 UI 管理 web profile 插件安装态（bundle 层栈 + cordis.patch.yml insert 行/disabled），0 patch",
   "version": "0.1.0",
   "private": true,
   "license": "BSD-3-Clause",

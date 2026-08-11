@@ -1,12 +1,11 @@
 /**
- * 发现层存储：`$DSH_HOME/plugin-sources/` 域根读写——sources.yml（源集合，
- * 用户唯一配置入口）＋lock.yml（TOFU：resolved commit + 内容哈希）＋
- * cache/<source-id>/（每源枚举快照，派生数据）。配置与派生分离（apt 同构：
- * sources.list 配置 / var/lib/apt/lists 快照）。
+ * 发现层存储（0811 适配）：`$DSH_HOME/plugin-sources/` 域根读写——
+ * sources.yml（索引源集合，唯一配置入口）＋lock.yml（TOFU：resolved
+ * 引用）＋cache/<source-id>/（每源枚举快照，派生数据）。配置与派生分离。
  *
  * 命名 `plugin-sources/` 而非 `plugins/`：后者与旧 registry 的
  * `~/.dsh/plugins/` 安装目录同名易混。删目录即重置发现层，不影响安装态
- * （cordis.patch.yml 在域根之外，官方位置）。
+ * （安装态在 profile 的 package.json bundles 与 cordis.patch.yml）。
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -18,7 +17,6 @@ export const SOURCES_FILE = 'sources.yml'
 export const LOCK_FILE = 'lock.yml'
 const CACHE_DIR = 'cache'
 const ENTRIES_FILE = 'entries.json'
-const SOURCE_KINDS = new Set(['index', 'manifest', 'single'])
 const TRUST_LEVELS = new Set(['official', 'community', 'untrusted'])
 
 /** 发现层域根。 */
@@ -69,14 +67,14 @@ export function readSources(dshHome: string): PluginSource[] {
   return root.map((raw, i) => normalizeSource(raw, i))
 }
 
-/** 校验并规整一个源条目。 */
+/** 校验并规整一个源条目（0811 仅 index 一种）。 */
 export function normalizeSource(raw: unknown, index: number): PluginSource {
   const r = (raw ?? {}) as Record<string, unknown>
   if (typeof r.id !== 'string' || r.id.trim() === '') {
     throw new Error(`plugin-sources: sources[${index}] missing string "id"`)
   }
-  if (typeof r.kind !== 'string' || !SOURCE_KINDS.has(r.kind)) {
-    throw new Error(`plugin-sources: sources[${index}] ("${r.id}") kind must be one of index|manifest|single`)
+  if (r.kind !== undefined && r.kind !== 'index') {
+    throw new Error(`plugin-sources: sources[${index}] ("${r.id}") kind must be index (repository sources removed in 0811)`)
   }
   if (typeof r.locator !== 'string' || r.locator.trim() === '') {
     throw new Error(`plugin-sources: sources[${index}] ("${r.id}") missing string "locator"`)
@@ -86,7 +84,7 @@ export function normalizeSource(raw: unknown, index: number): PluginSource {
   }
   return {
     id: r.id.trim(),
-    kind: r.kind as PluginSource['kind'],
+    kind: 'index',
     locator: r.locator.trim(),
     trust: (r.trust as PluginSource['trust']) ?? 'community',
   }
@@ -131,8 +129,8 @@ export function readLock(dshHome: string): LockEntry[] {
     if (typeof r.canonical !== 'string' || r.canonical.trim() === '') {
       throw new Error(`plugin-sources: locks[${i}] missing string "canonical"`)
     }
-    if (r.kind !== 'repository' && r.kind !== 'bundle') {
-      throw new Error(`plugin-sources: locks[${i}] ("${r.canonical}") kind must be repository|bundle`)
+    if (r.kind !== 'bundle' && r.kind !== 'plugin') {
+      throw new Error(`plugin-sources: locks[${i}] ("${r.canonical}") kind must be bundle|plugin`)
     }
     if (typeof r.ref !== 'string' || r.ref.trim() === '') {
       throw new Error(`plugin-sources: locks[${i}] ("${r.canonical}") missing string "ref"`)

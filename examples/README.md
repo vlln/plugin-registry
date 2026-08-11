@@ -1,8 +1,8 @@
 # 安装示例（Installation examples）
 
-本目录不含插件代码——插件是独立仓库/包，本页示例**如何安装**它们。两种官方安装路径 + 管理面板，覆盖 [loop](https://github.com/dsh-external/dsh-loop)、[task-status](https://github.com/dsh-external/dsh-task-status)、[whale-girl](https://github.com/dsh-external/whale-girl) 等现有插件。
+本目录不含插件代码——插件是独立仓库/包，本页示例**如何安装**它们。**0811 起官方移除 repository-plugins 机制**（`vendor/loader/src/repository.ts` 删除），外部插件统一经 web profile 安装，两条官方路径 + 管理面板：
 
-## 路径一：bundle 插件（dsh.client 包）
+## 路径一：bundle 插件（dsh.bundle 包）
 
 loop / task-status / navbar 等 UI 插件是 bundle 形态（`dsh.bundle` + `dsh.client`），经官方 profile 管理：
 
@@ -11,24 +11,24 @@ dsh plugin --profile web add "github:dsh-external/dsh-task-status#main"   # 推�
 # 或本地目录：dsh plugin --profile web add <dsh-task-status 本地路径>
 ```
 
-装完 **重启 web**（bundle 挂载在启动时合成），设置页/对话页出现插件效果。
+装完 **重启 web**（bundle 层在启动时合成），设置页/对话页出现插件效果。
 
-## 路径二：repository 插件（.dsh-plugin）
+## 路径二：非 bundle 插件（profile patch insert 行）
 
-whale-girl 等无 UI 或自渲染 UI 的插件是 repository 形态，经 `$DSH_HOME/cordis.patch.yml` 安装：
+纯 cordis 插件（无 `dsh.bundle` 声明）经 profile `cordis.patch.yml` 的 insert 行挂载。先让包在 profile 可解析（`dsh plugin --profile web add <包>` 或 pnpm add），再写行：
 
 ```yaml
-repository-plugins:
-  repositories:
-    - github:dsh-external/whale-girl#<commit>&path:/.dsh-plugin
+- insert:
+    - id: my-plugin
+      name: 'my-plugin-package'   # 必须加引号（YAML @ 开头是保留指示符）
 ```
 
-配置即安装——官方 watcher 检测到列表变化即事务性换代（或下次启动挂载）。
+**0811 保留配置级 HMR**——写行/删行**实时挂载/卸载，无需重启**（薄控制台面板与 `plugin_install` 工具即走此通道）。
 
 ## 管理面板：薄控制台
 
-已装插件用薄控制台（`packages/plugin/console`）管理——浏览器面板增删/启停（读写作 `$DSH_HOME/cordis.patch.yml`）。安装命令见 [根 README「安装」](../README.md)。
+已装插件用薄控制台（`packages/plugin/console`）管理——浏览器面板管理 insert 行（实时）+ bundle 安装/启停（读写作 profile 安装态）。安装命令见 [根 README「安装」](../README.md)。
 
 ## 开发新插件
 
-创建官方 repository-plugin 的契约与引导见 [cookbook/creating-a-repository-plugin](../docs/cookbook/creating-a-repository-plugin.md) 与 [skills/make-dsh-plugin](../skills/make-dsh-plugin/SKILL.md)。
+创建官方 bundle 插件 / 纯 cordis 插件的契约与引导见 [skills/make-dsh-plugin](../skills/make-dsh-plugin/SKILL.md)。

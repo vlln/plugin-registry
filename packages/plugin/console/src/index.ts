@@ -1,13 +1,14 @@
 /**
- * 薄控制台 Node half：读写 `$DSH_HOME/cordis.patch.yml` 的
- * `repository-plugins` 行（官方仓库插件的用户配置层，homePatchPath）。
+ * 薄控制台 Node half（0811 适配）：读写 web profile 的安装态——
+ * ① `dsh.profile.bundles`（bundle 插件，pnpm add/reconcile）；
+ * ② profile `cordis.patch.yml` 的 insert 行（非 bundle 插件，配置 HMR
+ * 实时挂载，无需重启）；③ 同文件的 disabled 标记（启停持久化）。
  * 经 httpServer 提供 `/api/plugin-console` 路由供浏览器面板调用。
  *
- * 0 patch：完全官方机制——glue 插件经 bundle 挂载，config 是官方
- * HMR-watched 的 home 级用户 patch 层。
+ * 0 patch：完全官方机制——glue 插件经 bundle 挂载，安装态是官方
+ * HMR-watched 的 profile 用户 patch 层 + 官方 bundle 层栈。
  */
-import { readFileSync, writeFileSync } from 'node:fs'
-import { createHash } from 'node:crypto'
+import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { execFile, spawnSync } from 'node:child_process'
 import { join } from 'node:path'
 import type { Context } from 'cordis'
@@ -20,83 +21,198 @@ function resolveDshHome(): string {
     : join(process.env.HOME ?? '/tmp', '.dsh')
 }
 
-/** home 级用户 patch 文件（官方 homePatchPath）。 */
-function homePatchPath(): string {
-  return join(resolveDshHome(), 'cordis.patch.yml')
+/** 当前 profile（web 默认）目录。 */
+function profileWebDir(): string {
+  return join(resolveDshHome(), 'profiles', 'web')
+}
+
+/** 当前 profile 的 cordis.patch.yml（用户 patch 层，配置 HMR watched）。 */
+function profilePatchPath(): string {
+  return join(profileWebDir(), 'cordis.patch.yml')
+}
+
+/* ---------------- insert 行管理（非 bundle 插件安装态） ---------------- */
+
+/** 一个 patch insert 行（bundle 之外的插件安装形态）。 */
+interface InsertRow {
+  id: string
+  name: string
 }
 
 /**
- * UI 插件（bundle 插件）的用户覆盖文件：当前 profile 的 cordis.patch.yml。
- * bundle 层的挂载行在此被用户的 `disabled: true/false` 覆盖（官方 patch
- * 语义：按 id 覆盖同名行）。当前 profile = 启动时的 profile（web 默认）。
+ * 读 profile patch 的全部 insert 行：解析顶层 `- insert:` 块下的
+ * `- id: <id>` / `name: <pkg>` 对（简化行级解析，与 0810 同策略）。
  */
-function profilePatchPath(): string {
-  return join(resolveDshHome(), 'profiles', 'web', 'cordis.patch.yml')
-}
-
-interface RepositoryRow {
-  /** 当前 repositories 列表。 */
-  repositories: string[]
-  /** repository-plugins 行是否存在。 */
-  present: boolean
-}
-
-/** 读当前 repositories 列表（解析 home cordis.patch.yml 的 repository-plugins 行）。 */
-function readRepositories(): RepositoryRow {
-  const file = homePatchPath()
+function readInsertRows(): InsertRow[] {
+  const file = profilePatchPath()
   let content: string
   try {
     content = readFileSync(file, 'utf8')
   } catch {
-    return { repositories: [], present: false }
+    return []
   }
-  // 简化解析：找 `- id: repository-plugins` 行后的 `repositories:` 列表。
-  // （正式版用 YAML 解析器；原型用行级匹配足够验证机制。）
+  const rows: InsertRow[] = []
   const lines = content.split('\n')
-  const repos: string[] = []
-  let inRepoBlock = false
+  let inInsert = false
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i]!
-    if (line.includes('id: repository-plugins')) {
-      inRepoBlock = true
+    const trimmed = line.trim()
+    if (trimmed === 'insert:' || trimmed.startsWith('- insert:')) {
+      inInsert = true
       continue
     }
-    if (inRepoBlock) {
-      if (line.trim().startsWith('repositories:')) {
-        // 收集后面的 - xxx 列表项
-        for (let j = i + 1; j < lines.length; j += 1) {
-          const item = lines[j]!
-          if (item.trimStart().startsWith('- ')) {
-            repos.push(item.trim().slice(2).trim())
-          } else if (!item.trimStart().startsWith('#')) {
+    if (!inInsert) continue
+    // 缩进回到顶层列表（`- id:` 开头的非 insert 行）即离开 insert 块。
+    if (/^- id:/.test(trimmed) && !line.startsWith('    ')) {
+      inInsert = false
+      continue
+    }
+    const idMatch = /^(\s*)- id:\s*([^\s]+)/.exec(line)
+    if (idMatch === null) continue
+    let name: string | undefined
+    for (let j = i + 1; j < lines.length; j += 1) {
+      const next = lines[j]!
+      if (/^(\s*)- id:/.test(next) && !next.startsWith('    ')) break
+      const nameMatch = /name:\s*(.+)/.exec(next.trim())
+      if (nameMatch !== null) {
+        name = nameMatch[1]!.trim().replace(/^['"]|['"]$/g, '')
+        break
+      }
+    }
+    rows.push({ id: idMatch[2]!, name: name ?? idMatch[2]! })
+  }
+  return rows
+}
+
+/**
+ * 写一个 insert 行（新增或按 id 更新 name）。保留文件其余内容；
+ * 文件为 `[]` 模板时重建为带 insert 块的列表。写后配置 HMR 实时挂载。
+ */
+function writeInsertRow(id: string, name: string): void {
+  const file = profilePatchPath()
+  let content: string
+  try {
+    content = readFileSync(file, 'utf8')
+  } catch {
+    content = '[]\n'
+  }
+  const lines = content.split('\n')
+  // 丢弃空数组文档行（`[]`）——追加 insert 块后不能残留（双文档 YAML 启动失败）。
+  const significant = lines.filter(l => l.trim() !== '[]' && l.trim() !== '')
+  const existing = readInsertRows()
+  if (existing.some(r => r.id === id)) {
+    // 更新已有行：定位并替换 name 值。
+    let inInsert = false
+    const out: string[] = []
+    for (let i = 0; i < significant.length; i += 1) {
+      const line = significant[i]!
+      const trimmed = line.trim()
+      if (trimmed === 'insert:' || trimmed.startsWith('- insert:')) { inInsert = true; out.push(line); continue }
+      if (inInsert && /^- id:/.test(trimmed) && !line.startsWith('    ')) inInsert = false
+      const idMatch = inInsert ? /^(\s*)- id:\s*([^\s]+)/.exec(line) : null
+      if (idMatch !== null && idMatch[2] === id) {
+        out.push(line)
+        const indent = idMatch[1]!
+        // 找该行子树内的 name 行，替换；没有则插入。
+        let replaced = false
+        for (let j = i + 1; j < significant.length; j += 1) {
+          const next = significant[j]!
+          if (/^(\s*)- id:/.test(next.trim()) && !next.startsWith('    ')) break
+          if (/name:/.test(next.trim())) {
+            out.push(`${indent}  name: '${name}'`)
+            replaced = true
+            // 跳过原 name 行（j 继续走，但 out 已按新内容推进——需要跳过）
+            significant[j] = '' // mark consumed
             break
           }
         }
-        break
+        if (!replaced) out.push(`${indent}  name: '${name}'`)
+        continue
       }
-      if (line.trim().startsWith('- id:')) break
+      out.push(line)
     }
+    writeFileSync(file, `${out.filter(l => l !== '').join('\n')}\n`)
+    return
   }
-  return { repositories: repos, present: inRepoBlock }
+  // 新增：append 一个 insert 块。name 必须加引号——YAML 中 `@` 开头是
+  // 保留指示符，裸写会解析失败（HMR 不生效，已实证）。
+  significant.push('', '- insert:')
+  significant.push(`    - id: ${id}`)
+  significant.push(`      name: '${name}'`)
+  writeFileSync(file, `${significant.join('\n')}\n`)
+  console.log(`[plugin-console] wrote insert row ${id} (${name}) to ${file}`)
 }
 
-/** 写 repositories 列表（重建 home cordis.patch.yml 的 repository-plugins 行）。 */
-function writeRepositories(repositories: string[]): void {
-  const file = homePatchPath()
-  const block = [
-    '# Home-level patch layer (HMR-watched). 薄控制台写入目标。',
-    '- id: repository-plugins',
-    '  config:',
-    // 空数组必须写 `[]`——裸 `repositories:` 解析为 null，官方 schema 校验失败
-    // （换代失败回滚 = 移除不生效，已实证）。
-    ...(repositories.length === 0 ? ['    repositories: []'] : ['    repositories:', ...repositories.map(r => `      - ${r}`)]),
-    '',
-  ].join('\n')
-  writeFileSync(file, block)
-  console.log(`[plugin-console] wrote ${repositories.length} repositories to ${file}`)
+/** 按 id 移除 insert 行；不存在返回 false。空掉的 insert 块一并删除。 */
+function removeInsertRow(id: string): boolean {
+  const file = profilePatchPath()
+  let content: string
+  try {
+    content = readFileSync(file, 'utf8')
+  } catch {
+    return false
+  }
+  const existing = readInsertRows()
+  if (!existing.some(r => r.id === id)) return false
+  const lines = content.split('\n')
+  const out: string[] = []
+  let removed = false
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i]!
+    const trimmed = line.trim()
+    // insert 块起始行：收集整块，移除目标行后若块内还有行则保留，否则整块丢弃。
+    if (trimmed === 'insert:' || trimmed.startsWith('- insert:')) {
+      const blockStart = i
+      const block: string[] = []
+      block.push(line)
+      i += 1
+      let blockHadTarget = false
+      for (; i < lines.length; i += 1) {
+        const next = lines[i]!
+        if (/^(\s*)- id:/.test(next.trim()) && !next.startsWith('    ')) {
+          // 顶层列表新行（非 insert 块子行）：块结束，回退让外层处理该行。
+          i -= 1
+          break
+        }
+        const idMatch = /^(\s*)- id:\s*([^\s]+)/.exec(next)
+        if (idMatch !== null && idMatch[2] === id) {
+          blockHadTarget = true
+          removed = true
+          // 跳过目标行及其子行（直到下一个 - id: 或块尾）。
+          for (let j = i + 1; j < lines.length; j += 1) {
+            const after = lines[j]!
+            if (/^(\s*)- id:/.test(after.trim()) && !after.startsWith('    ')) break
+            i = j
+          }
+          continue
+        }
+        block.push(next)
+      }
+      // 块内还有其余 `- id:` 行 → 保留；否则整块丢弃（空 insert 是脏 patch）。
+      const hasRemainingRow = block.some(l => /^(\s*)- id:\s*/.test(l))
+      if (hasRemainingRow) {
+        out.push(...block)
+      } else {
+        void blockStart
+      }
+      continue
+    }
+    out.push(line)
+  }
+  // 移除后若无任何顶层 `- id:` / `- insert:` 行：恢复 `[]` 模板——纯注释
+  // 文件解析为 null，HMR reload 失败（已实证 dispose 不触发）。
+  const hasAnyRow = out.some(l => /^- id:/.test(l.trim()) || /^- insert:/.test(l.trim()) || /^insert:/.test(l.trim()))
+  const text = hasAnyRow
+    ? `${out.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd()}\n`
+    : '# Your patch layer for this dsh profile, applied after every bundle layer:\n# a top-level YAML array of loader patch entries (id-targeted config\n# overrides, disables, and insert lists; `!!js` expressions allowed).\n[]\n'
+  writeFileSync(file, text)
+  console.log(`[plugin-console] removed insert row ${id} from ${file}`)
+  return removed
 }
 
-/** 一个 Loader 树插件的启停状态（bundle 插件，官方 disabled 标记管理）。 */
+/* ---------------- disabled 标记管理（启停持久化） ---------------- */
+
+/** 一个 Loader 树插件的启停状态（bundle/内置插件，官方 disabled 标记管理）。 */
 interface UiPluginRow {
   /** 插件 id（bundle 挂载行的 id）。 */
   id: string
@@ -105,7 +221,7 @@ interface UiPluginRow {
 }
 
 /**
- * 读 Loader 树插件的 disabled 状态：解析 home cordis.patch.yml 的所有
+ * 读 Loader 树插件的 disabled 状态：解析 profile cordis.patch.yml 的所有
  * `- id: <name>` 顶层行及其 `disabled: true/false` 标记。
  */
 function readUiPlugins(): UiPluginRow[] {
@@ -148,8 +264,7 @@ function writeUiPluginDisabled(id: string, disabled: boolean): void {
     content = ''
   }
   const lines = content.split('\n')
-  // 丢弃空数组文档行（`[]`）与纯注释/空行，保证输出是单一 patch 列表文档
-  // （`[]` + 追加列表会拼成双文档 YAML，启动解析失败——已实证）。
+  // 丢弃空数组文档行（`[]`）与纯注释/空行，保证输出是单一 patch 列表文档。
   const significant = lines.filter(l => l.trim() !== '[]')
   let targetLine = -1
   let targetIndent = ''
@@ -177,69 +292,16 @@ function writeUiPluginDisabled(id: string, disabled: boolean): void {
       }
     }
     if (disabledLine === -1) {
-      // 无 disabled 行：在 id 行后插入
       significant.splice(targetLine + 1, 0, `${targetIndent}  disabled: ${String(disabled)}`)
     } else {
       significant[disabledLine] = `${targetIndent}  disabled: ${String(disabled)}`
     }
   }
-  writeFileSync(file, significant.join('\n'))
+  writeFileSync(file, `${significant.join('\n').trimEnd()}\n`)
   console.log(`[plugin-console] set ${id} disabled=${String(disabled)} in ${file}`)
 }
 
-/** 解析 `github:owner/repo#ref&path:...` 源为 {owner, repo, ref, tail}。 */
-function parseSource(source: string): { owner: string; repo: string; ref: string; tail: string } | null {
-  const match = /^github:([^/\s#&]+)\/([^/\s#&]+)#([^\s#&]+)/.exec(source)
-  if (match === null) return null
-  return { owner: match[1]!, repo: match[2]!, ref: match[3]!, tail: source.slice(match[0].length) }
-}
-
-/** 40-hex commit（固定引用可对比）；分支/标签名则只能报告远端最新。 */
-function isCommitSha(value: string): boolean {
-  return /^[0-9a-f]{40}$/.test(value)
-}
-
-/** git ls-remote 结果：missing=true 表示远端无此 ref（未推送/已删除），sha=null 且 missing=false 表示网络/认证失败。 */
-interface GitRemoteResult {
-  sha: string | null
-  missing: boolean
-}
-
-/** git ls-remote 取远端 ref 指向的 commit；区分网络失败与远端无此 ref。 */
-function gitRemoteCommit(owner: string, repo: string, ref: string): Promise<GitRemoteResult> {
-  return new Promise((resolve) => {
-    execFile(
-      'git',
-      ['ls-remote', `https://github.com/${owner}/${repo}.git`, ref],
-      { timeout: 15_000 },
-      (error, stdout) => {
-        if (error) {
-          resolve({ sha: null, missing: false })
-          return
-        }
-        const sha = stdout.split('\n')[0]?.split('\t')[0] ?? ''
-        resolve(isCommitSha(sha) ? { sha, missing: false } : { sha: null, missing: true })
-      },
-    )
-  })
-}
-
-/** 一个 repository 源的更新检查结果。 */
-interface UpdateCheckRow {
-  source: string
-  ref: string
-  refKind: 'sha' | 'branch'
-  latestSha: string | null
-  hasUpdate: boolean
-  /** 源对应的插件名（cache manifest；未准备/不可读为 undefined）——面板按名 join 进已加载区。 */
-  pluginName?: string
-  error?: string
-}
-
-/** 当前 profile 目录（bundle 安装/更新的 pnpm 工作目录）。 */
-function profileWebDir(): string {
-  return join(resolveDshHome(), 'profiles', 'web')
-}
+/* ---------------- bundle 管理（profile 层栈） ---------------- */
 
 /** 读 profile 清单（package.json）。 */
 function readProfileManifest(): { dependencies?: Record<string, string>; dsh?: { profile?: { bundles?: string[] } } } {
@@ -315,10 +377,10 @@ function reconcileBundles(added: string[], beforeManifest?: ReturnType<typeof re
 }
 
 /**
- * bundle 安装/更新：在 profile 目录跑 pnpm add/update，然后 reconcile 层栈。
+ * bundle 安装/更新/移除：在 profile 目录跑 pnpm 子命令，然后 reconcile 层栈。
  * 与官方 `dsh plugin <sub>`（pnpm forwarder + reconcile）同机制。
- * @param args - pnpm 子命令参数（add <source> 或 update <name>）。
- * @returns {names, output} 新增层名与 pnpm 输出（失败时 output 为错误信息）。
+ * @param args - pnpm 子命令参数（add <source> / update <name> / remove <name>）。
+ * @returns {ok, names, output} 新增层名与 pnpm 输出（失败时 output 为错误信息）。
  */
 function runPnpm(args: string[]): { ok: boolean; names: string[]; output: string } {
   const dir = profileWebDir()
@@ -333,84 +395,68 @@ function runPnpm(args: string[]): { ok: boolean; names: string[]; output: string
   return { ok: true, names, output: output.slice(-500) }
 }
 
-/** 检查全部已配置源的远端状态。 */
-async function checkUpdates(sources: string[]): Promise<UpdateCheckRow[]> {
-  const rows: UpdateCheckRow[] = []
-  for (const source of sources) {
-    const pluginName = repositoryManifestName(source)
-    const parsed = parseSource(source)
-    if (parsed === null) {
-      rows.push({ source, pluginName, ref: '', refKind: 'sha', latestSha: null, hasUpdate: false, error: 'unsupported source (expected github:owner/repo#ref)' })
-      continue
-    }
-    const result = await gitRemoteCommit(parsed.owner, parsed.repo, parsed.ref)
-    if (result.sha === null) {
-      rows.push({
-        source,
-        pluginName,
-        ref: parsed.ref,
-        refKind: isCommitSha(parsed.ref) ? 'sha' : 'branch',
-        latestSha: null,
-        hasUpdate: false,
-        error: result.missing ? 'remote has no such ref（未推送或已删除）' : 'cannot reach remote (network/credentials)',
-      })
-      continue
-    }
-    rows.push({
-      source,
-      pluginName,
-      ref: parsed.ref,
-      refKind: isCommitSha(parsed.ref) ? 'sha' : 'branch',
-      latestSha: result.sha,
-      hasUpdate: parsed.ref !== result.sha,
-    })
-  }
-  return rows
+/** 已安装包是否声明 dsh.bundle（tools 判别用；未装返回 false）。 */
+function isBundlePackage(packageName: string): boolean {
+  return exportsBundlePatch(packageName)
 }
 
-interface WebServerLike {
-  register(route: {
-    kind: 'exact' | 'prefix'
-    path: string
-    handler: (req: unknown, res: { statusCode: number; setHeader(k: string, v: string): void; end(body: string): void }) => void | Promise<void>
-  }): () => void
-}
+/* ---------------- loader 树投影 ---------------- */
 
-/** Cordis 插件名。 */
-export const name = 'plugin-console'
-
-/** 需要宿主 web server（web 组合）+ loader（读/改 loader 树条目）+ tools（注册 plugin_* 管理工具）。 */
-export const inject = ['httpServer', 'loader', 'tools']
-
-/** loader 树条目投影（条目短 id + 包名 + 当前 disabled + 当前版本）。 */
 interface LoadedEntryRow {
-  /**
-   * 条目短 id（EntryOptions.id，如 dsh-loop）——profile patch 的
-   * `- id:` 匹配这个（含父前缀的完整 id `include:dsh-loop` 匹配不上，
-   * 已实证重启不生效）。repository 插件用 manifest 名（wrapper name）。
-   */
+  /** 条目短 id（EntryOptions.id）——profile patch 的 `- id:` 匹配这个。 */
   id: string
-  /** 包名（@dsh-external/dsh-loop 等；@deepseek-ai/* = 官方内置）。 */
+  /** 包名（@dsh-external/* 等；@deepseek-ai/* = 官方内置）。 */
   name: string
-  /** 当前是否被禁用（含父条目禁用继承）；repository 插件 = 未挂载。 */
+  /** 当前是否被禁用（含父条目禁用继承）。 */
   disabled: boolean
   /** 已安装版本（读 profile node_modules 的 package.json）；未装/读不到为 undefined。 */
   version?: string
-  /** 来源：loader 树条目（bundle/内置）或 repository 插件（RepositoryCache 挂载）。 */
-  kind?: 'loader' | 'repository'
-  /** repository 插件：config 行解析出的 ref（commit 或分支名）。 */
-  ref?: string
-  /** repository 插件：ref 类型（固定 commit / 分支）。 */
-  refKind?: 'sha' | 'branch'
+  /** 来源：loader 树条目（bundle/内置）。 */
+  kind?: 'loader'
 }
 
-/**
- * 版本检查缓存：name -> { latest, checkedAt }（进程内存）。
- * 防 registry 请求风暴策略：
- * - 面板 GET /versions **只读缓存**（零网络）；
- * - 进程启动后延迟预扫描（apply 里 setTimeout 30s）填充缓存；
- * - 手动 POST /versions/refresh 强制查（30 秒最小间隔防抖）。
- */
+/** 读已安装包版本（profile node_modules/<name>/package.json）；未装返回 undefined。 */
+function readInstalledVersion(name: string): string | undefined {
+  try {
+    const manifest = JSON.parse(readFileSync(join(profileWebDir(), 'node_modules', name, 'package.json'), 'utf8')) as {
+      version?: string
+    }
+    return typeof manifest.version === 'string' ? manifest.version : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** 遍历 loader 树收集全部条目（含嵌套子树），id 取短 id（options.id）。 */
+function collectLoaderEntries(ctx: ConsoleCtx): LoadedEntryRow[] {
+  const loader = (ctx as unknown as { loader?: { entries?(): Generator<unknown> } }).loader
+  if (loader?.entries === undefined) return []
+  // 0810 的 loader 树存在同 id 双条目（一条禁用一条启用）——按 id 去重，
+  // 优先保留启用条目，避免 React key 冲突。
+  const byId = new Map<string, LoadedEntryRow>()
+  for (const raw of loader.entries()) {
+    const entry = raw as { id?: string; options?: { id?: string; name?: string }; disabled?: boolean }
+    const id = entry.options?.id ?? entry.id
+    if (typeof id !== 'string' || id.length === 0) continue
+    const name = entry.options?.name ?? id
+    const row: LoadedEntryRow = {
+      id,
+      name,
+      disabled: entry.disabled === true,
+      version: readInstalledVersion(name),
+      kind: 'loader',
+    }
+    const prev = byId.get(id)
+    if (prev === undefined || (prev.disabled === true && row.disabled === false)) {
+      byId.set(id, row)
+    }
+  }
+  return [...byId.values()]
+}
+
+/* ---------------- 版本检查 ---------------- */
+
+/** 版本检查缓存：name -> { latest, checkedAt }（进程内存）。 */
 const versionCache = new Map<string, { latest: string | null; checkedAt: number }>()
 const VERSION_REFRESH_MIN_MS = 30 * 1000
 let lastVersionRefreshAt = 0
@@ -437,10 +483,7 @@ function userPluginNames(ctx: ConsoleCtx): string[] {
     .filter(name => !name.startsWith('@deepseek-ai/') && !name.startsWith('@cordisjs/') && !name.startsWith('cordis:')))]
 }
 
-/**
- * 批量强制刷新版本缓存（可选 force；手动检查时用）。
- * @returns 是否实际执行了查询（false = 距上次刷新 < 最小间隔，直接返回缓存）。
- */
+/** 批量强制刷新版本缓存（可选 force）。 */
 function refreshVersions(ctx: ConsoleCtx, force: boolean): boolean {
   const now = Date.now()
   if (!force && now - lastVersionRefreshAt < VERSION_REFRESH_MIN_MS) return false
@@ -451,156 +494,21 @@ function refreshVersions(ctx: ConsoleCtx, force: boolean): boolean {
   return true
 }
 
-/** 读已安装包版本（profile node_modules/<name>/package.json）；未装返回 undefined。 */
-function readInstalledVersion(name: string): string | undefined {
-  try {
-    const manifest = JSON.parse(readFileSync(join(profileWebDir(), 'node_modules', name, 'package.json'), 'utf8')) as {
-      version?: string
-    }
-    return typeof manifest.version === 'string' ? manifest.version : undefined
-  } catch {
-    return undefined
-  }
+/* ---------------- 路由与装配 ---------------- */
+
+interface WebServerLike {
+  register(route: {
+    kind: 'exact' | 'prefix'
+    path: string
+    handler: (req: unknown, res: { statusCode: number; setHeader(k: string, v: string): void; end(body: string): void }) => void | Promise<void>
+  }): () => void
 }
 
-/** 遍历 loader 树收集全部条目（含嵌套子树），id 取短 id（options.id）。 */
-function collectLoaderEntries(ctx: ConsoleCtx): LoadedEntryRow[] {
-  const loader = (ctx as unknown as { loader?: { entries?(): Generator<unknown> } }).loader
-  if (loader?.entries === undefined) return []
-  // 0810 的 loader 树存在同 id 双条目（一条禁用一条启用，如工具插件
-  // 重复注册）——按 id 去重，优先保留启用条目，避免 React key 冲突
-  // 导致列表切换时 reconciliation 残留。
-  const byId = new Map<string, LoadedEntryRow>()
-  for (const raw of loader.entries()) {
-    const entry = raw as { id?: string; options?: { id?: string; name?: string }; disabled?: boolean }
-    const id = entry.options?.id ?? entry.id
-    if (typeof id !== 'string' || id.length === 0) continue
-    const name = entry.options?.name ?? id
-    const row: LoadedEntryRow = {
-      id,
-      name,
-      disabled: entry.disabled === true,
-      version: readInstalledVersion(name),
-      kind: 'loader',
-    }
-    const prev = byId.get(id)
-    if (prev === undefined || (prev.disabled === true && row.disabled === false)) {
-      byId.set(id, row)
-    }
-  }
-  return [...byId.values()]
-}
+/** Cordis 插件名。 */
+export const name = 'plugin-console'
 
-/** cordis Plugin.Runtime 面（registry 遍历用；避免 import 类型）。 */
-interface RuntimeFace {
-  name?: string
-  /** cordis DisposableList（可迭代，非原生数组——不要用 .some 等数组方法）。 */
-  fibers?: Iterable<{ state?: number }>
-}
-
-/** cordis FiberState.ACTIVE（wrapper 同款常量，保持对齐）。 */
-const FIBER_ACTIVE = 2
-
-/**
- * 读 repository 插件的 manifest 名（wrapper 内嵌）：specifier →
- * cacheKey(sha256) → cache 的 dsh-plugin.mjs → manifest.name。
- * cache 未预填充/不可读时返回 undefined（插件未装，无从显示状态）。
- */
-function repositoryManifestName(specifier: string): string | undefined {
-  try {
-    const key = createHash('sha256').update(specifier).digest('hex')
-    const wrapper = join(resolveDshHome(), 'cache', 'repository-plugins', key, 'node_modules', 'repository', 'dsh-plugin.mjs')
-    const text = readFileSync(wrapper, 'utf8')
-    const match = /const manifest = (\{.*?\})/.exec(text)
-    if (match === null) return undefined
-    const manifest = JSON.parse(match[1]!) as { name?: string }
-    return typeof manifest.name === 'string' ? manifest.name : undefined
-  } catch {
-    return undefined
-  }
-}
-
-/** repository 插件的 cache 包目录（与 manifest wrapper 同目录）。 */
-function repositoryCacheDir(specifier: string): string {
-  const key = createHash('sha256').update(specifier).digest('hex')
-  return join(resolveDshHome(), 'cache', 'repository-plugins', key, 'node_modules', 'repository')
-}
-
-/** 读 repository 插件 cache 包的 version（package.json）；未准备/不可读返回 undefined。 */
-function readRepositoryVersion(specifier: string): string | undefined {
-  try {
-    const manifest = JSON.parse(readFileSync(join(repositoryCacheDir(specifier), 'package.json'), 'utf8')) as {
-      version?: string
-    }
-    return typeof manifest.version === 'string' ? manifest.version : undefined
-  } catch {
-    return undefined
-  }
-}
-
-/** repository 插件行附加信息（specifier → 插件名 + 版本 + ref 面）。 */
-interface RepositoryMeta {
-  pluginName?: string
-  version?: string
-  ref?: string
-  refKind?: 'sha' | 'branch'
-}
-
-/** 从 config 源列表构建 specifier → 插件元信息（version/ref 本地零网络）。 */
-function repositoryMetaMap(repositories: string[]): Map<string, RepositoryMeta> {
-  const map = new Map<string, RepositoryMeta>()
-  for (const source of repositories) {
-    const parsed = parseSource(source)
-    map.set(source, {
-      pluginName: repositoryManifestName(source),
-      version: readRepositoryVersion(source),
-      ref: parsed?.ref,
-      refKind: parsed !== null && isCommitSha(parsed.ref) ? 'sha' : (parsed !== null ? 'branch' : undefined),
-    })
-  }
-  return map
-}
-
-/**
- * 枚举 RepositoryCache 挂载的 repository 插件（并入「已加载插件」）。
- *
- * 识别：config 的每个 repository 源（specifier）经 cache 的 wrapper manifest
- * 得到插件名；`ctx.registry` 里 runtime.name 命中该集合的即 repository 插件
- * （wrapper 挂载的 runtime），运行状态 = 任一 fiber active。不依赖 fiber 父
- * 链（cordis 拦截 ctx.parent 访问）。版本/ref 从 cache 包与 config 行取（零网络）。
- */
-function collectRepositoryPlugins(ctx: ConsoleCtx): LoadedEntryRow[] {
-  const metaBySpec = repositoryMetaMap(readRepositories().repositories)
-  const byName = new Map<string, LoadedEntryRow>()
-  for (const [source, meta] of metaBySpec.entries()) {
-    if (meta.pluginName === undefined) continue
-    byName.set(meta.pluginName, {
-      id: meta.pluginName,
-      name: meta.pluginName,
-      disabled: true, // 默认未挂载；registry 命中后按 fiber 状态覆盖
-      version: meta.version,
-      kind: 'repository',
-      ref: meta.ref,
-      refKind: meta.refKind,
-      source,
-    })
-  }
-  if (byName.size === 0) return []
-  const registry = (ctx as unknown as { registry?: { entries?(): Iterable<[unknown, RuntimeFace]> } }).registry
-  if (registry?.entries === undefined) return [...byName.values()]
-  // registry 对同一插件可能存多个 runtime（wrapper 挂载的多个 fiber）——
-  // 按名去重，任一 active 即视为运行中。
-  for (const [, runtime] of registry.entries()) {
-    const name = runtime.name
-    if (typeof name !== 'string' || !byName.has(name)) continue
-    const fibers = [...(runtime.fibers ?? [])] as Array<{ state?: number }>
-    const row = byName.get(name)!
-    if (fibers.some(f => f.state === FIBER_ACTIVE)) {
-      row.disabled = false
-    }
-  }
-  return [...byName.values()]
-}
+/** 需要宿主 web server（web 组合）+ loader（读/改 loader 树条目）+ tools（注册 plugin_* 管理工具）。 */
+export const inject = ['httpServer', 'loader', 'tools']
 
 interface ConsoleCtx extends Context {
   httpServer?: WebServerLike
@@ -614,10 +522,16 @@ export function apply(ctx: ConsoleCtx): void {
     // AI-native 插件管理工具（plugin_*）：agent 面 = 面板写同一安装态。
     const pluginTools = createPluginTools({
       dshHome: () => resolveDshHome(),
-      readRepositories,
-      writeRepositories,
+      isBundlePackage,
+      readInsertRows,
+      writeInsertRow,
+      removeInsertRow,
       bundleInstall: (source) => {
         const result = runPnpm(['add', source])
+        return result.ok ? { names: result.names, output: result.output } : null
+      },
+      bundleRemove: (name) => {
+        const result = runPnpm(['remove', name])
         return result.ok ? { names: result.names, output: result.output } : null
       },
     })
@@ -653,84 +567,33 @@ export function apply(ctx: ConsoleCtx): void {
         const method = (req as { method?: string })?.method ?? 'GET'
         const path = url.split('?')[0] ?? '/'
         try {
-          if (method === 'GET' && (path === '/api/plugin-console/repositories' || path === '/api/plugin-console/repositories/')) {
-            // 结构化源行：源字符串 + 解析 + 插件名/版本（cache）+ ref 面 + 挂载态。
-            // 未挂载源（cache 未准备/刚添加未换代）也成行，pluginName 缺失时挂载态未知。
-            const sources = readRepositories().repositories
-            const meta = repositoryMetaMap(sources)
-            const mountedNames = new Set(collectRepositoryPlugins(ctx).filter(r => !r.disabled).map(r => r.name))
-            const rows = sources.map((source) => {
-              const m = meta.get(source)
-              const parsed = parseSource(source)
-              return {
-                source,
-                parsed: parsed ?? undefined,
-                pluginName: m?.pluginName,
-                version: m?.version,
-                ref: m?.ref,
-                refKind: m?.refKind,
-                mounted: m?.pluginName !== undefined && mountedNames.has(m.pluginName),
-              }
-            })
-            json(200, { ok: true, repositories: rows, present: rows.length > 0 })
+          // insert 行（非 bundle 插件安装态）列表
+          if (method === 'GET' && (path === '/api/plugin-console/inserts' || path === '/api/plugin-console/inserts/')) {
+            json(200, { ok: true, inserts: readInsertRows() })
             return
           }
-          if (method === 'POST' && (path === '/api/plugin-console/repositories' || path === '/api/plugin-console/repositories/')) {
-            let body = ''
-            ;(req as { on?: (e: string, cb: (c: Buffer) => void) => void })?.on?.('data', (c: Buffer) => { body += c.toString('utf8') })
-            ;(req as { on?: (e: string, cb: () => void) => void })?.on?.('end', () => {
-              const parsed = JSON.parse(body) as { repositories?: string[] }
-              writeRepositories(parsed.repositories ?? [])
-              json(200, { ok: true })
-            })
-            return
-          }
-          // 更新检查：对每个已配置源查远端最新 commit
-          if (method === 'GET' && (path === '/api/plugin-console/updates' || path === '/api/plugin-console/updates/')) {
-            void (async () => {
-              try {
-                const rows = await checkUpdates(readRepositories().repositories)
-                json(200, { ok: true, updates: rows })
-              } catch (error) {
-                json(500, { ok: false, message: error instanceof Error ? error.message : String(error) })
-              }
-            })()
-            return
-          }
-          // 更新执行：把指定源的 ref 更新为远端最新 commit（写配置后官方 config HMR 即时换代，无需重启）
-          if (method === 'POST' && (path === '/api/plugin-console/updates' || path === '/api/plugin-console/updates/')) {
+          // insert 行：写（新增/更新）与删（POST /inserts/<id>，body {name?} 或 {remove: true}）
+          const insertMatch = /^\/api\/plugin-console\/inserts\/([^/]+)$/.exec(path)
+          if (method === 'POST' && insertMatch !== null) {
+            const id = decodeURIComponent(insertMatch[1]!)
             let body = ''
             ;(req as { on?: (e: string, cb: (c: Buffer) => void) => void })?.on?.('data', (c: Buffer) => { body += c.toString('utf8') })
             ;(req as { on?: (e: string, cb: () => void) => void })?.on?.('end', () => {
               void (async () => {
                 try {
-                  const parsed = JSON.parse(body) as { source?: string }
-                  const source = parsed.source ?? ''
-                  const current = readRepositories().repositories
-                  if (!current.includes(source)) {
-                    json(404, { ok: false, message: `source not configured: ${source}` })
+                  const parsed = JSON.parse(body) as { name?: string; remove?: boolean }
+                  if (parsed.remove === true) {
+                    const removed = removeInsertRow(id)
+                    json(removed ? 200 : 404, { ok: removed })
                     return
                   }
-                  const parsedSource = parseSource(source)
-                  if (parsedSource === null) {
-                    json(400, { ok: false, message: 'unsupported source (expected github:owner/repo#ref)' })
+                  const name = (parsed.name ?? '').trim()
+                  if (name.length === 0) {
+                    json(400, { ok: false, message: 'insert row needs a name' })
                     return
                   }
-                  const result = await gitRemoteCommit(parsedSource.owner, parsedSource.repo, parsedSource.ref)
-                  if (result.sha === null) {
-                    json(result.missing ? 400 : 502, {
-                      ok: false,
-                      message: result.missing ? 'remote has no such ref（未推送或已删除）' : 'cannot reach remote (network/credentials)',
-                    })
-                    return
-                  }
-                  if (result.sha === parsedSource.ref) {
-                    json(200, { ok: true, updated: false, source, latestSha: result.sha })
-                    return
-                  }
-                  const updated = `github:${parsedSource.owner}/${parsedSource.repo}#${result.sha}${parsedSource.tail}`
-                  writeRepositories(current.map(item => item === source ? updated : item))
-                  json(200, { ok: true, updated: true, source, from: parsedSource.ref, to: latest })
+                  writeInsertRow(id, name)
+                  json(200, { ok: true, id, name, live: true })
                 } catch (error) {
                   json(500, { ok: false, message: error instanceof Error ? error.message : String(error) })
                 }
@@ -740,7 +603,7 @@ export function apply(ctx: ConsoleCtx): void {
           }
           // 已加载插件：读 loader 树（实时，含运行时启停后的状态）
           if (method === 'GET' && (path === '/api/plugin-console/installed' || path === '/api/plugin-console/installed/')) {
-            json(200, { ok: true, plugins: [...collectLoaderEntries(ctx), ...collectRepositoryPlugins(ctx)] })
+            json(200, { ok: true, plugins: collectLoaderEntries(ctx) })
             return
           }
           // bundle 版本：只读缓存（零网络——registry 查询由启动延迟预扫描 +
@@ -775,15 +638,11 @@ export function apply(ctx: ConsoleCtx): void {
                 try {
                   const parsed = JSON.parse(body) as { disabled?: boolean }
                   const disabled = parsed.disabled === true
-                  // 管理工具自身不可停用：禁用会卸载本面板（管理入口消失），
-                  // 前端按钮已隐藏，此处防护直接调 API 的路径。
+                  // 管理工具自身不可停用：禁用会卸载本面板（管理入口消失）。
                   if (id === '@dsh-external/plugin-console') {
                     json(409, { ok: false, message: '管理工具自身不可停用' })
                     return
                   }
-                  // 运行时启停：用与 GET /installed 相同的 entries() 遍历匹配条目
-                  // （resolve 可能命中不同的 Entry 对象——已实证状态不生效）。
-                  // 匹配短 id（options.id），与 patch 的 `- id:` 一致。
                   const loader = (ctx as unknown as { loader?: { entries?(): Generator<unknown> } }).loader
                   let target: { update?(options: { disabled: boolean }): Promise<unknown> } | undefined
                   if (loader?.entries !== undefined) {
@@ -863,7 +722,6 @@ export function apply(ctx: ConsoleCtx): void {
                       json(502, { ok: false, message: `pnpm remove failed: ${result.output}` })
                       return
                     }
-                    // 依赖移除后 reconcile 自动把该 bundle 移出层栈（机制与 install 对称）。
                     json(200, { ok: true, action: 'remove', name, needsRestart: true })
                     return
                   }

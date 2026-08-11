@@ -1,7 +1,8 @@
 /**
- * 薄控制台 browser half：设置页「插件」面板。列出当前 repositories
- * （已装 .dsh-plugin 包），支持增删行（写回 cordis.patch.yml → 官方
- * HMR 换代）。fetch 自建路由 `/api/plugin-console`，零官方改动。
+ * 薄控制台 browser half：设置页「插件」面板（0811 适配）。列出
+ * insert 插件（profile patch insert 行，实时挂载/卸载）+ 已加载插件
+ * （启停持久化）+ bundle 安装。fetch 自建路由 `/api/plugin-console`，
+ * 零官方改动。
  */
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import { ConsolePanel } from './Panel.tsx'
