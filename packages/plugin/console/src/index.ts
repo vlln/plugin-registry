@@ -87,8 +87,9 @@ function writeRepositories(repositories: string[]): void {
     '# Home-level patch layer (HMR-watched). 薄控制台写入目标。',
     '- id: repository-plugins',
     '  config:',
-    '    repositories:',
-    ...repositories.map(r => `      - ${r}`),
+    // 空数组必须写 `[]`——裸 `repositories:` 解析为 null，官方 schema 校验失败
+    // （换代失败回滚 = 移除不生效，已实证）。
+    ...(repositories.length === 0 ? ['    repositories: []'] : ['    repositories:', ...repositories.map(r => `      - ${r}`)]),
     '',
   ].join('\n')
   writeFileSync(file, block)
@@ -271,8 +272,10 @@ function exportsBundlePatch(packageName: string): boolean {
  * 加入 `dsh.profile.bundles` 层栈；已从依赖移除或失去声明的包离开层栈。
  * @returns 新增的层（调用方用于回显）。
  */
-function reconcileBundles(added: string[]): string[] {
-  const before = readProfileManifest() as {
+function reconcileBundles(added: string[], beforeManifest?: ReturnType<typeof readProfileManifest>): string[] {
+  // beforeManifest = pnpm 命令执行前的清单（调用方在 pnpm 前捕获）：移除语义依赖
+  // 「曾是依赖」判定——remove 后读取会因依赖已消失而漏删 bundles 层（已实证）。
+  const before = beforeManifest ?? readProfileManifest() as {
     dependencies?: Record<string, string>
     dsh?: { profile?: { bundles?: string[] } }
   }
@@ -319,12 +322,14 @@ function reconcileBundles(added: string[]): string[] {
  */
 function runPnpm(args: string[]): { ok: boolean; names: string[]; output: string } {
   const dir = profileWebDir()
+  // pnpm 执行前捕获清单：reconcile 的「曾是依赖」判定需要移除前的状态。
+  const before = readProfileManifest()
   const result = spawnSync('pnpm', args, { cwd: dir, encoding: 'utf8', timeout: 120_000 })
   const output = (result.stdout ?? '') + (result.stderr ?? '')
   if (result.status !== 0) {
     return { ok: false, names: [], output: output.slice(-1000) }
   }
-  const names = reconcileBundles([])
+  const names = reconcileBundles([], before)
   return { ok: true, names, output: output.slice(-500) }
 }
 
