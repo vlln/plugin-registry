@@ -52,6 +52,16 @@ repository 插件（`.dsh-plugin`）的 `devDependencies` 必含 `@deepseek-ai/d
 
 bundle 插件的**启停覆盖写 profile 层**，不要写进 bundle 包内层（产品层不该动）或 home 层（repository 用）。薄控制台读写的 repository 列表在 home 层。
 
+## 1d. npm 版 dsh 兼容性（2026-08-11 实测，0.0.1-rc.1）
+
+官方私有 npm 库是未来主流分发（`npx -p @deepseek-ai/dsh@0.0.1-rc.1 dsh web`，lib 生产模式）。实测与源码版（0810 快照）的差异：
+
+- **bundle 生态兼容** ✓：console（`dsh plugin --profile web add` 安装、`/installed` 合并枚举、启停）在 npm 版全功能正常。
+- **repository 插件不可用** ❌：npm 版私有库（181 包）无 `@deepseek-ai/dsh-repository-plugin`，base 组合行也无 repository-plugins 插件——**运行时缺失**（不是安装 404，是加载都不尝试）。过渡桥（prepare-cache）在 npm 版下无效。repository 插件生态（含 whale-girl 参考实现 + 本 skill 主路径）需源码版 dsh 或等官方发布。
+- **"路由 200"不可作挂载判据**：npm 版 httpServer 对未匹配路由返回 200 SPA fallback 主页（`__DSH_BOOT__` HTML）；源码版返回 404。验证挂载看响应体（JSON/HTML）而非状态码。
+- **代理坑**：npm/pnpm 下载走环境代理会超时卡死——装 npm 包用 `env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u all_proxy` 直连（实测 519 包 2 分钟 vs 代理 10 分钟+超时）。
+- **token 展开坑**：pnpm 项目级 `.npmrc` **不展开** `${NPM_TOKEN}`（安全策略，凭据须在用户级 `~/.npmrc` 或 `pnpm config set`）；npm 支持项目级 `${VAR}` 展开。
+
 ## 2. 已挂载插件改源码需 web 重启（ESM 缓存）
 
 `index.mjs`/src 改动后，disable/enable/CLI 重装**都不生效**——ESM 模块缓存按 URL 永久缓存，`mount()` 的 `import(entryUrl)` 无 query bust，同 URL 二次 import 返回旧模块。**只能 web 重启**。
