@@ -32,6 +32,8 @@ interface LoadedPluginRow {
   name: string
   disabled: boolean
   version?: string
+  /** 来源：loader 树条目（bundle/内置）或 repository 插件（RepositoryCache 挂载）。 */
+  kind?: 'loader' | 'repository'
 }
 
 /* ---- 官方「模型」页设计语言（ModelsSection.module.css 对齐） ---- */
@@ -359,11 +361,12 @@ export function ConsolePanel(): React.ReactNode {
                     <span style={nameStyle}>{plugin.name}</span>
                   </span>
                   <span style={actionsStyle}>
-                    {!official.includes(plugin) && version.canUpdate ? (
+                    {/* repository 插件：config 行管理（repository 区增删/更新），此处只读状态 */}
+                    {plugin.kind !== 'repository' && !official.includes(plugin) && version.canUpdate ? (
                       <Button size="sm" variant="outline" disabled={busy || bundleBusy} onClick={() => { void updateBundle(plugin.name) }}>更新</Button>
                     ) : null}
-                    {/* 内置插件不可停用（官方组合层）；管理工具自身不可停用（自毁）；仅其他用户插件可启停 */}
-                    {!official.includes(plugin) && !isSelf(plugin) ? (
+                    {/* 内置插件不可停用（官方组合层）；管理工具自身不可停用（自毁）；repository 插件走 config 行管理；仅其他用户插件可启停 */}
+                    {plugin.kind !== 'repository' && !official.includes(plugin) && !isSelf(plugin) ? (
                       <Button size="sm" variant="outline" disabled={busy} onClick={() => { void togglePlugin(plugin.id, !plugin.disabled) }}>
                         {plugin.disabled ? '启用' : '停用'}
                       </Button>
@@ -371,6 +374,7 @@ export function ConsolePanel(): React.ReactNode {
                     {/* 状态 Pill 贴右缘（名称左、按钮中、Pill 右） */}
                     {official.includes(plugin) ? <Pill>内置</Pill> : null}
                     {isSelf(plugin) ? <Pill>管理工具</Pill> : null}
+                    {plugin.kind === 'repository' ? <Pill>repository</Pill> : null}
                     <Pill active={!plugin.disabled}>{plugin.disabled ? '已停用' : '运行中'}</Pill>
                   </span>
                 </div>

@@ -7,6 +7,7 @@
  * HMR-watched 的 home 级用户 patch 层。
  */
 import { readFileSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { execFile, spawnSync } from 'node:child_process'
 import { join } from 'node:path'
 import type { Context } from 'cordis'
@@ -376,15 +377,17 @@ interface LoadedEntryRow {
   /**
    * 条目短 id（EntryOptions.id，如 dsh-loop）——profile patch 的
    * `- id:` 匹配这个（含父前缀的完整 id `include:dsh-loop` 匹配不上，
-   * 已实证重启不生效）。
+   * 已实证重启不生效）。repository 插件用 manifest 名（wrapper name）。
    */
   id: string
   /** 包名（@dsh-external/dsh-loop 等；@deepseek-ai/* = 官方内置）。 */
   name: string
-  /** 当前是否被禁用（含父条目禁用继承）。 */
+  /** 当前是否被禁用（含父条目禁用继承）；repository 插件 = 未挂载。 */
   disabled: boolean
   /** 已安装版本（读 profile node_modules 的 package.json）；未装/读不到为 undefined。 */
   version?: string
+  /** 来源：loader 树条目（bundle/内置）或 repository 插件（RepositoryCache 挂载）。 */
+  kind?: 'loader' | 'repository'
 }
 
 /**
@@ -464,6 +467,7 @@ function collectLoaderEntries(ctx: ConsoleCtx): LoadedEntryRow[] {
       name,
       disabled: entry.disabled === true,
       version: readInstalledVersion(name),
+      kind: 'loader',
     }
     const prev = byId.get(id)
     if (prev === undefined || (prev.disabled === true && row.disabled === false)) {
@@ -471,6 +475,69 @@ function collectLoaderEntries(ctx: ConsoleCtx): LoadedEntryRow[] {
     }
   }
   return [...byId.values()]
+}
+
+/** cordis Plugin.Runtime 面（registry 遍历用；避免 import 类型）。 */
+interface RuntimeFace {
+  name?: string
+  /** cordis DisposableList（可迭代，非原生数组——不要用 .some 等数组方法）。 */
+  fibers?: Iterable<{ state?: number }>
+}
+
+/** cordis FiberState.ACTIVE（wrapper 同款常量，保持对齐）。 */
+const FIBER_ACTIVE = 2
+
+/**
+ * 读 repository 插件的 manifest 名（wrapper 内嵌）：specifier →
+ * cacheKey(sha256) → cache 的 dsh-plugin.mjs → manifest.name。
+ * cache 未预填充/不可读时返回 undefined（插件未装，无从显示状态）。
+ */
+function repositoryManifestName(specifier: string): string | undefined {
+  try {
+    const key = createHash('sha256').update(specifier).digest('hex')
+    const wrapper = join(resolveDshHome(), 'cache', 'repository-plugins', key, 'node_modules', 'repository', 'dsh-plugin.mjs')
+    const text = readFileSync(wrapper, 'utf8')
+    const match = /const manifest = (\{.*?\})/.exec(text)
+    if (match === null) return undefined
+    const manifest = JSON.parse(match[1]!) as { name?: string }
+    return typeof manifest.name === 'string' ? manifest.name : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * 枚举 RepositoryCache 挂载的 repository 插件（并入「已加载插件」）。
+ *
+ * 识别：config 的每个 repository 源（specifier）经 cache 的 wrapper manifest
+ * 得到插件名；`ctx.registry` 里 runtime.name 命中该集合的即 repository 插件
+ * （wrapper 挂载的 runtime），运行状态 = 任一 fiber active。不依赖 fiber 父
+ * 链（cordis 拦截 ctx.parent 访问）。
+ */
+function collectRepositoryPlugins(ctx: ConsoleCtx): LoadedEntryRow[] {
+  const expected = new Set(readRepositories().repositories.map(repositoryManifestName).filter((n): n is string => n !== undefined))
+  if (expected.size === 0) return []
+  const registry = (ctx as unknown as { registry?: { entries?(): Iterable<[unknown, RuntimeFace]> } }).registry
+  if (registry?.entries === undefined) return []
+  // registry 对同一插件可能存多个 runtime（wrapper 挂载的多个 fiber）——
+  // 按名去重，保留任一 active 即视为运行中。
+  const byName = new Map<string, LoadedEntryRow>()
+  for (const [, runtime] of registry.entries()) {
+    const name = runtime.name
+    if (typeof name !== 'string' || !expected.has(name)) continue
+    const fibers = [...(runtime.fibers ?? [])] as Array<{ state?: number }>
+    const row: LoadedEntryRow = {
+      id: name,
+      name,
+      disabled: !fibers.some(f => f.state === FIBER_ACTIVE),
+      kind: 'repository',
+    }
+    const prev = byName.get(name)
+    if (prev === undefined || (prev.disabled === true && row.disabled === false)) {
+      byName.set(name, row)
+    }
+  }
+  return [...byName.values()]
 }
 
 interface ConsoleCtx extends Context {
@@ -593,7 +660,7 @@ export function apply(ctx: ConsoleCtx): void {
           }
           // 已加载插件：读 loader 树（实时，含运行时启停后的状态）
           if (method === 'GET' && (path === '/api/plugin-console/installed' || path === '/api/plugin-console/installed/')) {
-            json(200, { ok: true, plugins: collectLoaderEntries(ctx) })
+            json(200, { ok: true, plugins: [...collectLoaderEntries(ctx), ...collectRepositoryPlugins(ctx)] })
             return
           }
           // bundle 版本：只读缓存（零网络——registry 查询由启动延迟预扫描 +
