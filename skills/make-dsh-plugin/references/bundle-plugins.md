@@ -39,7 +39,7 @@ bundle 插件是**独立 npm 包**（或包目录），声明 `dsh.bundle`：
 
 - bundle 插件 `dependencies` **声明为空是设计**——`@deepseek-ai/*` 官方包由 profile 的 pnpm 闭包在挂载时注入
 - **不要声明官方包**：声明了公共 npm 解析不到反而失败（repository 插件则声明、由官方环境解析——两类相反）
-- 本地装 bundle 需官方 monorepo 构建产物 link 进 profile
+- 本地装 bundle 需官方 monorepo 构建产物 link 进 profile（见 [gotchas.md](gotchas.md) 1）
 
 ## 安装与管理
 
@@ -58,9 +58,7 @@ bundle 插件是**独立 npm 包**（或包目录），声明 `dsh.bundle`：
 
 **写安装说明时**（README/skill 输出）：给出**用户能直接复制执行**的命令——本地路径写清 bundle 子目录与构建前提；git 源写清子目录语法（`&path:/`）、prepare 构建与 `allowBuilds` 放行。不要给「指向仓库根」或「臆造协议」的说明。
 
-- **启停**：写 profile 层 `$DSH_HOME/profiles/web/cordis.patch.yml` 的 `<id>: disabled: true/false`（Loader 树 patch 语义）
-- **管理**：薄控制台 UI 插件区（profile 层）
-- 同名 `cordis.patch.yml` 三层归属（bundle 包内声明 / profile 层启停 / home 层 repository）——**别写错层**
+- **启停/三层归属**：同名 `cordis.patch.yml` 三层（bundle 包内声明 / profile 层启停 / home 层 repository）别写错层，见 [gotchas.md](gotchas.md) 1b
 
 ## 验证
 

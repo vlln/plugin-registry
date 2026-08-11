@@ -77,37 +77,11 @@ my-plugin/
   `@deepseek-ai/dsh-repository-plugin`）——不要手写生成的
   `dsh-plugin.mjs` / `dsh-plugin-assets/`。
 
-### Skill 包（`dsh.skills`）
+### Skill 包（`dsh.skills`）与 MCP server（`dsh.mcpServers`）
 
-`SKILL.md` 放 `.dsh-plugin/skills/<name>/`，在 `dsh.skills` 声明列表（相对
-`.dsh-plugin/` 路径）：
-
-```json
-"dsh": { "skills": ["./skills/foo/SKILL.md", "./skills/bar/SKILL.md"] }
-```
-
-**SKILL.md 写法**——遵循 make-skill 规范（权威模板）：frontmatter（`name`
-1-64 小写连字符、`description` 祈使句「Use this skill when...」、可选
-`metadata`/`requires`）+ 正文结构（Tool Wrapper / Generator / Reviewer /
-Inversion / Pipeline 模式），<500 行，细节 progressive disclosure 到
-`references/`。每个 skill 一个 `SKILL.md`；仓库 README 用表格列（Step 6）。
-`make-skill` 是编写 agent skill 的参考——不要发明竞争格式。
-
-### MCP server（`dsh.mcpServers`）
-
-在 `dsh.mcpServers` 声明 MCP server（官方 schema）。标准 MCP 形态是
-server id → 启动配置的映射：
-
-```json
-"dsh": { "mcpServers": {
-  "my-server": { "command": "node", "args": ["./mcp/my-server.js"], "env": {} }
-} }
-```
-
-server 是 stdio MCP server（stdin/stdout 上的 JSON-RPC）。确切 schema 字段
-（`command`/`args`/`env`、允许的 transport）是官方格式细节——发布前对照
-当前官方 spec 验证；server 侧逻辑在 `.dsh-plugin/mcp/`。仓库 README 用表格
-列 MCP server（Step 6）。
+声明写法（`dsh.skills` 相对路径列表 / `dsh.mcpServers` 的 server-id → 启动配置映射）与
+SKILL.md 写法规范（frontmatter / 正文模式 / <500 行，遵循 make-skill）见
+`references/entry-contract.md` 对应小节——不要发明竞争格式。
 
 **到达 Step 3/4 时读 `references/entry-contract.md`** 获取完整 `dsh.entry`
 契约。
@@ -135,16 +109,12 @@ marker 且无 "Failed to load plugins"。
 
 ## Step 5：安装与验证
 
-经 `$DSH_HOME/cordis.patch.yml` 的 `repository-plugins.repositories` 安装
-（`github:owner/repo#<ref>&path:/.dsh-plugin`）。分发 = 仓库本身（clone +
-pnpm prepare + prepack），无发布流程。
+两条安装通道（写法细则见 `references/install-and-verify.md` 与 `references/bundle-plugins.md`）：
 
-**写安装说明时必须给出用户可直接复制的命令**：
-- repository 插件：`cordis.patch.yml` 的 `repositories` 行（`github:owner/repo#<ref>&path:/.dsh-plugin`）——**这是唯一安装方式**；不要写 `dsh plugin add`（那是 bundle 通道）、`dsh registry`（已移除）或「复制目录」等不可用形式。
-- bundle 插件：`dsh plugin --profile web add <bundle 包路径>`——`<包路径>` 必须是**含 `dsh.bundle`** 的 npm 包目录/git 源，见 `references/bundle-plugins.md`；git 源 monorepo 子目录用 `#<commit>&path:/<子目录>`，**产物入库（推荐）则 git 源真一行安装**，不入库则需 `prepare` 脚本 + `allowBuilds` 放行（pnpm ≥10 默认阻止）；不要指向仓库根或源码目录，不要写 `git+file://`（本地可达但非分发形态）。
+- **repository**：`$DSH_HOME/cordis.patch.yml` 的 `repository-plugins.repositories` 加 `github:owner/repo#<ref>&path:/.dsh-plugin`——**唯一安装方式**；勿写 `dsh plugin add`（那是 bundle 通道）或已移除的 `dsh registry`
+- **bundle**：`dsh plugin --profile web add <bundle 包路径>`——含 `dsh.bundle` 的 npm 包目录/git 源；git 源 monorepo 子目录 `#<commit>&path:/<子目录>`，**产物入库（推荐）→ 真一行安装**，不入库则 `prepare` + `allowBuilds` 放行
 
-**读 `references/install-and-verify.md`** 获取按改动面的验证（哪些改动需
-重启 web vs 只刷新）与挂载失败排查。
+**写安装说明时必须给出用户可直接复制的命令**；验证按改动面（哪些需重启 web vs 只刷新）与挂载失败排查见 `references/install-and-verify.md`。
 
 ## Step 5b：发布到 GitHub
 
@@ -262,31 +232,10 @@ skill 产出，README 推荐回 plugin-registry 的管理工具）。管理也�
 
 **进入迭代期时读 `references/dev-conventions.md`**。
 
-## 推荐管理
-
-薄控制台 `packages/plugin/console` 经 `$DSH_HOME/cordis.patch.yml` 管理官方
-repository 插件——已装 `.dsh-plugin` 包的插件管理 UI（README 模板的「插件
-管理」章节推荐它，见 Step 6）。
-
 ## 坑（Gotchas）
 
-- **官方包未发布到公共 npm**：`@deepseek-ai/dsh-tools` 等未发布——本地
-  `npm install` 失败。分发由官方环境解析（github: 源）；本地验证需
-  symlink 至 monorepo 构建产物或 mock registry。不要改依赖。bundle 插件
-  （dsh.client）同坑但**不声明依赖**——profile 的 pnpm 闭包挂载时注入；
-  声明了反而失败。
-- **安装与启用分离**——插件进入 config 并挂载才执行；boot log 干净才算
-  验证。
-- **entry 契约失败在挂载时暴露**：`dsh.entry` 指向 `.dsh-plugin/` 外、
-  缺 prepack、未声明依赖——在安装/挂载失败，而非编写时。
-- **ESM 缓存**：改已挂载插件的 `index.mjs` 需重启 web 才生效。
-- **宿主覆盖注入的 CSS**：关键 UI 样式必须 JS 内联（宿主全局 CSS 可能清掉
-  注入的 `<style>`），勿依赖 CSS class。
-- **先选形态**：写代码前先定能力面——纯 skill 包无需 entry；UI 插件需要
-  entry + httpServer，而不是已不存在的 client-half 机制。
-
-**读 `references/gotchas.md`** 获取完整清单（挂载排查顺序、schema-DSL
-时机、环境事实）。
+高频坑（官方包未发布、ESM 缓存重启、宿主 CSS 覆盖、entry 契约失败时机等）
+见 `references/gotchas.md`（唯一清单家）；**先读它再动手**。
 
 ## 参考
 
