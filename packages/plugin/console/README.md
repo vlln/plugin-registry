@@ -52,7 +52,7 @@ dsh plugin --profile web add .   # 当前目录即 bundle 包子目录（dsh 锚
 ## 使用
 
 - **repository 插件区**：增删 `repositories` 源列表行（`github:owner/repo#<ref>&path:/.dsh-plugin`），
-  每行可「检查更新」——固定到远端最新 commit（写配置，换代在下次启动/HMR）
+  每行可「检查更新」——固定到远端最新 commit（写配置后即时换代，无需重启）
 - **UI 插件区**：已加载 bundle 列表（用户 + 内置），行内「停用/启用」切换 Loader 树 `disabled` 标记；
   「安装 bundle 插件」经 `pnpm add` 把新 bundle 加进 profile 层栈
 
@@ -81,8 +81,9 @@ web 面板刷新即见 agent 写入结果（同文件，不实时推送）。
 
 ## 生效方式
 
-web 默认无运行中 HMR（官方 TODO），面板写配置后**重启 web 生效**；官方启用 web HMR 后自动事务性换代。
-Node half 改动需重启 web（ESM 缓存）；client 面板改动重装 + 刷新页面即可。
+- **repository 插件**：增删/更新写 `cordis.patch.yml` 后 **官方 config HMR 即时换代**（默认 web 生效，无需重启；远端克隆失败自动回滚旧代）
+- **UI（bundle）插件**：安装/更新/启停需**重启 web**（层栈/ESM 缓存）；已挂载 bundle 的运行时启停即时生效并持久化
+- **Node half 改动**需重启 web（ESM 缓存）；**client 面板改动**重装 + 刷新页面即可
 
 ## 开发插件（引导）
 

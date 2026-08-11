@@ -209,7 +209,7 @@ export function ConsolePanel(): React.ReactNode {
     }
   }, [])
 
-  /** 把指定源的 ref 更新为远端最新 commit（写配置，官方换代在下次启动）。 */
+  /** 把指定源的 ref 更新为远端最新 commit（写配置后官方 config HMR 即时换代，无需重启）。 */
   const applyUpdate = useCallback(async (source: string): Promise<void> => {
     setBusy(true)
     setError(undefined)
@@ -393,7 +393,7 @@ export function ConsolePanel(): React.ReactNode {
             {checking ? '检查中' : '检查更新'}
           </Button>,
         )}
-        <p style={introStyle}>`.dsh-plugin` 包源列表；增删行 = 装/卸，更新 = 固定到远端最新 commit。</p>
+        <p style={introStyle}>`.dsh-plugin` 包源列表；增删行 = 装/卸，更新 = 固定到远端最新 commit（改完即生效，无需重启）。</p>
         {state.repositories.length === 0 ? (
           <p style={{ ...introStyle, fontSize: 12, lineHeight: '18px' }}>未配置 repository 插件源。</p>
         ) : null}

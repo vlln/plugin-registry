@@ -617,7 +617,7 @@ export function apply(ctx: ConsoleCtx): void {
             })()
             return
           }
-          // 更新执行：把指定源的 ref 更新为远端最新 commit（写配置，官方换代在下次启动）
+          // 更新执行：把指定源的 ref 更新为远端最新 commit（写配置后官方 config HMR 即时换代，无需重启）
           if (method === 'POST' && (path === '/api/plugin-console/updates' || path === '/api/plugin-console/updates/')) {
             let body = ''
             ;(req as { on?: (e: string, cb: (c: Buffer) => void) => void })?.on?.('data', (c: Buffer) => { body += c.toString('utf8') })
