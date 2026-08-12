@@ -70,7 +70,7 @@ dsh plugin --profile web add .   # 产物已入库，无需构建；当前目录
 
 | Skill | 作用 |
 |---|---|
-| [make-dsh-plugin](skills/make-dsh-plugin/SKILL.md) | 创建官方 bundle / cordis 插件：先选形态（skill 包 / MCP / Node 工具 / 带 UI）→ 声明 `dsh.bundle` 或纯 apply → 安装验证纪律。详情分置 `references/`；参考实现 `whale-girl` |
+| [make-dsh-plugin](skills/make-dsh-plugin/SKILL.md) | 创建官方 bundle / cordis 插件：先选形态（skill 包 / MCP / Node 工具 / 带 UI）→ 声明 `dsh.bundle` 或纯 apply → 安装验证纪律。详情分置 `references/`；仓库内参考实现 `packages/plugin/console` |
 
 ## 开发前须知（踩过的坑）
 

@@ -78,4 +78,4 @@ web 面板刷新即见 agent 写入结果（同文件，不实时推送）。
 ## 开发插件（引导）
 
 创建官方 bundle 插件 / 纯 cordis 插件的契约见
-[make-dsh-plugin skill](../../../skills/make-dsh-plugin/SKILL.md)。参考实现：`whale-girl`。
+[make-dsh-plugin skill](../../../skills/make-dsh-plugin/SKILL.md)。仓库内参考实现：本包（bundle + 自渲染 client 的完整例子）。

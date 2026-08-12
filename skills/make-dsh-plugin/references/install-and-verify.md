@@ -40,5 +40,4 @@ bundle 插件同此表；额外确认挂载后 `__DSH_BOOT__` 含 client 行、`
 
 ## 参考实现
 
-- bundle + 自渲染 client：`whale-girl`（`__ModuleLoader__.load` 标准注册 + `apply(ctx)` 内自渲染 DOM）
-- bundle + client：`dsh-loop`、`dsh-task-status`、`packages/plugin/console`
+- 仓库内参考实现：`packages/plugin/console`（bundle + `__ModuleLoader__.load` client 完整例子）

@@ -89,7 +89,7 @@ export function apply(ctx) {
 
 ## client half（可选）——自渲染
 
-带 UI 的插件声明 `dsh.client` + `exports["./client"]`，client bundle 经 `__ModuleLoader__.load({id, factory})` 注册（factory 返回 `{name, apply}`，由 client 内核挂载时调用 `apply(ctx)`）。自渲染 DOM 逻辑放 `apply` 内——**与填官方 hole 正交**（whale-girl 实证自渲染跑 bundle 照常）。
+带 UI 的插件声明 `dsh.client` + `exports["./client"]`，client bundle 经 `__ModuleLoader__.load({id, factory})` 注册（factory 返回 `{name, apply}`，由 client 内核挂载时调用 `apply(ctx)`）。自渲染 DOM 逻辑放 `apply` 内——**与填官方 hole 正交**（自渲染跑 bundle 照常，参考实现 `packages/plugin/console`）。
 
 构建：esbuild CJS 输出 + 外层 `window.__ModuleLoader__.load` 包装（对齐 `packages/plugin/console` 的 tsdown banner/footer 模式）。
 

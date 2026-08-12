@@ -7,14 +7,14 @@
 | 旧插件现状 | 迁移目标 | 依据 |
 |---|---|---|
 | 已有官方 npm/cordis 包 + 增量 `dsh.plugin.json`（如 distill/dsh-vision/chat-width） | **bundle 插件**（`dsh.bundle` + patch） | 删除增量清单，走官方 bundle 通道——包本身没变，只去掉 registry 专属物 |
-| 纯旧机制插件（自造 `__ModuleLoader__` client half，如旧 loop/navbar/task-status） | **bundle 插件**（`dsh.bundle` + `dsh.client`） | Node half 已是 Cordis；client 转 `__ModuleLoader__.load` 标准 bundle（whale-girl 迁移范本） |
+| 纯旧机制插件（自造 `__ModuleLoader__` client half，如旧 loop/navbar/task-status） | **bundle 插件**（`dsh.bundle` + `dsh.client`） | Node half 已是 Cordis；client 转 `__ModuleLoader__.load` 标准 bundle（仓库内范本 `packages/plugin/console`） |
 | 不确定 | 看当前插件形态（[插件类型对比](../plugin-types.md)） | bundle vs 纯 cordis 判据 = 是否带组合层 |
 
 ## 迁移步骤（bundle 唯一路径）
 
 1. **删增量清单**：移除 `dsh.plugin.json`（`id`/`contributes` 声明面在官方格式不存在——工具由 entry 内 `defineTool` 注册）
 2. **声明 bundle**：`package.json#dsh.bundle`（`patch` 指向组合行 `cordis.patch.yml`，含 insert 挂载自身）；`dsh.client` 声明 + `exports["./client"]`（有 client half 时）
-3. **client 转标准 bundle**：`__ModuleLoader__.load({id, factory})`，factory 返回 `{name, apply}`（`exports["./client"]` 指向构建产物）；自渲染 DOM 逻辑保留在 `apply` 内——whale-girl 实证自渲染与 bundle 兼容
+3. **client 转标准 bundle**：`__ModuleLoader__.load({id, factory})`，factory 返回 `{name, apply}`（`exports["./client"]` 指向构建产物）；自渲染 DOM 逻辑保留在 `apply` 内——自渲染与 bundle 兼容（仓库内参考实现 `packages/plugin/console`）
 4. **Node half**：entry 保持 Cordis（`name`/`inject`/`apply`），`main`/`exports["."]` 指向；`inject` 声明所用服务（0811 cordis 严格注入，未声明即抛错）
 5. **安装**：`dsh plugin --profile web add <包路径>`（bundle 进 `dsh.profile.bundles` 层栈）
 6. **管理**：薄控制台（bundle 区 + 已加载区启停）

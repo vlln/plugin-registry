@@ -51,8 +51,8 @@ repository-plugin、`__ModuleLoader__` 之外的旧协议、`dsh registry` CLI�
 **核心判据**（0811 分类）：包是否声明 `dsh.bundle.patch`。声明 = 一层组合
 patch（多个 insert/config/disabled 行）→ `dsh plugin --profile web add` 进层栈，
 **重启生效**；无声明 = 单个 Cordis 插件 → profile `cordis.patch.yml` insert
-行，**配置 HMR 实时生效**。带 UI 的独立插件两类皆可（whale-girl 自渲染
-client 在 bundle 里照常工作）——选型看是否需要组合层，而非 UI 形态。
+行，**配置 HMR 实时生效**。带 UI 的独立插件两类皆可（自渲染 client 在
+bundle 里照常工作）——选型看是否需要组合层，而非 UI 形态。
 
 ## Step 1：仓库布局
 
@@ -98,7 +98,7 @@ make-skill）见 `references/entry-contract.md` 对应小节——不要发明�
 带 UI 的插件声明 `dsh.client`（platform web）+ `exports["./client"]`，client
 bundle 经 `__ModuleLoader__.load({id, factory})` 注册（factory 返回
 `{name, apply}`，由 client 内核挂载时调用 `apply(ctx)`）。自渲染 DOM 逻辑
-放 `apply` 内——**与填官方 hole 正交**（whale-girl 实证自渲染跑 bundle 照常）。
+放 `apply` 内——**与填官方 hole 正交**（自渲染跑 bundle 照常，参考实现 `packages/plugin/console`）。
 
 构建：esbuild CJS 输出 + 外层 `window.__ModuleLoader__.load` 包装（对齐
 `packages/plugin/console` 的 tsdown banner/footer 模式）。
@@ -219,4 +219,4 @@ skill 产出，README 推荐回 plugin-registry 的管理工具）。
   - `references/install-and-verify.md` — 按改动面验证
   - `references/gotchas.md` — 坑（官方包未发布、严格注入、ESM 缓存、宿主 CSS 覆盖）
   - `references/dev-conventions.md` — 门禁、决策记录
-- 参考实现：`whale-girl`（自渲染 UI，bundle 形态）、`dsh-loop`、`dsh-task-status`、`packages/plugin/console`
+- 参考实现（仓库内可见）：`packages/plugin/console`（bundle + `__ModuleLoader__.load` client 的完整例子）
