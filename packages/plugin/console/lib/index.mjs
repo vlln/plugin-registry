@@ -603,7 +603,7 @@ function createPluginTools(deps) {
 * ① `dsh.profile.bundles`（bundle 插件，pnpm add/reconcile）；
 * ② profile `cordis.patch.yml` 的 insert 行（非 bundle 插件，配置 HMR
 * 实时挂载，无需重启）；③ 同文件的 disabled 标记（启停持久化）。
-* 经 httpServer 提供 `/api/plugin-console` 路由供浏览器面板调用。
+* 经 webServer 提供 `/api/plugin-console` 路由供浏览器面板调用。
 *
 * 0 patch：完全官方机制——glue 插件经 bundle 挂载，安装态是官方
 * HMR-watched 的 profile 用户 patch 层 + 官方 bundle 层栈。
@@ -1025,7 +1025,7 @@ async function refreshVersions(ctx, force) {
 const name = "plugin-console";
 /** 需要宿主 web server（web 组合）+ loader（读/改 loader 树条目）+ tools（注册 plugin_* 管理工具）+ agentPresets（预设挂载标注）。 */
 const inject = [
-	"httpServer",
+	"webServer",
 	"loader",
 	"tools",
 	"agentPresets"
@@ -1056,8 +1056,8 @@ function apply(ctx) {
 		});
 		const disposeTools = ctx.tools?.register !== void 0 ? pluginTools.map((tool) => ctx.tools.register(tool)) : [];
 		if (disposeTools.length > 0) console.log(`[plugin-console] registered plugin tools: ${pluginTools.map((t) => t.name).join(", ")}`);
-		const httpServer = ctx.httpServer;
-		if (httpServer === void 0) return () => {
+		const webServer = ctx.webServer;
+		if (webServer === void 0) return () => {
 			for (const dispose of disposeTools) dispose();
 		};
 		const prescanTimer = setTimeout(() => {
@@ -1065,7 +1065,7 @@ function apply(ctx) {
 				console.log(`[plugin-console] version prescan failed: ${error instanceof Error ? error.message : String(error)}`);
 			});
 		}, 3e4);
-		const disposeRoutes = httpServer.register({
+		const disposeRoutes = webServer.register({
 			kind: "prefix",
 			path: "/api/plugin-console",
 			handler: async (req, res) => {

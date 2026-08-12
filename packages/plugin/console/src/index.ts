@@ -3,7 +3,7 @@
  * ① `dsh.profile.bundles`（bundle 插件，pnpm add/reconcile）；
  * ② profile `cordis.patch.yml` 的 insert 行（非 bundle 插件，配置 HMR
  * 实时挂载，无需重启）；③ 同文件的 disabled 标记（启停持久化）。
- * 经 httpServer 提供 `/api/plugin-console` 路由供浏览器面板调用。
+ * 经 webServer 提供 `/api/plugin-console` 路由供浏览器面板调用。
  *
  * 0 patch：完全官方机制——glue 插件经 bundle 挂载，安装态是官方
  * HMR-watched 的 profile 用户 patch 层 + 官方 bundle 层栈。
@@ -574,10 +574,10 @@ interface WebServerLike {
 export const name = 'plugin-console'
 
 /** 需要宿主 web server（web 组合）+ loader（读/改 loader 树条目）+ tools（注册 plugin_* 管理工具）+ agentPresets（预设挂载标注）。 */
-export const inject = ['httpServer', 'loader', 'tools', 'agentPresets']
+export const inject = ['webServer', 'loader', 'tools', 'agentPresets']
 
 interface ConsoleCtx extends Context {
-  httpServer?: WebServerLike
+  webServer?: WebServerLike
   /** 官方工具注册服务（工具面；web 组合提供）。 */
   tools?: { register(definition: unknown): () => void }
 }
@@ -607,8 +607,8 @@ export function apply(ctx: ConsoleCtx): void {
     if (disposeTools.length > 0) {
       console.log(`[plugin-console] registered plugin tools: ${pluginTools.map((t) => (t as { name?: string }).name).join(', ')}`)
     }
-    const httpServer = ctx.httpServer
-    if (httpServer === undefined) {
+    const webServer = ctx.webServer
+    if (webServer === undefined) {
       return () => { for (const dispose of disposeTools) dispose() }
     }
     // 启动延迟预扫描：web 起来 30 秒后批量查一次 registry 版本，填充缓存
@@ -618,7 +618,7 @@ export function apply(ctx: ConsoleCtx): void {
         console.log(`[plugin-console] version prescan failed: ${error instanceof Error ? error.message : String(error)}`)
       })
     }, 30_000)
-    const disposeRoutes = httpServer.register({
+    const disposeRoutes = webServer.register({
       kind: 'prefix',
       path: '/api/plugin-console',
       handler: async (req, res) => {
