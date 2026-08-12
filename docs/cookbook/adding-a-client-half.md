@@ -52,17 +52,15 @@ window.__ModuleLoader__.load({
 1. **在 dsh 源码环境内**：插件目录放 `tsdown.config.ts`，引用 dsh 的 client preset 或等价配置，产出 `client.js` 随插件分发。
 2. **任意 bundler**：按契约手工产出（外部依赖只能是平台模块 `connection`/`runtime` 等，其余内联；跨插件值导入是运行时 loud 错误，协作走 cordis 服务）。
 
-完整契约见 [registry client half 设计稿](../registry-client-half-design.md#构建契约bundle-格式--模块表面)；可安装示例：`whale-girl`（自渲染 client，entry 路由服务）。
+完整契约见 [registry client half 设计稿](../registry-client-half-design.md#构建契约bundle-格式--模块表面)；可安装示例：`whale-girl`（自渲染 client，现为官方 bundle，`__ModuleLoader__.load` 标准注册）。
 
 ## 4. 安装、启用、验证
 
 ```sh
-dsh registry install ./my-plugin        # 安装（默认禁用；client.main 缺失会在此时报错）
-dsh registry enable acme/greeter        # 启用：挂载 Node 侧 + 登记 client half
-dsh registry list                       # enabled acme/greeter@0.1.0
+dsh plugin --profile web add <包路径>   # bundle 进层栈；client 经 __DSH_BOOT__ 挂载
 ```
 
-**验证点**：启用后 Web 刷新页面，bundle 经 `/plugins/acme/greeter/client.js` 进入 `__DSH_BOOT__`，浏览器出现插件 UI；`dsh registry disable` 后刷新，UI 消失。
+**验证点**：重启 web 后刷新页面，client 经 `/plugins/<id>/client.js` 进入 `__DSH_BOOT__`，浏览器出现插件 UI；`__ModuleLoader__` 注册成功无 `loaded without registering` 报错。
 
 ## 3.5 client half 的 UI 自由度
 

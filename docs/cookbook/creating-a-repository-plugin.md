@@ -1,6 +1,6 @@
-# Cookbook：创建官方 repository-plugin（0809 格式）
+# Cookbook：创建官方 repository-plugin（0809 格式）【历史存档】
 
-> 本文是「创建官方 repository-plugin」的权威文档。官方 0809 的仓库插件格式（`.dsh-plugin` + `cordis.patch.yml` 安装）替代旧机制（`dsh.plugin.json`/`dsh registry`，已移除，见 [official-0809-coverage](../official-0809-coverage.md)）。完整参考实现：`whale-girl`（GUI 宠物插件，含门禁/决策/素材契约/自渲染 client）。
+> **历史文档（2026-08-12）**：官方 0811 移除 repository-plugins 机制（`vendor/loader/src/repository.ts` 删除），本文描述的 `.dsh-plugin` + `repository-plugins.repositories` 安装路径**已不可用**。仅作决策依据与演进记录保留。当前插件形态见 [插件类型对比](../plugin-types.md)（bundle vs 纯 cordis）——原 repository 参考实现 `whale-girl` 已迁移为官方 bundle（自渲染 client 照常工作，见 whale-girl 仓库决策记录）。
 
 ## 仓库布局
 

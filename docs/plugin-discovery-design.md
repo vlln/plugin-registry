@@ -4,12 +4,12 @@
 
 ## 背景与定位
 
-官方基线（0809 起）只定义安装态：
+官方基线（0811 起）只定义 web profile 安装态（repository-plugins 机制已移除）：
 
-- **repository 插件**：`$DSH_HOME/cordis.patch.yml` 的 `repository-plugins.repositories` 行，源格式 `github:owner/repo#<精确ref>&path:/.dsh-plugin`，官方 RepositoryCache clone + prepare + 事务性换代
-- **bundle 插件**：profile 层栈，`dsh plugin --profile web add <pkg>`（pnpm forwarder + reconcile）
+- **bundle 插件**：profile 层栈，`dsh plugin --profile web add <pkg>`（pnpm forwarder + reconcile），重启生效
+- **纯 cordis 插件**：profile `cordis.patch.yml` insert 行，配置 HMR 实时生效
 
-官方 **config-only 决策明确拒绝** install 命令与「注册表/安装数据库/市场/发现索引」。组织 hub 索引（`plugins.json`，204 仓库，2h 自动刷新）是泛仓库列表（含非插件仓库），非官方格式，不宜直接当插件源。
+官方 **config-only 决策明确拒绝** install 命令与「注册表/安装数据库/市场/发现索引」。组织 hub 索引（`catalog.json`，241 仓库，2h 自动刷新）是泛仓库列表（含非插件仓库），非官方格式，不宜直接当插件源。
 
 **定位**：发现层是 agent 工具面（`defineTool` 注册的 `plugin_*` 工具）与 console 面板（人操作面）共享同一安装态的**读侧**。安装态始终留在官方位置（`cordis.patch.yml`）；发现层只回答"能装什么、怎么装、可不可信"。
 
@@ -19,8 +19,7 @@
 
 ```
 $DSH_HOME/
-├── cordis.patch.yml              # 安装态（官方位置，发现层不动）
-├── cache/repository-plugins/     # 官方 RepositoryCache（不动）
+├── profiles/web/cordis.patch.yml # 安装态（profile patch 层，发现层不动）
 └── plugin-sources/               # 发现层域根（本协议拥有）
     ├── sources.yml               # 源集合（用户可编辑的唯一配置入口）
     ├── lock.yml                  # TOFU：canonical-source → resolved-commit + content-hash
@@ -40,19 +39,15 @@ sources:
     kind: index                          # 读现成索引文件（hub plugins.json / 任何 catalog）
     locator: https://raw.githubusercontent.com/dsh-external/hub/main/plugins.json
     trust: official                      # official / community / untrusted
-  - id: my-plugins
-    kind: manifest                       # 用户手写清单
-    locator: file://$DSH_HOME/plugin-sources/my.yml
-  - id: whale-girl
-    kind: single                         # 单仓库直引
-    locator: github:dsh-external/whale-girl#<ref>&path:/.dsh-plugin
-    trust: official
+  - id: my-catalog
+    kind: index                         # 本地 catalog 文件（hub clone 或手写）
+    locator: file://$DSH_HOME/plugin-sources/catalog.json
+    trust: community
 ```
 
-- **index**：hub 即组织默认源（富化层——只做分类/描述，`dsh.*` 字段仍是身份与安装语义的权威）
-- **manifest**：个人源（几个仓库的手写清单）
-- **single**：单仓库直引，探测单插件元数据
+- **index**：hub 即组织默认源（富化层——只做分类/描述；0811 起 hub catalog 的 `bundle` 标记决定安装形态）
 - 每源带 `trust` 层级——agent 自动安装第三方前的供应链防线（一行字段的成本）
+- **0811 变化**：原 `single`（单仓库直引探测）/`manifest` 源类型随 repository 机制移除；外部插件统一是 npm 包（bundle 或纯 cordis），发现层只保留 index（hub catalog）
 
 ## 枚举与缓存
 
@@ -75,9 +70,9 @@ sources:
 
 | 工具 | 参数 | 行为 |
 |---|---|---|
-| `plugin_search` | `query?`, `source?`, `refresh?` | `source` 给定 → 把该源加入源集合（若新）→ 枚举（懒加载探测 / 缓存命中 / refresh 强制刷新）→ 过滤返回 |
-| `plugin_install` | `source` | 官方格式源直装；已装则更新 ref；解析并固化 resolved commit 到 lock.yml；装过的源自动入 sources.yml |
-| `plugin_uninstall` | `id` | 删安装态行（清单保留，可再装） |
+| `plugin_search` | `query?`, `source?`, `refresh?` | `source` 给定 → 把该源加入源集合（若新）→ 枚举（缓存命中 / refresh 强制刷新）→ 过滤返回 |
+| `plugin_install` | `source` | npm 包直装：声明 `dsh.bundle` → pnpm add + 层栈（重启生效）；纯 cordis → pnpm add + insert 行（实时挂载）；TOFU 固化到 lock.yml |
+| `plugin_uninstall` | `id` | 删 insert 行（实时）或 bundle 依赖（重启生效）；清单保留，可再装 |
 | `plugin_status` | `id?` | 无参 = list 安装态；有参 = 单插件状态 |
 
 ## 设计依据（包管理器对照摘要）
@@ -104,9 +99,10 @@ sources:
 
 ## 实现同步（2026-08，落地后补充）
 
-- **已实现**（`ea7f285` + 测试）：4 工具注册（`inject tools` + `ctx.tools.register`）；`src/discovery/{store,enumerate,tools,types}.ts`；web boot 日志 `registered plugin tools` 实证；39 项 node:test + 20 项 e2e（真实 hub 索引 159 条 → 安装写 `cordis.patch.yml` → 状态/更新/卸载/裸 ref 拒绝）
-- **实现偏差**：
-  - `index` 源 locator 支持**本地文件**（`file://` 或裸路径）——hub 仓库为私有，匿名 `raw.githubusercontent` 404，本机经 hub clone 的 `plugins.json` 走本地通道（hub 2h 自动刷新同步）
-  - `plugin_search` 的 `source` 参数按形态推断：URL/file → index，`github:` → single，npm 包 → 仅记住源（bundle 无发现元数据，直接 install）
+- **已实现**（0811 适配）：4 工具注册（`inject tools` + `ctx.tools.register`）；`src/discovery/{store,enumerate,tools,types}.ts`；web boot 日志 `registered plugin tools` 实证；34 项 node:test
+- **0811 适配**（repository 机制移除后重写）：
+  - `enumerate.ts` 删 `single`（github raw 探测）/`manifest` 源，仅保留 `index`（hub catalog，`repos` 格式）
+  - `store.ts` 源 kind 收紧为 `index`；lock kind 收紧为 `bundle`/`plugin`
+  - `plugin_install` 按包是否声明 `dsh.bundle` 分流：bundle → pnpm add + 层栈（重启生效）；纯 cordis → pnpm add + insert 行（配置 HMR 实时挂载，零重启）
+  - `index` 源 locator 支持**本地文件**（`file://` 或裸路径）——hub 仓库为私有，匿名 `raw.githubusercontent` 404，本机经 hub clone 的 `catalog.json` 走本地通道（hub 2h 自动刷新同步）
   - 测试管线用 **node:test + tsx**（vitest 4/vite 8 与 vite 7 的 NodeNext 解析在独立包环境不兼容；`tests/tsconfig.json` paths 把未发布的 `@deepseek-ai/dsh-tools` 映射到 stub）
-  - `plugin_install` 对 bundle 走 `pnpm add` + reconcile；`plugin_uninstall` 仅覆盖 repository 行（bundle 卸载留面板/手动）
