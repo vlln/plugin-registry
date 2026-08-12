@@ -10,6 +10,7 @@ plugin-registry 的推进路线。状态标注：`待决策`（需先拍板形�
 | 跨 session 全局看板 | 暂缓 | 同上，基于已移除的 `conversation.view` 机制，需重评估 |
 | task-status 输出投影 | 暂缓 | 基于已移除的轮询投影通道，需重评估 |
 | **agent native 插件生态管理** | 实施完成（agent 真调待 LLM 环境） | 设计定稿（`docs/plugin-discovery-design.md`）；实现落地——console Node half 注册 `plugin_search/install/uninstall/status` ×4 工具（`ea7f285`）；发现层 `$DSH_HOME/plugin-sources/`（sources.yml 源集合 + lock.yml TOFU + cache/ 快照）；index（URL/本地文件）/single（懒加载探测 1h 缓存）/manifest 三源类型；trust 层级 + first-index + 禁裸分支。验证：39 项 node:test + 20 项 e2e + web 注册日志实证。剩余：GUI 会话 agent 真调（需 LLM key） |
+| **bundle 实时展开**（装 bundle 零重启） | 下轮 | 设计定稿（`docs/console-ui-plugin-management.md`「待实现」节）：bundle 包内 patch 行展开写入用户 profile patch → 配置 HMR 实时生效，消除「装 bundle 需重启」反直觉；已实测 insert 行实时挂载通道可用（`[HMR-PROBE] applied`） |
 
 
 ## 文档项（零代码）
@@ -21,7 +22,7 @@ plugin-registry 的推进路线。状态标注：`待决策`（需先拍板形�
 
 ## 官方基线持续对齐
 
-- 机制分支 `feat/plugin-registry-mvp-0808` 已冻结退役（0809 转向后不再演进）；当前基线 = 官方 0810 快照，验证站 `/tmp/dsh-0810`（薄控制台验证通过，见 CHANGELOG）
+- 机制分支 `feat/plugin-registry-mvp-0808` 已冻结退役（0809 转向后不再演进）；当前基线 = 官方 0811 快照，验证站 `/tmp/dsh-0811` + `/tmp/dsh-0811-home`（薄控制台 profile patch 双通道适配验证通过，见 CHANGELOG 0811 条目）
 
 ## 已决定不做（记录）
 
