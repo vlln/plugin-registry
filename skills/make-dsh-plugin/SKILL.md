@@ -1,138 +1,142 @@
 ---
 name: make-dsh-plugin
 description: >
-  当用户要为 DeepSeek Harness 开发官方 repository-plugin（0809 格式）插件时
-  使用本 skill。引导形态选择（纯 skill 包 / MCP server / Node 工具 / 浏览器
-  UI），然后搭建 `.dsh-plugin/` 包：package.json#dsh.entry（或 dsh.skills /
-  dsh.mcpServers）、Cordis entry、可选自渲染 client、prepack、cordis.patch.yml
-  安装。也覆盖开发规范（门禁、决策记录、验证纪律）。不是已移除的旧机制
-  （dsh.plugin.json / dsh registry）。
+  当用户要为 DeepSeek Harness 开发官方 bundle 插件或纯 cordis 插件时使用
+  本 skill。引导形态选择（纯 skill 包 / MCP server / Node 工具 / 浏览器 UI /
+  组合层），然后搭建 npm 包：dsh.bundle + cordis.patch.yml（或纯 Cordis
+  entry + insert 行）、可选 dsh.client、安装验证纪律。也覆盖开发规范
+  （门禁、决策记录、验证纪律）。不是已移除的旧机制（dsh.plugin.json /
+  dsh registry / repository-plugin）。
 license: BSD-3-Clause
 metadata:
   author: dsh-external/plugin-registry
-  version: "2.0.0"
+  version: "3.0.0"
 requires:
   bins:
     - dsh
 ---
 
-# 创建官方 repository-plugin
+# 创建官方 bundle / cordis 插件
 
-本 skill 构建 **repository-plugin**（0809 官方格式）：一个仓库（或子目录）
-本身即插件，经 `$DSH_HOME/cordis.patch.yml` 安装。**没有** manifest 协议、没有
-`__ModuleLoader__`、没有 `dsh registry` CLI——旧机制已于 2026-08 移除。
+本 skill 构建 **0811 官方形态**的插件：外部插件统一是 npm 包，经 web
+profile 安装——声明 `dsh.bundle` 的走层栈（重启生效），纯 Cordis 包走
+profile `cordis.patch.yml` insert 行（配置 HMR 实时生效）。**没有**
+repository-plugin、`__ModuleLoader__` 之外的旧协议、`dsh registry` CLI——
+旧机制已于 2026-08 移除（0811 起 repository-plugins 机制删除）。
 
-**权威契约内嵌在本 skill 的 `references/`**（entry + skill + MCP 在
-`entry-contract.md`、bundle 在 `bundle-plugins.md`、验证在
-`install-and-verify.md`、规范在 `dev-conventions.md`、坑在
-`gotchas.md`）——开发不需要任何仓库文档。到达对应阶段时读对应 reference。
+**权威契约内嵌在本 skill 的 `references/`**（bundle + entry + skill + MCP 在
+`bundle-plugins.md` 与 `entry-contract.md`、验证在 `install-and-verify.md`、
+规范在 `dev-conventions.md`、坑在 `gotchas.md`）——开发不需要任何仓库文档。
+到达对应阶段时读对应 reference。
 
 ## 何时使用
 
 - 用户想为 dsh 开发新插件（工具、skill 包、MCP server、事件监听、服务、
   命令、prompt、浏览器 UI）。
-- 用户要 repository-plugin 的脚手架 / 示例 / 模板。
-- 插件挂载失败且原因是 entry 契约。
+- 用户要 bundle 插件 / 纯 cordis 插件的脚手架 / 示例 / 模板。
+- 插件挂载失败且原因是 entry 契约或安装通道。
 
 ## Step 0：选择插件形态
 
-按插件分发什么选官方路径。`dsh` 字段 strict——能力面二选一：
+按插件分发什么选官方路径。`dsh` 字段 strict——能力面声明：
 
-| 需求 | 官方路径 | `dsh` 字段 | 起点 |
+| 需求 | 官方路径 | 安装通道 | 起点 |
 |---|---|---|---|
-| 纯 skill 包（无代码） | `.dsh-plugin/skills/` + prepack | `dsh.skills` | Step 2（skills） |
-| MCP server | `.dsh-plugin/mcp/` + 声明 | `dsh.mcpServers` | Step 2（mcp） |
-| Node 工具 / 事件 / 服务 | Cordis entry + `defineTool` | `dsh.entry` | Step 3 |
-| Node + 浏览器 UI | entry + httpServer 路由 + 自渲染 client | `dsh.entry` | Step 4 |
-| Bundle（产品服务、dsh.client UI） | npm 包 + `dsh.bundle` | `dsh.bundle` | 读 `references/bundle-plugins.md` |
+| 纯 skill 包（无代码） | npm 包 + `dsh.skills` | bundle（或 insert 行） | Step 2（skills） |
+| MCP server | npm 包 + `dsh.mcpServers` | bundle（或 insert 行） | Step 2（mcp） |
+| Node 工具 / 事件 / 服务 | npm 包 + Cordis entry（`main`） | insert 行（实时） | Step 3 |
+| Node + 浏览器 UI | npm 包 + Cordis entry + `dsh.client` | bundle | Step 3 + 4 |
+| 带组合层（多行 insert/config/disabled 随包分发） | npm 包 + `dsh.bundle` | bundle 层栈 | 读 `references/bundle-plugins.md` |
 
-插件可组合多面（如一个 skill 包 + 一个工具共存于一个 `.dsh-plugin`）。前四行是
-**repository 插件**（用户经 cordis.patch.yml 安装，本 skill 主路径——下方 Step 1-6）；
-最后一行是 **bundle 插件**（随 profile 分发，安装/管理不同——见
-`references/bundle-plugins.md`）。
+**核心判据**（0811 分类）：包是否声明 `dsh.bundle.patch`。声明 = 一层组合
+patch（多个 insert/config/disabled 行）→ `dsh plugin --profile web add` 进层栈，
+**重启生效**；无声明 = 单个 Cordis 插件 → profile `cordis.patch.yml` insert
+行，**配置 HMR 实时生效**。带 UI 的独立插件两类皆可（whale-girl 自渲染
+client 在 bundle 里照常工作）——选型看是否需要组合层，而非 UI 形态。
 
 ## Step 1：仓库布局
 
-`my-plugin/` 根保留元资产（文档/决策等，不分发）；分发路径全部在
-`.dsh-plugin/` 内（官方 containment 契约）：
+`my-plugin/` 根即 npm 包（bundle 形态包根 = 仓库根）：
 
 ```
 my-plugin/
-├── .dsh-plugin/
-│   ├── package.json            # name/version + dsh.* + scripts.prepack
-│   ├── index.mjs               # Node half 入口：完整 Cordis 插件
-│   ├── client/  client.js      # 自渲染 client 源码 / 构建产物
-│   ├── assets/                 # entry 路由静态服务的文件
-│   └── src/                    # 纯逻辑（零宿主依赖，可单测）
-└── scripts/                    # 门禁 + 生成器（可选）
+├── package.json            # name/version + main/exports + dsh.bundle/dsh.client
+├── cordis.patch.yml        # dsh.bundle 声明的组合层（insert 挂载自身）
+├── index.mjs               # Node half 入口：完整 Cordis 插件（main/exports["."]）
+├── client/  lib/client.js  # client bundle 源码 / 构建产物（dsh.client 通道）
+└── scripts/                # 门禁 + 生成器（可选）
 ```
 
 ## Step 2：`package.json` + 能力面
 
-按 `references/entry-contract.md` 的模板。关键决策：
+按 `references/bundle-plugins.md` 与 `references/entry-contract.md` 的模板。
+关键决策：
 
-- `dsh` 字段：`skills` / `mcpServers` / `entry`（strict，官方 schema）。无
-  `contributes`——工具在 entry 内经 `defineTool` 注册。
-- `scripts.prepack` **必须**调用 `dsh-plugin-prepare`（devDep
-  `@deepseek-ai/dsh-repository-plugin`）——不要手写生成的
-  `dsh-plugin.mjs` / `dsh-plugin-assets/`。
+- `dsh.bundle.patch` → `cordis.patch.yml`（组合层，含 `- insert: - id: <自身> name: <包名>`）
+- `dsh.client` 声明（platform web）+ `exports["./client"]`（有 client half 时）
+- `main`/`exports["."]` 指向 Cordis entry（`name`/`inject`/`apply`）
+- `inject` 声明 `ctx.get` 用到的全部服务（`settings`/`httpServer` 等）——
+  **0811 cordis 严格注入**：未声明即抛 `cannot get property without inject`
 
 ### Skill 包（`dsh.skills`）与 MCP server（`dsh.mcpServers`）
 
-声明写法（`dsh.skills` 相对路径列表 / `dsh.mcpServers` 的 server-id → 启动配置映射）与
-SKILL.md 写法规范（frontmatter / 正文模式 / <500 行，遵循 make-skill）见
-`references/entry-contract.md` 对应小节——不要发明竞争格式。
-
-**到达 Step 3/4 时读 `references/entry-contract.md`** 获取完整 `dsh.entry`
-契约。
+声明写法（`dsh.skills` 相对路径列表 / `dsh.mcpServers` 的 server-id → 启动
+配置映射）与 SKILL.md 写法规范（frontmatter / 正文模式 / <500 行，遵循
+make-skill）见 `references/entry-contract.md` 对应小节——不要发明竞争格式。
 
 ## Step 3：Node half——Cordis entry
 
 `index.mjs` 导出完整 Cordis 插件（`name`/`inject`/`apply`）。用 `defineTool`
 注册工具；服务/事件/命令/prompt 是完整 Cordis，无需声明。依赖解析是官方
-运行时的职责（`@deepseek-ai/*`、`cordis`）。在 `ctx.effect()`/`ctx.on()` 内
-注册，disable 时清理。
+运行时的职责（`@deepseek-ai/*`、`cordis`——profile pnpm 闭包注入，勿声明）。
+在 `ctx.effect()`/`ctx.on()` 内注册，disable 时清理。
 
-**检查点**：entry 可解析；工具已注册；无未声明依赖。
+**检查点**：entry 可解析；工具已注册；inject 声明完整。
 
 ## Step 4：Client half（可选）——自渲染
 
-无动态 client-half 机制。带 UI 的插件：
-1. entry 注册 httpServer 路由服务 client 脚本（`GET /my-plugin/ui.js`）；
-2. client 脚本自执行 DOM 渲染（无 `__ModuleLoader__`）；
-3. 页面注入是插件自己的事（宿主页 `<script>` 注入或配置注入点）。
+带 UI 的插件声明 `dsh.client`（platform web）+ `exports["./client"]`，client
+bundle 经 `__ModuleLoader__.load({id, factory})` 注册（factory 返回
+`{name, apply}`，由 client 内核挂载时调用 `apply(ctx)`）。自渲染 DOM 逻辑
+放 `apply` 内——**与填官方 hole 正交**（whale-girl 实证自渲染跑 bundle 照常）。
 
-完整模式：entry 注册 `ui.js`/`state`/`assets` 路由，宿主页注入 `<script>`（tapIndex 注入）。
+构建：esbuild CJS 输出 + 外层 `window.__ModuleLoader__.load` 包装（对齐
+`packages/plugin/console` 的 tsdown banner/footer 模式）。
 
-**检查点**：浏览器冒烟通过——headless Chrome dump-dom 显示插件的 DOM
-marker 且无 "Failed to load plugins"。
+**检查点**：`__DSH_BOOT__` 含 client 行；`/plugins/<id>/client.js` 200；无
+`loaded without registering` 报错。
 
 ## Step 5：安装与验证
 
-两条安装通道（写法细则见 `references/install-and-verify.md` 与 `references/bundle-plugins.md`）：
+安装通道（写法细则见 `references/install-and-verify.md` 与
+`references/bundle-plugins.md`）：
 
-- **repository**：`$DSH_HOME/cordis.patch.yml` 的 `repository-plugins.repositories` 加 `github:owner/repo#<ref>&path:/.dsh-plugin`——**唯一安装方式**；勿写 `dsh plugin add`（那是 bundle 通道）或已移除的 `dsh registry`
-- **bundle**：`dsh plugin --profile web add <bundle 包路径>`——含 `dsh.bundle` 的 npm 包目录/git 源；git 源 monorepo 子目录 `#<commit>&path:/<子目录>`，**产物入库（推荐）→ 真一行安装**，不入库则 `prepare` + `allowBuilds` 放行
+- **bundle**：`dsh plugin --profile web add <包路径/git 源>`——声明 `dsh.bundle`
+  的 npm 包；git 源一行（产物入库）或本地目录；装完**重启 web**
+- **纯 cordis**：`dsh plugin --profile web add <包>` 装依赖 + profile
+  `cordis.patch.yml` insert 行——**配置 HMR 实时挂载，零重启**
 
-**写安装说明时必须给出用户可直接复制的命令**；验证按改动面（哪些需重启 web vs 只刷新）与挂载失败排查见 `references/install-and-verify.md`。
+**写安装说明时必须给出用户可直接复制的命令**；验证按改动面（哪些需重启
+web vs 只刷新）与挂载失败排查见 `references/install-and-verify.md`。
 
 ## Step 5b：发布到 GitHub
 
-仓库本身就是分发单元——设置好让用户能找到并安装。
+npm 包（或 git 源）是分发单元——设置好让用户能找到并安装。
 
 **仓库 description**（一行：是什么 + 怎么装），具体模板：
 
 ```
-DSH 插件：<一句话功能>。官方 repository-plugin（.dsh-plugin 格式），cordis.patch.yml 安装：github:owner/repo#<ref>&path:/.dsh-plugin
+DSH 插件：<一句话功能>。官方 bundle 插件，dsh plugin --profile web add：github:owner/repo#<ref>
 ```
 
-遵循形态 "DSH plugin: <what it does>; official repository-plugin format,
-install via cordis.patch.yml `<repo-ref>`"。双语可选（英文在前利于国际发现）。
+遵循形态 "DSH plugin: <what it does>; official bundle, install via
+`dsh plugin --profile web add` `<repo-ref>`"。双语可选（英文在前利于国际发现）。
 
-**仓库 topics（GitHub 标签）**：打标签便于 `gh`/搜索/发现。**标签要描述插件实际做什么，而非只贴生态通用词**。两类组合：
+**仓库 topics（GitHub 标签）**：打标签便于 `gh`/搜索/发现。**标签要描述插件
+实际做什么，而非只贴生态通用词**。两类组合：
 
 **生态标签**（固定少量，标识 dsh 生态身份）：
-- `dsh` / `dsh-repository-plugin`（bundle 用 `dsh-bundle`）
+- `dsh` / `dsh-bundle`
 - `deepseek-harness`
 
 **功能标签**（有意义——描述插件能力/领域，按插件实际内容定）：
@@ -150,16 +154,11 @@ install via cordis.patch.yml `<repo-ref>`"。双语可选（英文在前利于�
 打标签。
 
 **发布检查清单**（分享仓库前）：
-- [ ] `package.json#dsh.entry` 指向 `.dsh-plugin/` 内；prepack 运行
-  `dsh-plugin-prepare`
+- [ ] `package.json#main`/`exports` 指向 entry；`dsh.bundle.patch` → `cordis.patch.yml`
 - [ ] 门禁通过（`scripts/gates/run.mjs`）——仓库自带门禁
-- [ ] README 有安装（cordis.patch.yml 行含具体 ref）、使用、skill 表（Step 6
-  规范）
+- [ ] README 有安装（`dsh plugin --profile web add` 含具体 ref）、使用、能力表
 - [ ] 仓库 description + topics 已设置（见上）
-- [ ] 安装冒烟：新 `cordis.patch.yml` 行 → 挂载 → boot log 干净
-
-无需 release 资产——仓库即插件（clone + prepare + prepack）。若要版本化
-ref，给提交打 tag 并把 README 的 config 行指向该 tag 的 commit 哈希。
+- [ ] 安装冒烟：装 → 挂载 → boot log 干净
 
 ## Step 6：开发规范
 
@@ -182,29 +181,6 @@ ref，给提交打 tag 并把 README 的 config 行指向该 tag 的 commit 哈�
 `docs/` 并引用；图片路径相对仓库内（如 `docs/preview/*.gif`），md-links
 可解析。纯 CLI 工具无 UI 可豁免，但 README 应有可演示的示例输出。
 
-**截取方式**（按需要选）：
-- **方式一：静态示意**（快、视觉近似）——手工构造 mock HTML（样式从插件
-  源码复制 token/圆角/间距），headless Chrome 截图：
-  ```sh
-  "/Applications/Google Chrome.app/.../Google Chrome" --headless \
-    --screenshot=out.png --window-size=980,280 file:///tmp/mock.html
-  ```
-  适用：布局/样式示意；**局限**：不运行 React 组件/官方槽，布局易错（缺
-  锚点会错位——用像素检查确认）。
-- **方式二：真实运行截图**（真、成本高）——官方 dsh web 真实运行，CDP
-  驱动 + 数据桩，官方槽渲染真实插件组件后截图。关键链路：
-  1. **会话显示**：workspace 与启动 cwd 绑定——用匹配 cwd 重启 web，侧栏
-     出现会话；
-  2. **对话页**：前端路由 `#/c/<id>` 导航 + CDP 点击侧栏会话 → 真实
-     chatFlow；
-  3. **数据**：CDP 注入 fetch 桩（`Runtime.evaluate` 包装 `window.fetch`
-     拦截 `/plugins/<id>/...` 返回演示数据）→ 官方组件轮询拿到数据 → 真实
-     渲染；
-  4. **精确截图**：`Page.captureScreenshot { clip: 元素 rect }`。
-  适用：README 主图/效果展示；**唯一桩**是插件数据（真实任务需模型在 GUI
-  运行，headless 无法驱动）。成本高（环境逆向 + CDP 脚本），README 主图
-  值得，示意足够时用方式一。
-
 **能力面表格**：
 
 - **Skills**（恒有）：`| Skill | 作用 |`——每个 SKILL.md 一行。
@@ -215,36 +191,32 @@ ref，给提交打 tag 并把 README 的 config 行指向该 tag 的 commit 哈�
 适用于任何带 skills/MCP/tools 的仓库。
 
 **推荐管理章节**（README 固定含一节，向用户推荐插件管理方式）：已装插件的
-管理，在 README 写一节推荐 plugin-registry 的薄控制台（官方 config 的
-浏览器管理面板）——模板：
+管理，在 README 写一节推荐 plugin-registry 的薄控制台——模板：
 
 ```
 ## 插件管理
 
-已装插件用 plugin-registry 的**薄控制台**管理（官方 config 的浏览器面板）：
-读写作 `$DSH_HOME/cordis.patch.yml`，增删/启停 repository 与 UI 插件，无需
-手改配置。安装：`dsh plugin --profile web add <plugin-registry>/packages/plugin/console`
+已装插件用 plugin-registry 的**薄控制台**管理（浏览器面板）：管理 profile
+插件安装态（bundle 层栈 + insert 行 + 启停），无需手改配置。安装：
+`dsh plugin --profile web add <plugin-registry>/packages/plugin/console`
 ```
 
 每个按本 skill 产出的插件 README 都带此节（生态回引——插件由 plugin-registry
-skill 产出，README 推荐回 plugin-registry 的管理工具）。管理也可直接编辑
-`$DSH_HOME/cordis.patch.yml`（官方原生方式），控制台是其可选 UI。
+skill 产出，README 推荐回 plugin-registry 的管理工具）。
 
 **进入迭代期时读 `references/dev-conventions.md`**。
 
 ## 坑（Gotchas）
 
-高频坑（官方包未发布、ESM 缓存重启、宿主 CSS 覆盖、entry 契约失败时机等）
-见 `references/gotchas.md`（唯一清单家）；**先读它再动手**。
+高频坑（官方包未发布、ESM 缓存重启、严格注入、宿主 CSS 覆盖、entry 契约
+失败时机等）见 `references/gotchas.md`（唯一清单家）；**先读它再动手**。
 
 ## 参考
 
 - 本 skill 内嵌契约：
-  - `references/entry-contract.md` — repository 插件：布局、dsh 字段
-    （entry/skills/mcpServers）、Cordis entry、自渲染 client、安装、开发规范
-  - `references/bundle-plugins.md` — bundle 插件（dsh.client）开发
+  - `references/bundle-plugins.md` — bundle 插件（dsh.bundle/dsh.client）开发
+  - `references/entry-contract.md` — Cordis entry、dsh 字段（skills/mcpServers）、自渲染 client
   - `references/install-and-verify.md` — 按改动面验证
-  - `references/gotchas.md` — 坑（官方包未发布、ESM 缓存、宿主 CSS 覆盖）
+  - `references/gotchas.md` — 坑（官方包未发布、严格注入、ESM 缓存、宿主 CSS 覆盖）
   - `references/dev-conventions.md` — 门禁、决策记录
-- 参考实现：任一已发布的 repository 插件（带 UI 的自渲染模式）
-- Bundle 参考：`dsh-loop`、`dsh-task-status`、`packages/plugin/console`
+- 参考实现：`whale-girl`（自渲染 UI，bundle 形态）、`dsh-loop`、`dsh-task-status`、`packages/plugin/console`

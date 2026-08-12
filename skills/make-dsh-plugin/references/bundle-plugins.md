@@ -1,6 +1,6 @@
 # Bundle 插件开发详情（dsh.client 包）
 
-官方两类插件之一。bundle = 随组合分发的产品服务（profile 驱动），与 repository 插件（用户独立安装，config 驱动）互补。选型与完整对比见 SKILL.md Step 0 形态表。本文件是 make-dsh-plugin 的自带参考（独立分发不依赖仓库 docs）。
+0811 官方插件形态之一（repository-plugins 机制已移除）。bundle = 声明 `dsh.bundle.patch` 的 npm 包（带组合层），经 profile 层栈安装；与纯 cordis 插件（insert 行实时挂载）互补。选型见 SKILL.md Step 0 形态表。本文件是 make-dsh-plugin 的自带参考（独立分发不依赖仓库 docs）。
 
 ## 形态
 
@@ -27,18 +27,18 @@ bundle 插件是**独立 npm 包**（或包目录），声明 `dsh.bundle`：
       name: 'my-bundle'
 ```
 
-插件本体仍是完整 Cordis 插件（`apply(ctx)` + `defineTool` 等，与 repository 的 entry 相同语义）。
+插件本体仍是完整 Cordis 插件（`apply(ctx)` + `defineTool` 等）。
 
 ## 开发
 
-- **Node half**：同 repository 的 entry（Cordis 插件 + `defineTool` 注册工具 + 服务/事件/命令）
-- **client**（可选）：`__ModuleLoader__` 契约的浏览器 bundle（经 `exports["./client"]` 进 `__DSH_BOOT__`），或自渲染（同 repository）
+- **Node half**：标准 Cordis entry（`name`/`inject`/`apply` + `defineTool` 注册工具 + 服务/事件/命令）
+- **client**（可选）：`__ModuleLoader__` 契约的浏览器 bundle（经 `exports["./client"]` 进 `__DSH_BOOT__`），或自渲染（`apply(ctx)` 内直接操作 DOM）
 - **构建**：`tsdown` 或官方 client preset——Node half 产物 + client bundle 产物
 
-## 依赖解析（与 repository 不同）
+## 依赖解析
 
 - bundle 插件 `dependencies` **声明为空是设计**——`@deepseek-ai/*` 官方包由 profile 的 pnpm 闭包在挂载时注入
-- **不要声明官方包**：声明了公共 npm 解析不到反而失败（repository 插件则声明、由官方环境解析——两类相反）
+- **不要声明官方包**：声明了公共 npm 解析不到反而失败——官方包由 profile 的 pnpm 闭包挂载时注入（`$DSH_HOME/profiles/node_modules` flat fallback）
 - 本地装 bundle 需官方 monorepo 构建产物 link 进 profile（见 [gotchas.md](gotchas.md) 1）
 
 ## 安装与管理
@@ -58,7 +58,7 @@ bundle 插件是**独立 npm 包**（或包目录），声明 `dsh.bundle`：
 
 **写安装说明时**（README/skill 输出）：给出**用户能直接复制执行**的命令——本地路径写清 bundle 子目录与构建前提；git 源写清子目录语法（`&path:/`）、prepare 构建与 `allowBuilds` 放行。不要给「指向仓库根」或「臆造协议」的说明。
 
-- **启停/三层归属**：同名 `cordis.patch.yml` 三层（bundle 包内声明 / profile 层启停 / home 层 repository）别写错层，见 [gotchas.md](gotchas.md) 1b
+- **启停/两层归属**：同名 `cordis.patch.yml` 两层（bundle 包内声明 / profile 层用户 insert+启停）别写错层，见 [gotchas.md](gotchas.md) 1b
 
 ## 验证
 

@@ -6,7 +6,7 @@
 
 两类插件写不同层：repository 操作 home 级 `$DSH_HOME/cordis.patch.yml` 的 `repositories` 列表（增删行 = 装/卸），UI（bundle）插件启停写 **profile 级** `$DSH_HOME/profiles/web/cordis.patch.yml` 的 `disabled` 标记（官方 `vendor/include` 支持 `disabled?: boolean`）。
 
-扩展动机：薄控制台最初只管理 repository 插件；UI 插件经 `dsh plugin --profile web add` 装进 profile 后无面板管理入口——扩展后面板分三区（已加载插件 / repository 插件源 / 安装 bundle 插件）统一管理。
+扩展动机：薄控制台给 profile 插件安装态一个浏览器管理入口——0811 起外部插件统一经 web profile 安装，面板分三区（安装插件统一入口 / 已加载插件启停 / insert 插件实时挂载）统一管理。
 
 ## Node half
 

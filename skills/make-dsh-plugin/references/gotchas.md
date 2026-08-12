@@ -17,17 +17,12 @@
 
 **bundle 插件同坑、更隐蔽**：bundle（dsh.client 包，如 loop/task-status）同样 import `@deepseek-ai/dsh-tools`/`dsh-llm`，但 **`dependencies` 声明为空**——官方包由 profile 的 pnpm 闭包（`dsh plugin --profile web add` 挂载环境）注入。**插件不该自己声明这些依赖**：声明了公共 npm 解析不到反而失败；依赖由挂载环境提供是设计。本地装 bundle 同样需官方 monorepo 构建产物 link 进 profile。
 
-### 1a. repository 插件分发期断点：安装 404（dsh-repository-plugin 未发布）
+### 1a. repository 插件已随 0811 机制移除（历史断点）
 
-repository 插件（`.dsh-plugin`）的 `devDependencies` 必含 `@deepseek-ai/dsh-repository-plugin`（`dsh-plugin-prepare` 提供者，官方 `installedPackageSchema` 硬校验：prepack 必须调 `dsh-plugin-prepare` + devDep 必须声明）——而该包**公共 npm 与私有 rc 库均不存在（404）**，RepositoryCache 安装时在 `.dsh-plugin/` 跑 `pnpm install` 直接 404。**声明必须、安装必败**，不能通过移除 devDep 绕过（loader 拒绝加载）。这是分发期断点：任何按官方格式开发的第三方插件在真实环境都装不上（官方 e2e 用本地 registry 模拟发布，真实用户撞 404；NPM_TOKEN 内测用户同样撞 404）。
-
-**过渡方案（实测链路，whale-girl 范本）**：预填充 RepositoryCache 让 loader 跳过 `pnpm install`：
-
-1. **wrapper 入库**：本地在可用官方包的环境跑 `dsh-plugin-prepare` 生成 `dsh-plugin.mjs` + `dsh-plugin-assets/`，提交入库（官方默认 prepack 生成，产物入库后 git 安装免构建直接可用；`files` 已声明则只需取消 gitignore）。
-2. **预填充 cache**（whale-girl 的 `scripts/prepare-cache.mjs` 可复刻）：cache 目录 = `$DSH_HOME/cache/repository-plugins/<sha256(specifier)>`（specifier = `github:owner/repo#<ref>&path:/.dsh-plugin` 全文）；拷贝 `.dsh-plugin` 到 `node_modules/repository/`；**临时摘除 devDependencies** 后 `npm install`（只装 runtime 依赖，避开官方包 404），**恢复原始 package.json**（loader metadata 校验需要 prepack/devDep 声明）；写 `.repository-cache.json` = `{"specifier": "<完整 specifier>"}`（loader `readCached` 精确匹配）。
-3. loader 命中缓存后跳过 `pnpm install`、校验 metadata、加载 wrapper。
-
-**废弃条件**：`@deepseek-ai/dsh-repository-plugin` 在私有库可见（`npm view` 非 404）后正常安装即可，移除桥脚本与入库 wrapper。
+repository 插件（`.dsh-plugin` + `dsh-repository-plugin` devDep）的安装断点
+（官方包 404、prepare-cache 桥）**已随 0811 repository-plugins 机制移除而失效**——
+该通道不复存在，勿再使用。原 repository 参考实现 `whale-girl` 已迁移为官方
+bundle（见 whale-girl 仓库决策记录）。
 
 ## 1c. git 源装 bundle：pnpm ≥10 阻止 prepare 脚本（allowBuilds）
 
@@ -48,17 +43,16 @@ repository 插件（`.dsh-plugin`）的 `devDependencies` 必含 `@deepseek-ai/d
 | 层 | 位置 | 属主 | 用途 |
 |---|---|---|---|
 | bundle 包内 | `packages/bundle/*/cordis.patch.yml` | 产品开发者 | 定义组合行（插件声明） |
-| profile 层 | `$DSH_HOME/profiles/web/cordis.patch.yml` | 用户 | 启停覆盖（`disabled` 标记） |
-| home 层 | `$DSH_HOME/cordis.patch.yml` | 机器级用户 | repository 插件 repositories 列表 |
+| profile 层 | `$DSH_HOME/profiles/web/cordis.patch.yml` | 用户 | insert 行（纯插件挂载）+ 启停覆盖（`disabled` 标记），配置 HMR watched |
 
-bundle 插件的**启停覆盖写 profile 层**，不要写进 bundle 包内层（产品层不该动）或 home 层（repository 用）。薄控制台读写的 repository 列表在 home 层。
+bundle 插件的**启停覆盖写 profile 层**，不要写进 bundle 包内层（产品层不该动）。0811 起无 home 层 repository 列表。
 
 ## 1d. npm 版 dsh 兼容性（2026-08-11 实测，0.0.1-rc.1）
 
 官方私有 npm 库是未来主流分发（`npx -p @deepseek-ai/dsh@0.0.1-rc.1 dsh web`，lib 生产模式）。实测与源码版（0810 快照）的差异：
 
 - **bundle 生态兼容** ✓：console（`dsh plugin --profile web add` 安装、`/installed` 合并枚举、启停）在 npm 版全功能正常。
-- **repository 插件不可用** ❌：npm 版私有库（181 包）无 `@deepseek-ai/dsh-repository-plugin`，base 组合行也无 repository-plugins 插件——**运行时缺失**（不是安装 404，是加载都不尝试）。过渡桥（prepare-cache）在 npm 版下无效。repository 插件生态（含 whale-girl 参考实现 + 本 skill 主路径）需源码版 dsh 或等官方发布。
+- **0811 起 repository 插件不可用** ❌：repository-plugins 机制删除（`vendor/loader/src/repository.ts` 移除），外部插件统一是 npm 包（bundle / 纯 cordis）。
 - **"路由 200"不可作挂载判据**：npm 版 httpServer 对未匹配路由返回 200 SPA fallback 主页（`__DSH_BOOT__` HTML）；源码版返回 404。验证挂载看响应体（JSON/HTML）而非状态码。
 - **代理坑**：npm/pnpm 下载走环境代理会超时卡死——装 npm 包用 `env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u all_proxy` 直连（实测 519 包 2 分钟 vs 代理 10 分钟+超时）。
 - **token 展开坑**：pnpm 项目级 `.npmrc` **不展开** `${NPM_TOKEN}`（安全策略，凭据须在用户级 `~/.npmrc` 或 `pnpm config set`）；npm 支持项目级 `${VAR}` 展开。
@@ -74,10 +68,10 @@ bundle 插件的**启停覆盖写 profile 层**，不要写进 bundle 包内层�
 
 日志 `plugin tree failed to load` 时按序查：
 
-1. `dsh.entry` 路径指向 `.dsh-plugin/` **外** → containment 违规，安装失败
-2. `scripts.prepack` 缺失/未调用 `dsh-plugin-prepare` → wrapper 未生成
-3. 依赖解析失败（见坑 1）——本地验证环境缺 symlink/mock registry
-4. `dsh` 字段用了 `skills`/`mcpServers`/`entry` 之外的值 → strict schema 拒绝
+1. `exports["."]`/`main` 指向不存在/无法解析的入口 → 包入口错误
+2. `inject` 未声明 `ctx.get` 用到的服务（`settings`/`httpServer` 等）→ 0811 严格注入抛错
+3. 依赖解析失败（见坑 1）——本地验证环境缺官方包闭包
+4. insert 行 `name:` 未加引号（YAML `@` 开头是保留指示符）→ 解析失败
 
 ## 4. 宿主环境覆盖注入的 CSS
 
@@ -88,5 +82,6 @@ bundle 插件的**启停覆盖写 profile 层**，不要写进 bundle 包内层�
 
 ## 5. 其他已实证的环境事实
 
-- **页面注入是插件自己的事**：官方无「第三方插件自动悬浮」机制——entry 自造注入点（httpServer 注入 `<script>` 或配置 hole）。
+- **client 经 `__ModuleLoader__.load` 注册**：0811 client-modules 只扫描声明 `dsh.client` 的包，client bundle 必须 `__ModuleLoader__.load({id, factory})`——否则报 `loaded without registering`。
+- **严格注入**：`ctx.get` 未在 `inject` 声明的服务 → `cannot get property without inject`，apply 开头即抛、整个 effect 不注册（路由全 fallback 成 SPA 主页）。
 - **工具 schema DSL 违规在挂载时暴露**：CLI enable 只校验名称，`defineTool` value-schema 违规在 web boot/面板 enable（reconcile）时暴露——发现后重启 web 确认日志。
