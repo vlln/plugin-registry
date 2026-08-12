@@ -2,6 +2,15 @@
 
 本仓库（plugin-registry：薄控制台 + 文档 + skill）的变更记录。机制件改动在官方 snapshot 宿主仓库的历史机制分支按提交记录（0809 转向后不再有机制件），本表汇总交付。
 
+## 2026-08（0812 基线适配——大规模服务重命名）
+
+官方发布 0812 快照（`snapshot-20260812T172954Z-final-unwatermarked-5fa48343c7`，提交 `40d214ce`，4548 文件大版本）后适配薄控制台。**0812 契约变化：大规模服务重命名**（17 个服务名变更）——`httpServer`→`webServer`、`tasks`→`jobs`、`bash`→`shell`、`compact`→`compaction` 等；`repository.ts` 无回归（0811 删除保持）。
+
+- ✅ **console 适配**：`inject` 的 `httpServer`→`webServer`；`ctx.httpServer`→`ctx.webServer`（`webServer.register` 路由接口不变，仅服务名改）
+- ✅ **生态适配**（dsh-external 插件仓库同步）：whale-girl + dsh-task-status 改 `webServer`+`jobs`（`onTaskDone`→`onJobDone`）；dsh-loop 改 `webServer`；dsh-navbar 纯 client 无服务依赖不改
+- ✅ **端到端验证（纯净 0812 + 构建产物，`/tmp/dsh-0812` + `/tmp/dsh-0812-home`）**：`dsh plugin --profile web add` 挂载 console + 4 插件 → 5 用户插件全激活 → client 全进 `__DSH_BOOT__` → 路由 200 → boot 无 `plugin tree failed to load`
+- **构建坑（0812 实证）**：本地仓库 symlink 官方包后 tsdown 会**误内联**依赖（lib 从 242 行膨胀到 7036 行）——Node half 的 tsdown 配置须显式 `external: [/@deepseek-ai\//]`（官方包由 profile 闭包注入，不内联）
+
 ## 2026-08（0811 基线适配——repository 机制移除 → profile patch 双通道）
 
 官方发布 0811 快照（`snapshot-20260811T152241Z-da262ec14c`，提交 `62480c41`，3430 文件大版本）后适配薄控制台。**0811 契约断裂**：官方 `vendor/loader/src/repository.ts` 删除（−258 行），`repository-plugins.repositories` 机制整体移除——`plugin_search`/`plugin_install`/`plugin_uninstall`/`plugin_status` 四个工具与面板「repository 插件源」区的官方后端不复存在。
@@ -45,7 +54,7 @@
 
 本仓库已转向 **0 patch 薄控制台**（0809 起，见上方「转向」条目）：不再构建「官方基线 + patch + package」，故原「机制分支基线 / patch 基线」标注随转向退役，仅作历史记录保留：
 
-- **当前基线**：官方 0811 快照（`snapshot-20260811T152241Z-da262ec14c`，提交 `62480c41`）——薄控制台 profile patch 双通道适配 + 端到端验证通过（见上方 0811 条目）；前基线 0810（`5521ff5f`）验证通过保留供对照
+- **当前基线**：官方 0812 快照（`snapshot-20260812T172954Z-final-unwatermarked-5fa48343c7`，提交 `40d214ce`）——薄控制台 webServer 适配 + 端到端验证通过（见上方 0812 条目）；前基线 0811（`62480c41`）双通道验证通过保留供对照
 - **历史机制分支基线**：官方 0808 快照（`20260808T121140Z`，提交 `57ffa9de`）——机制分支 `feat/plugin-registry-mvp-0808` 已冻结退役（0809 转向后不再演进）
 - **历史 patch 基线**：`patches/dsh-plugin-registry-0808.patch` 基于官方 0808 快照（49 文件，纯平台接线：CLI `dsh registry` 子命令、apiproxy `plugins` 域、client-modules `registerExternal` + 碰撞守卫、host 帧 `client-graph-changed` 自动刷新（Stage 1 起携带完整 graph）、浏览器端 graph diff 应用器（启停不整页刷新）、tasks/bash 非消耗式 `peek` seam、依赖闭包；不含复制分发包 `packages/plugin`、`packages/client/ui-plugin-manager`）；旧 0807/0806 patch 保留供对应基线追溯。**patch 瘦身（49→5）计划已随 0809 转向废弃**（机制件整体移除，无 patch 可瘦身），设计稿见 [patch 瘦身设计](docs/patch-slimming-design.md)（历史文档）
 
