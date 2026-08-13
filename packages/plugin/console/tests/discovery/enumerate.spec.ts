@@ -30,8 +30,8 @@ function indexSource(home: string, file: string): PluginSource {
 
 describe('parseGithubUrl', () => {
   it('parses bare and .git URLs', () => {
-    assert.deepEqual(parseGithubUrl('https://github.com/dsh-external/whale-girl'), { owner: 'dsh-external', repo: 'whale-girl' })
-    assert.deepEqual(parseGithubUrl('https://github.com/dsh-external/whale-girl.git'), { owner: 'dsh-external', repo: 'whale-girl' })
+    assert.deepEqual(parseGithubUrl('https://github.com/vlln/whale-girl'), { owner: 'dsh-external', repo: 'whale-girl' })
+    assert.deepEqual(parseGithubUrl('https://github.com/vlln/whale-girl'), { owner: 'dsh-external', repo: 'whale-girl' })
   })
   it('rejects non-github URLs', () => {
     assert.equal(parseGithubUrl('https://example.com/x'), null)
@@ -49,13 +49,13 @@ describe('facesOfDsh', () => {
 describe('hubRepoToPlugin', () => {
   it('maps bundle repos to bundle kind and plugin repos to plugin kind', () => {
     const bundle = hubRepoToPlugin(
-      { name: 'whale-girl', url: 'https://github.com/dsh-external/whale-girl.git', bundle: true, skill: false },
+      { name: 'whale-girl', url: 'https://github.com/vlln/whale-girl', bundle: true, skill: false },
       'hub',
     )
     assert.ok(bundle !== null)
     assert.equal(bundle.kind, 'bundle')
     const plugin = hubRepoToPlugin(
-      { name: 'dsh-loop', url: 'https://github.com/dsh-external/dsh-loop.git', bundle: false },
+      { name: 'dsh-loop', url: 'https://github.com/vlln/dsh-loop', bundle: false },
       'hub',
     )
     assert.ok(plugin !== null)
@@ -72,8 +72,8 @@ describe('enumerateIndex', () => {
     const home = freshHome()
     const catalog = join(home, 'catalog.json')
     writeFileSync(catalog, JSON.stringify({ repos: [
-      { name: 'whale-girl', url: 'https://github.com/dsh-external/whale-girl.git', description: '宠物', bundle: true },
-      { name: 'dsh-loop', url: 'https://github.com/dsh-external/dsh-loop.git', bundle: false },
+      { name: 'whale-girl', url: 'https://github.com/vlln/whale-girl', description: '宠物', bundle: true },
+      { name: 'dsh-loop', url: 'https://github.com/vlln/dsh-loop', bundle: false },
     ] }))
     const snap = await enumerateIndex(home, indexSource(home, catalog))
     assert.equal(snap.entries.length, 2)

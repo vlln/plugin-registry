@@ -61,7 +61,7 @@ describe('plugin_search', () => {
   it('enumerates a new index source (hub catalog repos format) and remembers it in sources.yml', async () => {
     const localIndex = join(home, 'catalog.json')
     writeFileSync(localIndex, JSON.stringify({ repos: [
-      { name: 'whale-girl', url: 'https://github.com/dsh-external/whale-girl.git', description: '宠物', bundle: true },
+      { name: 'whale-girl', url: 'https://github.com/vlln/whale-girl', description: '宠物', bundle: true },
     ] }))
     const res = await tools()['plugin_search']!.execute({ source: `file://${localIndex}` })
     const plugins = res.plugins as Array<{ id: string; sourceId: string; kind: string }>
@@ -74,7 +74,7 @@ describe('plugin_search', () => {
   it('filters by query across enumerated sources', async () => {
     const localIndex = join(home, 'catalog.json')
     writeFileSync(localIndex, JSON.stringify({ repos: [
-      { name: 'whale-girl', url: 'https://github.com/dsh-external/whale-girl.git', description: '桌面宠物' },
+      { name: 'whale-girl', url: 'https://github.com/vlln/whale-girl', description: '桌面宠物' },
       { name: 'chat-width', url: 'https://github.com/dsh-external/chat-width.git', description: '消息宽度' },
     ] }))
     const t = tools()

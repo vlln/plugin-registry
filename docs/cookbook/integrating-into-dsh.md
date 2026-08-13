@@ -13,11 +13,11 @@
 
 ```sh
 # 方式 A：git clone
-git clone https://github.com/dsh-external/plugin-registry.git
+git clone https://github.com/vlln/plugin-registry
 cd plugin-registry
 
 # 方式 B：GitHub Releases 下载源码包
-#   在 https://github.com/dsh-external/plugin-registry/releases 下载
+#   在 https://github.com/vlln/plugin-registry/releases 下载
 #   最新 release 的 Assets：plugin-registry-<版本>.tar.gz（或 .zip）
 tar -xzf plugin-registry-<版本>.tar.gz   # 解压出 plugin-registry-<版本>/ 目录
 cd plugin-registry-<版本>

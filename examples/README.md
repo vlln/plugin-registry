@@ -7,7 +7,7 @@
 loop / task-status / navbar 等 UI 插件是 bundle 形态（`dsh.bundle` + `dsh.client`），经官方 profile 管理：
 
 ```sh
-dsh plugin --profile web add "github:dsh-external/dsh-task-status#main"   # 推荐：git 源一行（产物已入库）
+dsh plugin --profile web add "github:vlln/dsh-task-status#main"   # 推荐：git 源一行（产物已入库）
 # 或本地目录：dsh plugin --profile web add <dsh-task-status 本地路径>
 ```
 

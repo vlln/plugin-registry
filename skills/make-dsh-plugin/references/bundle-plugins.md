@@ -50,7 +50,7 @@ bundle 插件是**独立 npm 包**（或包目录），声明 `dsh.bundle`：
   cd packages/my-bundle && dsh plugin --profile web add .   # 包目录内 add .（dsh 锚定 . 为绝对路径）
   ```
   ❌ 不要写仓库根（`dsh plugin --profile web add ./`）——根不是 npm 包，无 `dsh.bundle`。
-- **git 源**：官方经 npm git 依赖语法解析（`github:owner/repo#<commit>&path:/<子目录>`、`git+https://github.com/owner/my-bundle.git#<commit>` 等 pnpm 语法均可用）。bundle 在 monorepo 子目录时用 **`#<commit>&path:/<子目录>`**（注意 `path:` 前缀 + 前导 `/`，实测 plugin-registry 的 console 即 `github:dsh-external/plugin-registry#main&path:/packages/plugin/console`）。**产物入库是推荐做法**（`lib/` 等构建产物提交进仓库，`files` 声明）——git 源安装不跑构建，产物直接可用，**真一行安装**（`dsh plugin --profile web add "github:owner/repo#ref&path:/packages/my-bundle"`，无额外步骤）。**产物不入库的备选**：带 `prepare` 脚本（如 `"prepare": "tsdown --config tsdown.config.ts"`）让 git 安装时自动构建——但 pnpm ≥10 默认阻止 git 依赖的 prepare，需按 dsh 提示把精确 key（**写入 yaml 时加引号**——含冒号，无引号 YAML 解析失败）加入 profile 的 `pnpm-workspace.yaml` `allowBuilds` 后重跑（多一步交互）。
+- **git 源**：官方经 npm git 依赖语法解析（`github:owner/repo#<commit>&path:/<子目录>`、`git+https://github.com/owner/my-bundle.git#<commit>` 等 pnpm 语法均可用）。bundle 在 monorepo 子目录时用 **`#<commit>&path:/<子目录>`**（注意 `path:` 前缀 + 前导 `/`，实测 plugin-registry 的 console 即 `github:vlln/plugin-registry#main&path:/packages/plugin/console`）。**产物入库是推荐做法**（`lib/` 等构建产物提交进仓库，`files` 声明）——git 源安装不跑构建，产物直接可用，**真一行安装**（`dsh plugin --profile web add "github:owner/repo#ref&path:/packages/my-bundle"`，无额外步骤）。**产物不入库的备选**：带 `prepare` 脚本（如 `"prepare": "tsdown --config tsdown.config.ts"`）让 git 安装时自动构建——但 pnpm ≥10 默认阻止 git 依赖的 prepare，需按 dsh 提示把精确 key（**写入 yaml 时加引号**——含冒号，无引号 YAML 解析失败）加入 profile 的 `pnpm-workspace.yaml` `allowBuilds` 后重跑（多一步交互）。
   ```sh
   dsh plugin --profile web add "github:owner/my-bundle#<commit>&path:/packages/my-bundle"
   ```

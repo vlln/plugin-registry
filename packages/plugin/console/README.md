@@ -35,7 +35,7 @@ watch-only 实例）——profile `cordis.patch.yml` 编辑实时生效，insert
 安装命令与方式（git 源真一行 / 本地目录）见仓库根 [README「安装」章节](../../../README.md)。构建产物已入库，git 源一行命令直接装（实测约 15 秒）：
 
 ```sh
-dsh plugin --profile web add "github:dsh-external/plugin-registry#main&path:/packages/plugin/console"
+dsh plugin --profile web add "github:vlln/plugin-registry#main&path:/packages/plugin/console"
 ```
 
 挂载后刷新 Web 页面，设置页出现「插件」面板（`settings.section` 插槽）。

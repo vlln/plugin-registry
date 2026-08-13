@@ -51,7 +51,7 @@ DeepSeek Harness 官方机制管「插件是什么、怎么跑」；本仓库补
 **方式一：git 源直接安装（推荐，真一行）**
 
 ```sh
-dsh plugin --profile web add "github:dsh-external/plugin-registry#main&path:/packages/plugin/console"
+dsh plugin --profile web add "github:vlln/plugin-registry#main&path:/packages/plugin/console"
 ```
 
 构建产物已入库（git 源安装不触发构建），一行命令直接装（实测约 15 秒）。
@@ -59,7 +59,7 @@ dsh plugin --profile web add "github:dsh-external/plugin-registry#main&path:/pac
 **方式二：本地目录（有源码时）**
 
 ```sh
-git clone https://github.com/dsh-external/plugin-registry.git
+git clone https://github.com/vlln/plugin-registry
 cd plugin-registry/packages/plugin/console
 dsh plugin --profile web add .   # 产物已入库，无需构建；当前目录即 bundle 包子目录（dsh 锚定 . 为绝对路径）
 ```
