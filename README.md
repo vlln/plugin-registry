@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="https://badgen.net/badge/license/BSD-3-Clause/blue" alt="license" />
+  <img src="https://badgen.net/badge/license/MIT/green" alt="license" />
   <img src="https://badgen.net/badge/format/official%20plugin/8257D0" alt="official plugin" />
 </p>
 
@@ -86,4 +86,4 @@ dsh plugin --profile web add .   # 产物已入库，无需构建；当前目录
 
 ## 版权
 
-BSD-3-Clause License，与 DeepSeek Harness 官方一致。见 [LICENSE](LICENSE)。
+MIT License。见 [LICENSE](LICENSE)。

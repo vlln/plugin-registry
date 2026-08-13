@@ -7,7 +7,7 @@ description: >
   entry + insert 行）、可选 dsh.client、安装验证纪律。也覆盖开发规范
   （门禁、决策记录、验证纪律）。不是已移除的旧机制（dsh.plugin.json /
   dsh registry / repository-plugin）。
-license: BSD-3-Clause
+license: MIT
 metadata:
   author: dsh-external/plugin-registry
   version: "3.0.0"

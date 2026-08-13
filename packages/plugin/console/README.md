@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="https://badgen.net/badge/license/BSD-3-Clause/blue" alt="license" />
+  <img src="https://badgen.net/badge/license/MIT/green" alt="license" />
   <img src="https://badgen.net/badge/format/official%20bundle/8257D0" alt="official bundle" />
 </p>
 
