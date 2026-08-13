@@ -8,7 +8,7 @@
 
 - ✅ **console 适配**：`inject` 的 `httpServer`→`webServer`；`ctx.httpServer`→`ctx.webServer`（`webServer.register` 路由接口不变，仅服务名改）
 - ✅ **生态适配**（dsh-external 插件仓库同步）：whale-girl + dsh-task-status 改 `webServer`+`jobs`（`onTaskDone`→`onJobDone`）；dsh-loop 改 `webServer`；dsh-navbar 纯 client 无服务依赖不改
-- ✅ **端到端验证（纯净 0812 + 构建产物，`/tmp/dsh-0812` + `/tmp/dsh-0812-home`）**：`dsh plugin --profile web add` 挂载 console + 4 插件 → 5 用户插件全激活 → client 全进 `__DSH_BOOT__` → 路由 200 → boot 无 `plugin tree failed to load`
+- ✅ **端到端验证（纯净 0812 + 构建产物）**：`dsh plugin --profile web add` 挂载 console + 4 插件 → 5 用户插件全激活 → client 全进 `__DSH_BOOT__` → 路由 200 → boot 无 `plugin tree failed to load`
 - **构建坑（0812 实证）**：本地仓库 symlink 官方包后 tsdown 会**误内联**依赖（lib 从 242 行膨胀到 7036 行）——Node half 的 tsdown 配置须显式 `external: [/@deepseek-ai\//]`（官方包由 profile 闭包注入，不内联）
 
 ## 2026-08（0811 基线适配——repository 机制移除 → profile patch 双通道）
@@ -20,7 +20,7 @@
 - ✅ **模型工具重写**：`plugin_search` 改搜 hub catalog（`dsh-external/hub` 的 catalog.json，repos 格式，index 源）；`plugin_install` 按包是否声明 `dsh.bundle` 分流——bundle → pnpm add + 层栈（重启生效），非 bundle → pnpm add + insert 行（**配置 HMR 实时挂载，零重启**）；`plugin_uninstall` 对称；`plugin_status` 列 insert 行 + TOFU lock
 - ✅ **client 面板适配**：删「repository 插件源」区，新增「insert 插件」区（包名输入 → 实时挂载/移除），保留已加载插件启停与 bundle 安装区
 - ✅ **发现层简化**：`enumerate.ts` 删 single（github raw 探测）与 manifest 源，仅保留 index（hub catalog）；`store.ts` 源 kind 收紧为 index，lock kind 收紧为 bundle|plugin
-- ✅ **端到端验证（纯净 0811 + 构建产物，`/tmp/dsh-0811` + `/tmp/dsh-0811-home`）**：`dsh plugin --profile web add` 挂载 console → 4 工具注册日志 → `/api/plugin-console/inserts` 写行 → web 日志 `[HMR-PROBE] applied`（**实时挂载，无重启**）→ 移除行 → patch 恢复 `[]` 模板 → disabled 启停 runtime+persisted → boot 无 `plugin tree failed to load`
+- ✅ **端到端验证（纯净 0811 + 构建产物）**：`dsh plugin --profile web add` 挂载 console → 4 工具注册日志 → `/api/plugin-console/inserts` 写行 → web 日志 `[HMR-PROBE] applied`（**实时挂载，无重启**）→ 移除行 → patch 恢复 `[]` 模板 → disabled 启停 runtime+persisted → boot 无 `plugin tree failed to load`
 - **注意（0811 实证）**：insert 行 `name:` 必须加引号（YAML `@` 开头是保留指示符，裸写解析失败 HMR 不生效）；移除最后一个 insert 行后必须恢复 `[]` 模板（纯注释文件解析为 null，HMR reload 失败）
 
 ## 2026-08（0810 基线适配——dshClient → dsh.client）
@@ -29,7 +29,7 @@
 
 - **契约变化**：官方 client 插件声明从 `dshClient` 迁移为 `dsh.client`（**原 `dshClient` 不再识别**）；官方内部另有 `SessionsService` 构造三参、tasks `ScopedLayers` 分层等变化（不触及 console）
 - ✅ **console 适配**：`packages/plugin/console/package.json` 的 `dshClient` 声明并入 `dsh.client`；README 与当前契约文档（`docs/plugin-types.md`、`docs/console-ui-plugin-management.md`）术语同步；plugin-types 安装行纠正为 `cordis.patch.yml`（官方 0805 起用户配置层）
-- ✅ **端到端验证（纯净 0810 + 构建产物，`/tmp/dsh-0810`）**：`dsh plugin --profile web add` 挂载 → boot graph 含 `plugin-console/client.js`（`dsh.client` 被官方 client-modules 正确扫描识别）→ `/api/plugin-console/repositories` GET/POST 读写 `$DSH_HOME/cordis.patch.yml` 正常 → boot 日志无 `plugin tree failed to load`
+- ✅ **端到端验证（纯净 0810 + 构建产物）**：`dsh plugin --profile web add` 挂载 → boot graph 含 `plugin-console/client.js`（`dsh.client` 被官方 client-modules 正确扫描识别）→ `/api/plugin-console/repositories` GET/POST 读写 `$DSH_HOME/cordis.patch.yml` 正常 → boot 日志无 `plugin tree failed to load`
 - **机制分支终态**：`feat/plugin-registry-mvp-0808` 冻结退役不再演进（0809 转向起）；旧机制 patch 分发已随转向移除，无 patch 重建动作
 
 ## 2026-08（转向薄控制台——阶段 2/3 交付）
@@ -100,7 +100,7 @@ task-status 实时 tail 与官方 `task_output` 工具的读取竞争问题（`t
 
 - **seam（机制分支）**：`TaskService` 抽象 `peek(id, caller?)`（返回保留输出，不推进游标、不标记 reported——终态通知仍由首次消耗式 read/wait 交付）；`TaskHooks` 可选 `peekOutput?()`（缺省回退到与 `read` 一致的终态幂等输出）；`BashProcess.peekOutput()`（bounded 保留窗口非消耗视图，lossy/spill 语义与 `readOutput` 一致），bash-local / pwsh-local 实现，tool-bash 接线
 - **示例**：task-status Node half 输出路由改 `ctx.tasks.peek`，client 由「增量追加」改「整段替换」渲染（peek 重复轮询返回同一全文）；展开卡去冗余行/去包裹层，新增双契约回归测试（`task-status.client.spec.ts`：旧增量契约追加累积 + peek 全文契约整段替换）
-- **验证**：`/tmp/dsh-0806` 集成验证——peek 非消耗（重复轮询同文本）、官方 read 在多次 peek 后仍读完整增量、peek 始终显示保留全文
+- **验证**：纯净 0806 基线集成验证——peek 非消耗（重复轮询同文本）、官方 read 在多次 peek 后仍读完整增量、peek 始终显示保留全文
 
 
 ## 2026-08（插件启停自动刷新）
