@@ -30,8 +30,8 @@ function indexSource(home: string, file: string): PluginSource {
 
 describe('parseGithubUrl', () => {
   it('parses bare and .git URLs', () => {
-    assert.deepEqual(parseGithubUrl('https://github.com/vlln/whale-girl'), { owner: 'dsh-external', repo: 'whale-girl' })
-    assert.deepEqual(parseGithubUrl('https://github.com/vlln/whale-girl'), { owner: 'dsh-external', repo: 'whale-girl' })
+    assert.deepEqual(parseGithubUrl('https://github.com/vlln/whale-girl'), { owner: 'vlln', repo: 'whale-girl' })
+    assert.deepEqual(parseGithubUrl('https://github.com/vlln/whale-girl.git'), { owner: 'vlln', repo: 'whale-girl' })
   })
   it('rejects non-github URLs', () => {
     assert.equal(parseGithubUrl('https://example.com/x'), null)
