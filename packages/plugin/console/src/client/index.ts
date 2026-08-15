@@ -1,8 +1,12 @@
 /**
- * 薄控制台 browser half：设置页「插件」面板（0811 适配）。列出
- * insert 插件（profile patch insert 行，实时挂载/卸载）+ 已加载插件
+ * 薄控制台 browser half：官方「插件」设置页内的「插件控制台」子 tab。
+ * 列出 insert 插件（profile patch insert 行，实时挂载/卸载）+ 已加载插件
  * （启停持久化）+ bundle 安装。fetch 自建路由 `/api/plugin-console`，
  * 零官方改动。
+ *
+ * 挂载点：官方 settings-plugins 节（id=plugins）声明了 `settings.plugins.tab`
+ * 子 tab 插槽——第三方管理面板应挂在这里，而不是再注册一个顶层
+ * 「插件」节（那会让设置页导航出现多个同名「插件」tab）。
  */
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import { ConsolePanel } from './Panel.tsx'
@@ -10,7 +14,7 @@ import { ConsolePanel } from './Panel.tsx'
 /** Cordis 插件名。 */
 export const name = 'plugin-console-client'
 
-/** 需要 slots（settings.section 插槽）。 */
+/** 需要 slots（settings.plugins.tab 子 tab 插槽）。 */
 export const inject = ['slots']
 
 /**
@@ -38,17 +42,17 @@ function patchPluginTabIcon(): void {
   }
 }
 
-/** 注册设置页「插件」面板 + 替换 tab 图标（设置页随时打开/关闭，全程监听）。 */
+/** 注册官方「插件」页内的「插件控制台」子 tab + 替换顶层 tab 图标（设置页随时打开/关闭，全程监听）。 */
 export function apply(ctx: ClientContext): void {
   const observer = new MutationObserver(patchPluginTabIcon)
   observer.observe(document.body, { childList: true, subtree: true })
   patchPluginTabIcon()
-  ctx.slots.inject('settings.section', () =>
+  ctx.slots.inject('settings.plugins.tab', () =>
     ctx.slots.register({
-      name: 'settings.section',
+      name: 'settings.plugins.tab',
       id: 'plugin-console',
-      order: 60,
-      label: () => '插件',
+      order: 10,
+      label: () => '插件控制台',
       inject: () => ({}),
     }, ConsolePanel))
 }

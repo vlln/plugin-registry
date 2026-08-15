@@ -119,24 +119,34 @@ window.__ModuleLoader__.load({
 			lineHeight: "18px",
 			color: "var(--dsw-alias-state-success-primary)"
 		};
-		/** 版本行：v当前 · latest（可更新时高亮）；本地/非 registry 包无 latest。 */
-		function versionText(plugin, latest, checked) {
+		/** 版本行：v当前 · latest（可更新时高亮）；本地/非 registry 包无 latest；
+		*  检查失败（error 非空）显示失败原因，与「本地包」区分开。 */
+		function versionText(plugin, latest, checked, error) {
 			const current = plugin.version === void 0 ? "?" : `v${plugin.version}`;
 			if (!checked) return {
 				text: `${current} · 待检查`,
-				canUpdate: false
+				canUpdate: false,
+				failed: false
+			};
+			if (error !== null && error !== void 0) return {
+				text: `${current} · 检查失败（${error}）`,
+				canUpdate: false,
+				failed: true
 			};
 			if (latest === null) return {
-				text: `${current} · 本地`,
-				canUpdate: false
+				text: `${current} · 本地/非 registry`,
+				canUpdate: false,
+				failed: false
 			};
 			if (latest === plugin.version) return {
 				text: `${current} · 已最新`,
-				canUpdate: false
+				canUpdate: false,
+				failed: false
 			};
 			return {
 				text: `${current} → v${latest}`,
-				canUpdate: true
+				canUpdate: true,
+				failed: false
 			};
 		}
 		/**
@@ -165,6 +175,7 @@ window.__ModuleLoader__.load({
 			const [installMsg, setInstallMsg] = (0, react.useState)(void 0);
 			const [versions, setVersions] = (0, react.useState)({});
 			const [versionChecked, setVersionChecked] = (0, react.useState)({});
+			const [versionErrors, setVersionErrors] = (0, react.useState)({});
 			const refresh = (0, react.useCallback)(async () => {
 				try {
 					const [installedRes, versionsRes] = await Promise.all([fetch("/api/plugin-console/installed", { headers: { accept: "application/json" } }), fetch("/api/plugin-console/versions", { headers: { accept: "application/json" } })]);
@@ -173,12 +184,15 @@ window.__ModuleLoader__.load({
 					setInstalled(installedBody.plugins ?? []);
 					const map = {};
 					const checkedMap = {};
+					const errorsMap = {};
 					for (const row of versionsBody.versions ?? []) {
 						map[row.name] = row.latest;
 						checkedMap[row.name] = row.checked === true;
+						errorsMap[row.name] = row.error ?? null;
 					}
 					setVersions(map);
 					setVersionChecked(checkedMap);
+					setVersionErrors(errorsMap);
 				} catch (caught) {
 					setError(caught instanceof Error ? caught.message : String(caught));
 				} finally {
@@ -214,12 +228,15 @@ window.__ModuleLoader__.load({
 					})).json();
 					const map = {};
 					const checkedMap = {};
+					const errorsMap = {};
 					for (const row of versionBody.versions ?? []) {
 						map[row.name] = row.latest;
 						checkedMap[row.name] = row.checked === true;
+						errorsMap[row.name] = row.error ?? null;
 					}
 					setVersions(map);
 					setVersionChecked(checkedMap);
+					setVersionErrors(errorsMap);
 				} catch (caught) {
 					setError(caught instanceof Error ? caught.message : String(caught));
 				} finally {
@@ -401,7 +418,7 @@ window.__ModuleLoader__.load({
 						})), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 							style: rowsStyle,
 							children: [shown.map((plugin) => {
-								const version = versionText(plugin, versions[plugin.name] ?? null, versionChecked[plugin.name] === true);
+								const version = versionText(plugin, versions[plugin.name] ?? null, versionChecked[plugin.name] === true, versionErrors[plugin.name] ?? null);
 								const isUserRow = !isOfficial(plugin) && !isSelf(plugin);
 								return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 									style: rowCardStyle,
@@ -449,7 +466,10 @@ window.__ModuleLoader__.load({
 											]
 										})]
 									}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-										style: versionLineStyle,
+										style: version.failed ? {
+											...versionLineStyle,
+											color: "var(--dsw-alias-state-error-primary)"
+										} : versionLineStyle,
 										children: version.text
 									})]
 								}, showAll ? `a${plugin.id}` : `u${plugin.id}`);
@@ -469,7 +489,7 @@ window.__ModuleLoader__.load({
 		//#region src/client/index.ts
 		/** Cordis 插件名。 */
 		const name = "plugin-console-client";
-		/** 需要 slots（settings.section 插槽）。 */
+		/** 需要 slots（settings.plugins.tab 子 tab 插槽）。 */
 		const inject = ["slots"];
 		/**
 		* 插头图标（plugin-line，参考 Clarity 图标库，dsh 风格：fill
@@ -493,18 +513,18 @@ window.__ModuleLoader__.load({
 				host.dataset.dshConsoleIcon = "1";
 			}
 		}
-		/** 注册设置页「插件」面板 + 替换 tab 图标（设置页随时打开/关闭，全程监听）。 */
+		/** 注册官方「插件」页内的「插件控制台」子 tab + 替换顶层 tab 图标（设置页随时打开/关闭，全程监听）。 */
 		function apply(ctx) {
 			new MutationObserver(patchPluginTabIcon).observe(document.body, {
 				childList: true,
 				subtree: true
 			});
 			patchPluginTabIcon();
-			ctx.slots.inject("settings.section", () => ctx.slots.register({
-				name: "settings.section",
+			ctx.slots.inject("settings.plugins.tab", () => ctx.slots.register({
+				name: "settings.plugins.tab",
 				id: "plugin-console",
-				order: 60,
-				label: () => "插件",
+				order: 10,
+				label: () => "插件控制台",
 				inject: () => ({})
 			}, ConsolePanel));
 		}
