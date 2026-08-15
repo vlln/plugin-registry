@@ -80,13 +80,15 @@ const savedStyle: React.CSSProperties = {
   margin: 0, fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-state-success-primary)',
 }
 
-/** 版本行：v当前 · latest（可更新时高亮）；本地/非 registry 包无 latest。 */
-function versionText(plugin: LoadedPluginRow, latest: string | null, checked: boolean): { text: string; canUpdate: boolean } {
+/** 版本行：v当前 · latest（可更新时高亮）；本地/非 registry 包无 latest；
+ *  检查失败（error 非空）显示失败原因，与「本地包」区分开。 */
+function versionText(plugin: LoadedPluginRow, latest: string | null, checked: boolean, error: string | null): { text: string; canUpdate: boolean; failed: boolean } {
   const current = plugin.version === undefined ? '?' : `v${plugin.version}`
-  if (!checked) return { text: `${current} · 待检查`, canUpdate: false }
-  if (latest === null) return { text: `${current} · 本地`, canUpdate: false }
-  if (latest === plugin.version) return { text: `${current} · 已最新`, canUpdate: false }
-  return { text: `${current} → v${latest}`, canUpdate: true }
+  if (!checked) return { text: `${current} · 待检查`, canUpdate: false, failed: false }
+  if (error !== null && error !== undefined) return { text: `${current} · 检查失败（${error}）`, canUpdate: false, failed: true }
+  if (latest === null) return { text: `${current} · 本地/非 registry`, canUpdate: false, failed: false }
+  if (latest === plugin.version) return { text: `${current} · 已最新`, canUpdate: false, failed: false }
+  return { text: `${current} → v${latest}`, canUpdate: true, failed: false }
 }
 
 /**
@@ -113,6 +115,7 @@ export function ConsolePanel(): React.ReactNode {
   const [installMsg, setInstallMsg] = useState<string | undefined>(undefined)
   const [versions, setVersions] = useState<Record<string, string | null>>({})
   const [versionChecked, setVersionChecked] = useState<Record<string, boolean>>({})
+  const [versionErrors, setVersionErrors] = useState<Record<string, string | null>>({})
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -121,16 +124,19 @@ export function ConsolePanel(): React.ReactNode {
         fetch('/api/plugin-console/versions', { headers: { accept: 'application/json' } }),
       ])
       const installedBody = (await installedRes.json()) as { plugins?: LoadedPluginRow[]; ok?: boolean }
-      const versionsBody = (await versionsRes.json()) as { versions?: { name: string; latest: string | null; checked?: boolean }[]; ok?: boolean }
+      const versionsBody = (await versionsRes.json()) as { versions?: { name: string; latest: string | null; checked?: boolean; error?: string | null }[]; ok?: boolean }
       setInstalled(installedBody.plugins ?? [])
       const map: Record<string, string | null> = {}
       const checkedMap: Record<string, boolean> = {}
+      const errorsMap: Record<string, string | null> = {}
       for (const row of versionsBody.versions ?? []) {
         map[row.name] = row.latest
         checkedMap[row.name] = row.checked === true
+        errorsMap[row.name] = row.error ?? null
       }
       setVersions(map)
       setVersionChecked(checkedMap)
+      setVersionErrors(errorsMap)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught))
     } finally {
@@ -164,15 +170,18 @@ export function ConsolePanel(): React.ReactNode {
     setError(undefined)
     try {
       const versionRes = await fetch('/api/plugin-console/versions/refresh', { method: 'POST', headers: { accept: 'application/json' } })
-      const versionBody = (await versionRes.json()) as { versions?: { name: string; latest: string | null; checked?: boolean }[] }
+      const versionBody = (await versionRes.json()) as { versions?: { name: string; latest: string | null; checked?: boolean; error?: string | null }[] }
       const map: Record<string, string | null> = {}
       const checkedMap: Record<string, boolean> = {}
+      const errorsMap: Record<string, string | null> = {}
       for (const row of versionBody.versions ?? []) {
         map[row.name] = row.latest
         checkedMap[row.name] = row.checked === true
+        errorsMap[row.name] = row.error ?? null
       }
       setVersions(map)
       setVersionChecked(checkedMap)
+      setVersionErrors(errorsMap)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught))
     } finally {
@@ -311,7 +320,7 @@ export function ConsolePanel(): React.ReactNode {
         )}
         <div style={rowsStyle}>
           {shown.map(plugin => {
-            const version = versionText(plugin, versions[plugin.name] ?? null, versionChecked[plugin.name] === true)
+            const version = versionText(plugin, versions[plugin.name] ?? null, versionChecked[plugin.name] === true, versionErrors[plugin.name] ?? null)
             const isUserRow = !isOfficial(plugin) && !isSelf(plugin)
             return (
               <div key={showAll ? `a${plugin.id}` : `u${plugin.id}`} style={rowCardStyle}>
@@ -336,7 +345,7 @@ export function ConsolePanel(): React.ReactNode {
                     {statePill(plugin)}
                   </span>
                 </div>
-                <span style={versionLineStyle}>{version.text}</span>
+                <span style={version.failed ? { ...versionLineStyle, color: 'var(--dsw-alias-state-error-primary)' } : versionLineStyle}>{version.text}</span>
               </div>
             )
           })}

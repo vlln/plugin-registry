@@ -597,6 +597,45 @@ function createPluginTools(deps) {
 	];
 }
 //#endregion
+//#region src/versions.ts
+const DEFAULT_REGISTRY = "https://registry.npmjs.org";
+/** npm registry 根（npm_config_registry 环境变量优先，兼容镜像源）。 */
+function registryRoot() {
+	const configured = process.env.npm_config_registry;
+	return (configured !== void 0 && configured.trim() !== "" ? configured : DEFAULT_REGISTRY).replace(/\/+$/, "");
+}
+/** scoped 包名（@scope/name）在 registry URL 路径中需把 / 编码为 %2f。 */
+function registryPackagePath(name) {
+	return name.startsWith("@") ? name.replace("/", "%2f") : name;
+}
+/**
+* 查询某包在 registry 上的最新版本（GET <registry>/<name>/latest）。
+* 永不抛出：失败折叠为 { latest: null, error }，由调用方记录/展示。
+*/
+async function npmViewLatest(name, fetchFn = fetch) {
+	const url = `${registryRoot()}/${registryPackagePath(name)}/latest`;
+	try {
+		const res = await fetchFn(url, { signal: AbortSignal.timeout(15e3) });
+		if (res.status === 404) return {
+			latest: null,
+			error: null
+		};
+		if (!res.ok) return {
+			latest: null,
+			error: `registry ${res.status}`
+		};
+		return {
+			latest: (await res.json()).version ?? null,
+			error: null
+		};
+	} catch (caught) {
+		return {
+			latest: null,
+			error: caught instanceof Error ? caught.message : String(caught)
+		};
+	}
+}
+//#endregion
 //#region src/index.ts
 /**
 * 薄控制台 Node half（0811 适配）：读写 web profile 的安装态——
@@ -978,48 +1017,44 @@ async function collectLoaderEntries(ctx) {
 	for (const row of byId.values()) if (row.disabled && presetIds.has(row.id)) row.presetMounted = true;
 	return [...byId.values()];
 }
-/** 版本检查缓存：name -> { latest, checkedAt }（进程内存）。 */
+/** 版本检查缓存：name -> { latest, error, checkedAt }（进程内存）。 */
 const versionCache = /* @__PURE__ */ new Map();
 const VERSION_REFRESH_MIN_MS = 3e4;
 let lastVersionRefreshAt = 0;
-/** npm view <name> version（registry 最新版）；失败/非 registry 包返回 null。 */
-function npmViewLatest(name) {
-	let latest = null;
-	try {
-		const result = spawnSync("npm", [
-			"view",
-			name,
-			"version"
-		], {
-			encoding: "utf8",
-			timeout: 15e3,
-			stdio: [
-				"ignore",
-				"pipe",
-				"pipe"
-			]
+/** 批量强制刷新版本缓存（可选 force）：registry 查询走原生 fetch，
+*  不 spawn 子进程（受限宿主环境管道捕获会被拦）；404 = 非 registry 包。 */
+async function refreshVersions(ctx, force) {
+	const now = Date.now();
+	if (!force && now - lastVersionRefreshAt < VERSION_REFRESH_MIN_MS) return false;
+	lastVersionRefreshAt = now;
+	const names = await userPluginNames(ctx);
+	await Promise.all(names.map(async (name) => {
+		const result = await npmViewLatest(name);
+		if (result.error !== null) ctx.logger.warn(`[plugin-console] version check failed for ${name}: ${result.error}`);
+		versionCache.set(name, {
+			latest: result.latest,
+			error: result.error,
+			checkedAt: Date.now()
 		});
-		const text = (result.stdout ?? "").trim();
-		if (result.status === 0 && /^\d+(\.\d+)+/.test(text)) latest = text.split("\n")[0].trim();
-	} catch {}
-	versionCache.set(name, {
-		latest,
-		checkedAt: Date.now()
+	}));
+	return true;
+}
+/** 版本行（缓存内容；error 区分「本地包」与「检查失败」）。 */
+function versionRows(names) {
+	return names.map((name) => {
+		const cached = versionCache.get(name);
+		return {
+			name,
+			latest: cached?.latest ?? null,
+			checked: cached !== void 0,
+			error: cached?.error ?? null
+		};
 	});
-	return latest;
 }
 /** 用户插件名列表（排除官方命名空间）。 */
 async function userPluginNames(ctx) {
 	const entries = await collectLoaderEntries(ctx);
 	return [...new Set(entries.map((row) => row.name).filter((name) => !name.startsWith("@deepseek-ai/") && !name.startsWith("@cordisjs/") && !name.startsWith("cordis:")))];
-}
-/** 批量强制刷新版本缓存（可选 force）。 */
-async function refreshVersions(ctx, force) {
-	const now = Date.now();
-	if (!force && now - lastVersionRefreshAt < VERSION_REFRESH_MIN_MS) return false;
-	lastVersionRefreshAt = now;
-	for (const name of await userPluginNames(ctx)) npmViewLatest(name);
-	return true;
 }
 /** Cordis 插件名。 */
 const name = "plugin-console";
@@ -1136,14 +1171,7 @@ function apply(ctx) {
 					if (method === "GET" && (path === "/api/plugin-console/versions" || path === "/api/plugin-console/versions/")) {
 						json(200, {
 							ok: true,
-							versions: (await userPluginNames(ctx)).map((name) => {
-								const cached = versionCache.get(name);
-								return {
-									name,
-									latest: cached?.latest ?? null,
-									checked: cached !== void 0
-								};
-							})
+							versions: versionRows(await userPluginNames(ctx))
 						});
 						return;
 					}
@@ -1151,14 +1179,7 @@ function apply(ctx) {
 						json(200, {
 							ok: true,
 							refreshed: await refreshVersions(ctx, false),
-							versions: (await userPluginNames(ctx)).map((name) => {
-								const cached = versionCache.get(name);
-								return {
-									name,
-									latest: cached?.latest ?? null,
-									checked: cached !== void 0
-								};
-							})
+							versions: versionRows(await userPluginNames(ctx))
 						});
 						return;
 					}

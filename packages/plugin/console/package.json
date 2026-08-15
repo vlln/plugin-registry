@@ -8,7 +8,7 @@
   "main": "lib/index.mjs",
   "scripts": {
     "build": "tsdown --config tsdown.config.ts",
-    "test": "TSX_TSCONFIG_PATH=tests/tsconfig.json node --import tsx --test tests/discovery/*.spec.ts"
+    "test": "TSX_TSCONFIG_PATH=tests/tsconfig.json node --import tsx --test \"tests/**/*.spec.ts\""
   },
   "exports": {
     ".": {
