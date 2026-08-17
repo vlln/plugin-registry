@@ -14,6 +14,7 @@ import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import type { Context } from 'cordis'
 import { createPluginTools } from './discovery/tools.ts'
+import { npmViewLatest } from './versions.ts'
 
 /** 解析 resolveDshHome（官方 dsh-paths）。 */
 function resolveDshHome(): string {
@@ -545,26 +546,10 @@ async function collectLoaderEntries(ctx: ConsoleCtx): Promise<LoadedEntryRow[]> 
 
 /* ---------------- 版本检查 ---------------- */
 
-/** 版本检查缓存：name -> { latest, checkedAt }（进程内存）。 */
-const versionCache = new Map<string, { latest: string | null; checkedAt: number }>()
+/** 版本检查缓存：name -> { latest, error, checkedAt }（进程内存）。 */
+const versionCache = new Map<string, { latest: string | null; error: string | null; checkedAt: number }>()
 const VERSION_REFRESH_MIN_MS = 30 * 1000
 let lastVersionRefreshAt = 0
-
-/** npm view <name> version（registry 最新版）；失败/非 registry 包返回 null。 */
-function npmViewLatest(name: string): string | null {
-  let latest: string | null = null
-  try {
-    const result = cliCommand('npm', ['view', name, 'version'], { encoding: 'utf8', timeout: 15_000, stdio: ['ignore', 'pipe', 'pipe'] })
-    const text = (result.stdout ?? '').trim()
-    if (result.status === 0 && /^\d+(\.\d+)+/.test(text)) {
-      latest = text.split('\n')[0]!.trim()
-    }
-  } catch {
-    // 保持 null（无法查询 = 非 registry 包或网络问题）。
-  }
-  versionCache.set(name, { latest, checkedAt: Date.now() })
-  return latest
-}
 
 /** 用户插件名列表（排除官方命名空间）。 */
 async function userPluginNames(ctx: ConsoleCtx): Promise<string[]> {
@@ -573,14 +558,28 @@ async function userPluginNames(ctx: ConsoleCtx): Promise<string[]> {
     .filter(name => !name.startsWith('@deepseek-ai/') && !name.startsWith('@cordisjs/') && !name.startsWith('cordis:')))]
 }
 
-/** 批量强制刷新版本缓存（可选 force）。 */
+/** 版本行（缓存内容；error 区分「本地包」与「检查失败」）。 */
+function versionRows(names: string[]): Array<{ name: string; latest: string | null; checked: boolean; error: string | null }> {
+  return names.map(name => {
+    const cached = versionCache.get(name)
+    return { name, latest: cached?.latest ?? null, checked: cached !== undefined, error: cached?.error ?? null }
+  })
+}
+
+/** 批量强制刷新版本缓存（可选 force）：registry 查询走原生 fetch，
+ *  不 spawn 子进程（受限宿主环境管道捕获会被拦）；404 = 非 registry 包。 */
 async function refreshVersions(ctx: ConsoleCtx, force: boolean): Promise<boolean> {
   const now = Date.now()
   if (!force && now - lastVersionRefreshAt < VERSION_REFRESH_MIN_MS) return false
   lastVersionRefreshAt = now
-  for (const name of await userPluginNames(ctx)) {
-    void npmViewLatest(name)
-  }
+  const names = await userPluginNames(ctx)
+  await Promise.all(names.map(async (name) => {
+    const result = await npmViewLatest(name)
+    if (result.error !== null) {
+      ctx.logger.warn(`[plugin-console] version check failed for ${name}: ${result.error}`)
+    }
+    versionCache.set(name, { latest: result.latest, error: result.error, checkedAt: Date.now() })
+  }))
   return true
 }
 
@@ -699,21 +698,13 @@ export function apply(ctx: ConsoleCtx): void {
           // bundle 版本：只读缓存（零网络——registry 查询由启动延迟预扫描 +
           // 手动刷新触发，避免面板每次打开打 registry）
           if (method === 'GET' && (path === '/api/plugin-console/versions' || path === '/api/plugin-console/versions/')) {
-            const versions = (await userPluginNames(ctx)).map(name => {
-              const cached = versionCache.get(name)
-              return { name, latest: cached?.latest ?? null, checked: cached !== undefined }
-            })
-            json(200, { ok: true, versions })
+            json(200, { ok: true, versions: versionRows(await userPluginNames(ctx)) })
             return
           }
           // 手动检查最新版本（POST /versions/refresh，30s 最小间隔防抖）
           if (method === 'POST' && (path === '/api/plugin-console/versions/refresh' || path === '/api/plugin-console/versions/refresh/')) {
             const did = await refreshVersions(ctx, false)
-            const versions = (await userPluginNames(ctx)).map(name => {
-              const cached = versionCache.get(name)
-              return { name, latest: cached?.latest ?? null, checked: cached !== undefined }
-            })
-            json(200, { ok: true, refreshed: did, versions })
+            json(200, { ok: true, refreshed: did, versions: versionRows(await userPluginNames(ctx)) })
             return
           }
           // 统一安装入口（POST /install，body {source}）：pnpm add →

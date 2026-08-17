@@ -47,6 +47,7 @@ function makeDeps(overrides: Partial<PluginToolDeps> = {}): PluginToolDeps {
       inserts = inserts.filter(r => r.id !== id)
       return inserts.length !== before
     },
+    readProfileManifest: () => ({ dsh: { profile: { bundles: [] } } }),
     ...overrides,
   }
 }
