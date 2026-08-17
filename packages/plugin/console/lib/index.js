@@ -338,7 +338,7 @@ window.__ModuleLoader__.load({
 							sectionHeader("安装插件"),
 							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 								style: introStyle,
-								children: "输入 npm 包名或源——自动安装并挂载：bundle 插件（声明 dsh.bundle）加入层栈（重启生效）；非 bundle 插件写 insert 行（配置 HMR 实时挂载，无需重启）。"
+								children: "输入 npm 包名或 GitHub 项目——自动安装并挂载：bundle 插件（声明 dsh.bundle）加入层栈（重启生效）；非 bundle 插件写 insert 行（配置 HMR 实时挂载，无需重启）。GitHub 项目支持 https://github.com/o/r、github.com/o/r、github:o/r 三种写法。"
 							}),
 							installMsg !== void 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 								style: savedStyle,
@@ -355,7 +355,7 @@ window.__ModuleLoader__.load({
 									}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
 										id: "console-install-source",
 										value: installInput,
-										placeholder: "@dsh-external/dsh-loop 或 git 源",
+										placeholder: "npm 包名 / https://github.com/o/r / github:o/r",
 										onChange: (e) => {
 											setInstallInput(e.target.value);
 										}

@@ -274,7 +274,7 @@ export function ConsolePanel(): React.ReactNode {
       {/* 安装插件：统一入口（自动 pnpm add + 按形态分流） */}
       <section style={sectionStyle}>
         {sectionHeader('安装插件')}
-        <p style={introStyle}>输入 npm 包名或源——自动安装并挂载：bundle 插件（声明 dsh.bundle）加入层栈（重启生效）；非 bundle 插件写 insert 行（配置 HMR 实时挂载，无需重启）。</p>
+        <p style={introStyle}>输入 npm 包名或 GitHub 项目——自动安装并挂载：bundle 插件（声明 dsh.bundle）加入层栈（重启生效）；非 bundle 插件写 insert 行（配置 HMR 实时挂载，无需重启）。GitHub 项目支持 https://github.com/o/r、github.com/o/r、github:o/r 三种写法。</p>
         {installMsg !== undefined ? <p style={savedStyle}>{installMsg}</p> : null}
         <div style={editorStyle}>
           <div style={fieldStyle}>
@@ -282,7 +282,7 @@ export function ConsolePanel(): React.ReactNode {
             <Input
               id="console-install-source"
               value={installInput}
-              placeholder="@dsh-external/dsh-loop 或 git 源"
+              placeholder="npm 包名 / https://github.com/o/r / github:o/r"
               onChange={(e) => { setInstallInput(e.target.value) }}
             />
           </div>
