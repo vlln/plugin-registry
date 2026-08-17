@@ -1,6 +1,7 @@
 /**
- * 发现层类型（0811 适配）：外部插件只有 profile bundle 一条官方安装路径。
- * - 源集合（sources.yml）：索引源 = 组织级 hub catalog（唯一现成索引）。
+ * 发现层类型（0813 适配）：外部插件只有 profile bundle 一条官方安装路径。
+ * - 源集合（sources.yml）：索引源 = 组织级 hub index.json
+ *   （schema plugin-sources/index/v1，唯一现成官方可装插件索引）。
  * - 安装态 = profile 的 `dsh.profile.bundles`（bundle 插件）＋ profile
  *   `cordis.patch.yml` 的 insert 行（非 bundle 插件，配置 HMR 实时挂载）。
  * - TOFU 锁（lock.yml）：记录 resolved 包引用，防内容漂移。
@@ -23,11 +24,11 @@ export type PluginFace = 'tool' | 'skill' | 'mcp' | 'ui' | 'bundle'
 
 /** 统一插件条目（枚举结果，first-index：sourceId 记录归属源）。 */
 export interface PluginEntry {
-  /** 插件 id（仓库名 / 包名）。 */
+  /** 插件 id = 安装规范（npm 包名），与 plugin_install/status 的 canonical 一致。 */
   id: string
   /** 官方安装形态：bundle 走 profile bundles 层；plugin 走 insert 行。 */
   kind: 'bundle' | 'plugin'
-  /** 官方格式源（npm 包名 或 github 仓库 URL）。 */
+  /** 官方安装规范（npm 包名），可原样喂给 plugin_install。 */
   source: string
   /** 能力面。 */
   faces: PluginFace[]

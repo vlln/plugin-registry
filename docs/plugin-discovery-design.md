@@ -36,8 +36,8 @@ $DSH_HOME/
 ```yaml
 sources:
   - id: hub
-    kind: index                          # 读现成索引文件（hub plugins.json / 任何 catalog）
-    locator: https://raw.githubusercontent.com/dsh-external/hub/main/plugins.json
+    kind: index                          # 读现成索引文件（hub index.json）
+    locator: https://raw.githubusercontent.com/dsh-external/hub/main/index.json
     trust: official                      # official / community / untrusted
   - id: my-catalog
     kind: index                         # 本地 catalog 文件（hub clone 或手写）
@@ -45,9 +45,9 @@ sources:
     trust: community
 ```
 
-- **index**：hub 即组织默认源（富化层——只做分类/描述；0811 起 hub catalog 的 `bundle` 标记决定安装形态）
+- **index**：hub 即组织默认源（富化层——只做分类/描述；条目 `source` 直接是 npm 包名，bundle 插件，可原样喂给 `plugin_install`）
 - 每源带 `trust` 层级——agent 自动安装第三方前的供应链防线（一行字段的成本）
-- **0811 变化**：原 `single`（单仓库直引探测）/`manifest` 源类型随 repository 机制移除；外部插件统一是 npm 包（bundle 或纯 cordis），发现层只保留 index（hub catalog）
+- **0811 起**：外部插件统一是 npm 包（bundle 或纯 cordis），发现层只保留 index——读 hub `index.json`（`plugin-sources/index/v1`，`plugins` 数组，非旧 `catalog.json` 的 `repos` 格式）
 
 ## 枚举与缓存
 
@@ -101,8 +101,9 @@ sources:
 
 - **已实现**（0811 适配）：4 工具注册（`inject tools` + `ctx.tools.register`）；`src/discovery/{store,enumerate,tools,types}.ts`；web boot 日志 `registered plugin tools` 实证；34 项 node:test
 - **0811 适配**（repository 机制移除后重写）：
-  - `enumerate.ts` 删 `single`（github raw 探测）/`manifest` 源，仅保留 `index`（hub catalog，`repos` 格式）
+  - `enumerate.ts` 删 `single`（github raw 探测）/`manifest` 源，仅保留 `index`
   - `store.ts` 源 kind 收紧为 `index`；lock kind 收紧为 `bundle`/`plugin`
   - `plugin_install` 按包是否声明 `dsh.bundle` 分流：bundle → pnpm add + 层栈（重启生效）；纯 cordis → pnpm add + insert 行（配置 HMR 实时挂载，零重启）
-  - `index` 源 locator 支持**本地文件**（`file://` 或裸路径）——hub 仓库为私有，匿名 `raw.githubusercontent` 404，本机经 hub clone 的 `catalog.json` 走本地通道（hub 2h 自动刷新同步）
+  - `index` 源 locator 支持**本地文件**（`file://` 或裸路径）——hub 仓库为私有，匿名 `raw.githubusercontent` 404，本机经 hub clone 的 `index.json` 走本地通道（hub 2h 自动刷新同步）
   - 测试管线用 **node:test + tsx**（vitest 4/vite 8 与 vite 7 的 NodeNext 解析在独立包环境不兼容；`tests/tsconfig.json` paths 把未发布的 `@deepseek-ai/dsh-tools` 映射到 stub）
+- **0813 适配**（格式统一）：`enumerate.ts` 从读 hub `catalog.json`（`repos` 格式，`source` = `github:owner/repo`）改为读 hub `index.json`（`plugin-sources/index/v1`，`plugins` 格式，`source` = npm 包名）——`plugin_search` 产出的 `source` 与 `plugin_install` 的入参一致，search→install 闭环打通；`PLUGIN_ITEM` schema 补 `trust`（修复 open issue #2）；hub `generate.mjs` 的 index 改 bundle-only（删死掉的 `repository` kind）

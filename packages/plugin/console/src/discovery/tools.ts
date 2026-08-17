@@ -50,6 +50,7 @@ const PLUGIN_ITEM = {
     faces: { type: 'array', items: { type: 'string' }, required: true },
     description: { type: 'string' },
     sourceId: { type: 'string', required: true },
+    trust: { type: 'string', enum: ['official', 'community', 'untrusted'] },
   },
 } as const
 
@@ -97,9 +98,10 @@ export function createPluginTools(deps: PluginToolDeps): ToolDefinition[] {
       name: 'plugin_search',
       description: 'Search installable DSH plugins. Without `source`, searches every registered source '
         + '(sources at $DSH_HOME/plugin-sources/sources.yml, enumeration cached; the default source is the '
-        + 'dsh-external hub catalog). With `source`, probes that source — an index JSON file/URL '
-        + '(hub catalog format: {"repos": [...]}) is probed lazily and remembered for later searches. '
-        + 'Results carry the owning source and trust level.',
+        + 'dsh-external hub index). With `source`, probes that source — an index JSON file/URL '
+        + '(plugin index format: {"plugins": [...]}, schema plugin-sources/index/v1) is probed lazily and '
+        + 'remembered for later searches. Each result\'s `source` is an install spec (npm package name) '
+        + 'you can pass straight to plugin_install. Results carry the owning source and trust level.',
       parameters: {
         query: { type: 'string', description: 'Substring to match against plugin id or description. Empty returns all.' },
         source: { type: 'string', description: 'A registered source id, or a new source (an index JSON file/URL) to probe and remember.' },

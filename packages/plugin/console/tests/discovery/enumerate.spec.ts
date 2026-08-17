@@ -1,6 +1,7 @@
 /**
- * 枚举层测试（0811 适配）：hub catalog（repos 格式）index 枚举——
- * mock fetch + 本地文件 + 304 + TTL 快照。
+ * 枚举层测试（0813 适配）：hub index.json（plugin-sources/index/v1，
+ * plugins 格式，source = npm 包名）index 枚举——mock fetch + 本地文件 +
+ * 304 + TTL 快照。
  */
 import { describe, it, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
@@ -8,7 +9,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  parseGithubUrl, facesOfDsh, enumerateIndex, enumerateSource, hubRepoToPlugin,
+  indexEntryToPlugin, enumerateIndex, enumerateSource,
 } from '../../src/discovery/enumerate.ts'
 import { readSnapshot, writeSources, sourcesPath } from '../../src/discovery/store.ts'
 import type { PluginSource } from '../../src/discovery/types.ts'
@@ -28,76 +29,67 @@ function indexSource(home: string, file: string): PluginSource {
   return { id: 'hub', kind: 'index', locator: `file://${file}`, trust: 'community' }
 }
 
-describe('parseGithubUrl', () => {
-  it('parses bare and .git URLs', () => {
-    assert.deepEqual(parseGithubUrl('https://github.com/vlln/whale-girl'), { owner: 'dsh-external', repo: 'whale-girl' })
-    assert.deepEqual(parseGithubUrl('https://github.com/vlln/whale-girl'), { owner: 'dsh-external', repo: 'whale-girl' })
-  })
-  it('rejects non-github URLs', () => {
-    assert.equal(parseGithubUrl('https://example.com/x'), null)
-  })
-})
-
-describe('facesOfDsh', () => {
-  it('derives faces from dsh fields', () => {
-    assert.deepEqual(facesOfDsh({ bundle: {} }), ['bundle'])
-    assert.deepEqual(facesOfDsh({ client: {} }), ['ui'])
-    assert.deepEqual(facesOfDsh(undefined), [])
-  })
-})
-
-describe('hubRepoToPlugin', () => {
-  it('maps bundle repos to bundle kind and plugin repos to plugin kind', () => {
-    const bundle = hubRepoToPlugin(
-      { name: 'whale-girl', url: 'https://github.com/vlln/whale-girl', bundle: true, skill: false },
+describe('indexEntryToPlugin', () => {
+  it('maps a bundle entry — id 取 source（npm 包名）', () => {
+    const e = indexEntryToPlugin(
+      { id: '@dsh-external/whale-girl', kind: 'bundle', source: '@dsh-external/whale-girl', faces: ['ui', 'bundle'], description: '宠物' },
       'hub',
     )
-    assert.ok(bundle !== null)
-    assert.equal(bundle.kind, 'bundle')
-    const plugin = hubRepoToPlugin(
-      { name: 'dsh-loop', url: 'https://github.com/vlln/dsh-loop', bundle: false },
-      'hub',
-    )
-    assert.ok(plugin !== null)
-    assert.equal(plugin.kind, 'plugin')
+    assert.ok(e !== null)
+    assert.equal(e.id, '@dsh-external/whale-girl')
+    assert.equal(e.kind, 'bundle')
+    assert.equal(e.source, '@dsh-external/whale-girl')
+    assert.deepEqual(e.faces, ['ui', 'bundle'])
+    assert.equal(e.description, '宠物')
+    assert.equal(e.sourceId, 'hub')
   })
-  it('returns null for entries without name or github url', () => {
-    assert.equal(hubRepoToPlugin({ name: 'x', url: 'https://example.com/x' }, 'hub'), null)
-    assert.equal(hubRepoToPlugin({ url: 'https://github.com/a/b' }, 'hub'), null)
+
+  it('skips repository kind（0811 已移除）与缺失 source 的条目', () => {
+    assert.equal(indexEntryToPlugin({ id: 'x', kind: 'repository', source: 'github:a/b&path:/.dsh-plugin' }, 'hub'), null)
+    assert.equal(indexEntryToPlugin({ id: 'x', kind: 'bundle' }, 'hub'), null)
+    assert.equal(indexEntryToPlugin({ id: 'x', kind: 'bundle', source: '  ' }, 'hub'), null)
+    // id 缺省时从 source 派生（index 的 id 与 source 对 bundle 恒等）。
+    assert.equal(indexEntryToPlugin({ kind: 'bundle', source: '@a/b' }, 'hub')!.id, '@a/b')
+  })
+
+  it('filters unknown faces', () => {
+    const e = indexEntryToPlugin({ id: 'x', kind: 'bundle', source: 'x', faces: ['bundle', 'nonsense', 3] }, 'hub')
+    assert.deepEqual(e!.faces, ['bundle'])
   })
 })
 
 describe('enumerateIndex', () => {
-  it('reads a local catalog.json (repos format)', async () => {
+  it('reads a local index.json (plugins format)', async () => {
     const home = freshHome()
-    const catalog = join(home, 'catalog.json')
-    writeFileSync(catalog, JSON.stringify({ repos: [
-      { name: 'whale-girl', url: 'https://github.com/vlln/whale-girl', description: '宠物', bundle: true },
-      { name: 'dsh-loop', url: 'https://github.com/vlln/dsh-loop', bundle: false },
+    const index = join(home, 'index.json')
+    writeFileSync(index, JSON.stringify({ plugins: [
+      { id: '@dsh-external/whale-girl', kind: 'bundle', source: '@dsh-external/whale-girl', description: '宠物', faces: ['ui', 'bundle'] },
+      { id: '@dsh-external/dsh-loop', kind: 'bundle', source: '@dsh-external/dsh-loop', faces: [] },
+      { id: 'stale', kind: 'repository', source: 'github:a/b&path:/.dsh-plugin' },
     ] }))
-    const snap = await enumerateIndex(home, indexSource(home, catalog))
+    const snap = await enumerateIndex(home, indexSource(home, index))
     assert.equal(snap.entries.length, 2)
-    assert.equal(snap.entries[0]!.id, 'whale-girl')
+    assert.equal(snap.entries[0]!.id, '@dsh-external/whale-girl')
     assert.equal(snap.entries[0]!.kind, 'bundle')
-    assert.equal(snap.entries[1]!.kind, 'plugin')
+    assert.equal(snap.entries[0]!.source, '@dsh-external/whale-girl')
     // 快照已缓存
     assert.ok(readSnapshot(home, 'hub') !== null)
   })
 
   it('uses a fresh snapshot without re-reading the file', async () => {
     const home = freshHome()
-    const catalog = join(home, 'catalog.json')
-    writeFileSync(catalog, JSON.stringify({ repos: [{ name: 'a', url: 'https://github.com/x/a' }] }))
-    await enumerateIndex(home, indexSource(home, catalog), { now: 1_000_000 })
+    const index = join(home, 'index.json')
+    writeFileSync(index, JSON.stringify({ plugins: [{ id: 'a', kind: 'bundle', source: 'a' }] }))
+    await enumerateIndex(home, indexSource(home, index), { now: 1_000_000 })
     // 新鲜快照期内改文件——应返回旧 entries（不重读）
-    writeFileSync(catalog, JSON.stringify({ repos: [{ name: 'b', url: 'https://github.com/x/b' }] }))
-    const snap = await enumerateIndex(home, indexSource(home, catalog), { now: 1_000_100 })
+    writeFileSync(index, JSON.stringify({ plugins: [{ id: 'b', kind: 'bundle', source: 'b' }] }))
+    const snap = await enumerateIndex(home, indexSource(home, index), { now: 1_000_100 })
     assert.equal(snap.entries[0]!.id, 'a')
   })
 
   it('fetches remote with ETag conditional refresh (304 keeps entries)', async () => {
     const home = freshHome()
-    const source: PluginSource = { id: 'hub', kind: 'index', locator: 'https://example.com/catalog.json', trust: 'community' }
+    const source: PluginSource = { id: 'hub', kind: 'index', locator: 'https://example.com/index.json', trust: 'community' }
     let calls = 0
     const fetchImpl = async (url: string, init?: { headers?: Record<string, string> }): Promise<{
       ok: boolean; status: number; etag: string | null; text(): Promise<string>; json(): Promise<unknown>
@@ -107,8 +99,8 @@ describe('enumerateIndex', () => {
       if (calls === 1) {
         return {
           ok: true, status: 200, etag: 'v1',
-          text: async () => JSON.stringify({ repos: [{ name: 'a', url: 'https://github.com/x/a' }] }),
-          json: async () => ({ repos: [{ name: 'a', url: 'https://github.com/x/a' }] }),
+          text: async () => JSON.stringify({ plugins: [{ id: 'a', kind: 'bundle', source: 'a' }] }),
+          json: async () => ({ plugins: [{ id: 'a', kind: 'bundle', source: 'a' }] }),
         }
       }
       assert.equal(init?.headers?.['If-None-Match'], 'v1')
@@ -126,7 +118,7 @@ describe('enumerateIndex', () => {
 
   it('fails loud on unreadable local file', async () => {
     const home = freshHome()
-    const source: PluginSource = { id: 'hub', kind: 'index', locator: 'file:///nonexistent/catalog.json', trust: 'community' }
+    const source: PluginSource = { id: 'hub', kind: 'index', locator: 'file:///nonexistent/index.json', trust: 'community' }
     await assert.rejects(enumerateIndex(home, source), /unreadable/)
   })
 })
@@ -134,9 +126,9 @@ describe('enumerateIndex', () => {
 describe('enumerateSource dispatch', () => {
   it('routes to index enumeration (only kind in 0811)', async () => {
     const home = freshHome()
-    const catalog = join(home, 'catalog.json')
-    writeFileSync(catalog, JSON.stringify({ repos: [{ name: 'a', url: 'https://github.com/x/a' }] }))
-    const snap = await enumerateSource(home, indexSource(home, catalog))
+    const index = join(home, 'index.json')
+    writeFileSync(index, JSON.stringify({ plugins: [{ id: 'a', kind: 'bundle', source: 'a' }] }))
+    const snap = await enumerateSource(home, indexSource(home, index))
     assert.equal(snap.entries.length, 1)
   })
 })
@@ -144,7 +136,7 @@ describe('enumerateSource dispatch', () => {
 describe('sources.yml round-trip', () => {
   it('keeps index kind', () => {
     const home = freshHome()
-    const file = join(home, 'catalog.json')
+    const file = join(home, 'index.json')
     writeFileSync(file, '{}')
     writeSources(home, [{ id: 'hub', kind: 'index', locator: `file://${file}` }])
     const text = readFileSync(sourcesPath(home), 'utf8')

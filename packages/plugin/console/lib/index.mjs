@@ -159,13 +159,29 @@ function snapshotFresh(snapshot, ttlMs, now = Date.now()) {
 	if (Number.isNaN(fetched)) return false;
 	return now - fetched < ttlMs;
 }
-/** 解析 github 仓库 URL（https://github.com/o/r.git 或裸 https://github.com/o/r）。 */
-function parseGithubUrl(url) {
-	const m = /^https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(url.trim());
-	if (m === null) return null;
+const FACES = /* @__PURE__ */ new Set([
+	"tool",
+	"skill",
+	"mcp",
+	"ui",
+	"bundle"
+]);
+/**
+* index.json（plugin-sources/index/v1）插件条目 → 统一插件条目。
+* 只收官方可装形态 `bundle`（source = npm 包名）；`repository` 已随 0811
+* 移除，跳过。id 取 source（安装规范）而非仓库名——与 plugin_install /
+* plugin_status 的 canonical 一致。
+*/
+function indexEntryToPlugin(raw, sourceId) {
+	const source = typeof raw.source === "string" ? raw.source : null;
+	if (raw.kind !== "bundle" || source === null || source.trim() === "") return null;
 	return {
-		owner: m[1],
-		repo: m[2].replace(/\.git$/, "")
+		id: source,
+		kind: "bundle",
+		source,
+		faces: Array.isArray(raw.faces) ? raw.faces.filter((f) => typeof f === "string" && FACES.has(f)) : [],
+		description: typeof raw.description === "string" ? raw.description : void 0,
+		sourceId
 	};
 }
 const defaultFetch = async (url, init) => {
@@ -178,34 +194,17 @@ const defaultFetch = async (url, init) => {
 		json: () => res.json()
 	};
 };
-/** hub catalog 仓库条目 → 统一插件条目。 */
-function hubRepoToPlugin(raw, sourceId) {
-	const name = typeof raw.name === "string" ? raw.name : null;
-	const url = typeof raw.url === "string" ? raw.url : null;
-	if (name === null || url === null) return null;
-	const gh = parseGithubUrl(url);
-	if (gh === null) return null;
-	const description = typeof raw.description === "string" ? raw.description : void 0;
-	const isBundle = raw.bundle === true;
-	const faces = [];
-	if (raw.skill === true) faces.push("skill");
-	if (isBundle) faces.push("bundle");
-	return {
-		id: name,
-		kind: isBundle ? "bundle" : "plugin",
-		source: `github:${gh.owner}/${gh.repo}`,
-		faces,
-		description,
-		sourceId
-	};
+/** 把 index.json 的 plugins 数组转成统一条目列表。 */
+function pluginsToEntries(body, sourceId) {
+	return (Array.isArray(body.plugins) ? body.plugins : []).map((p) => indexEntryToPlugin(p ?? {}, sourceId)).filter((e) => e !== null);
 }
 /**
-* index 源枚举：读 hub catalog JSON（locator = URL 或本地文件路径），
+* index 源枚举：读 hub index.json（locator = URL 或本地文件路径），
 * 条目转换，写快照。有新鲜快照 → 直接返回（不网络）；过期 → 拉取（带
 * ETag 条件刷新，304 时保留 entries 仅更新 fetchedAt）。
 *
 * locator 支持 file:///path 或裸本地路径（读文件，零网络——本机经 hub
-* clone 的 catalog.json 走此通道）。
+* clone 的 index.json 走此通道）。
 */
 async function enumerateIndex(dshHome, source, opts = {}) {
 	const now = opts.now ?? Date.now();
@@ -220,7 +219,7 @@ async function enumerateIndex(dshHome, source, opts = {}) {
 		} catch (error) {
 			throw new Error(`plugin-sources: index "${source.id}" local file unreadable (${filePath}): ${String(error)}`);
 		}
-		const entries = (Array.isArray(body.repos) ? body.repos : []).map((p) => hubRepoToPlugin(p ?? {}, source.id)).filter((e) => e !== null);
+		const entries = pluginsToEntries(body, source.id);
 		const snapshot = {
 			fetchedAt: new Date(now).toISOString(),
 			entries
@@ -242,8 +241,7 @@ async function enumerateIndex(dshHome, source, opts = {}) {
 		return refreshed;
 	}
 	if (!res.ok) throw new Error(`plugin-sources: index "${source.id}" fetch failed (${res.status}): ${source.locator}`);
-	const body = await res.json();
-	const entries = (Array.isArray(body.repos) ? body.repos : []).map((p) => hubRepoToPlugin(p ?? {}, source.id)).filter((e) => e !== null);
+	const entries = pluginsToEntries(await res.json(), source.id);
 	const snapshot = {
 		fetchedAt: new Date(now).toISOString(),
 		etag: res.etag ?? void 0,
@@ -252,7 +250,7 @@ async function enumerateIndex(dshHome, source, opts = {}) {
 	writeSnapshot(dshHome, source.id, snapshot);
 	return snapshot;
 }
-/** 按源类型分发枚举（0811 仅 index）。 */
+/** 按源类型分发枚举（0811 起仅 index）。 */
 async function enumerateSource(dshHome, source, opts = {}) {
 	return enumerateIndex(dshHome, source, opts);
 }
@@ -303,6 +301,14 @@ const PLUGIN_ITEM = {
 		sourceId: {
 			type: "string",
 			required: true
+		},
+		trust: {
+			type: "string",
+			enum: [
+				"official",
+				"community",
+				"untrusted"
+			]
 		}
 	}
 };
@@ -354,7 +360,7 @@ function createPluginTools(deps) {
 	return [
 		defineTool({
 			name: "plugin_search",
-			description: "Search installable DSH plugins. Without `source`, searches every registered source (sources at $DSH_HOME/plugin-sources/sources.yml, enumeration cached; the default source is the dsh-external hub catalog). With `source`, probes that source — an index JSON file/URL (hub catalog format: {\"repos\": [...]}) is probed lazily and remembered for later searches. Results carry the owning source and trust level.",
+			description: "Search installable DSH plugins. Without `source`, searches every registered source (sources at $DSH_HOME/plugin-sources/sources.yml, enumeration cached; the default source is the dsh-external hub index). With `source`, probes that source — an index JSON file/URL (plugin index format: {\"plugins\": [...]}, schema plugin-sources/index/v1) is probed lazily and remembered for later searches. Each result's `source` is an install spec (npm package name) you can pass straight to plugin_install. Results carry the owning source and trust level.",
 			parameters: {
 				query: {
 					type: "string",

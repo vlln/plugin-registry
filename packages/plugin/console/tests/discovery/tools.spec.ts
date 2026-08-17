@@ -1,7 +1,8 @@
 /**
- * 工具语义测试（0811 适配）：plugin_search / plugin_install /
+ * 工具语义测试（0813 适配）：plugin_search / plugin_install /
  * plugin_uninstall / plugin_status——真实临时 DSH_HOME；hub 用内联
- * index 文件源（catalog.json repos 格式）；insert 行用内存 patch 模拟。
+ * index 文件源（index.json plugins 格式，plugin-sources/index/v1）；
+ * insert 行用内存 patch 模拟。
  */
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
@@ -58,30 +59,34 @@ beforeEach(() => {
 })
 
 describe('plugin_search', () => {
-  it('enumerates a new index source (hub catalog repos format) and remembers it in sources.yml', async () => {
-    const localIndex = join(home, 'catalog.json')
-    writeFileSync(localIndex, JSON.stringify({ repos: [
-      { name: 'whale-girl', url: 'https://github.com/vlln/whale-girl', description: '宠物', bundle: true },
+  it('enumerates a new index source (index.json plugins format) and remembers it in sources.yml', async () => {
+    const localIndex = join(home, 'index.json')
+    writeFileSync(localIndex, JSON.stringify({ plugins: [
+      { id: '@dsh-external/whale-girl', kind: 'bundle', source: '@dsh-external/whale-girl', description: '宠物', faces: ['ui', 'bundle'] },
     ] }))
     const res = await tools()['plugin_search']!.execute({ source: `file://${localIndex}` })
-    const plugins = res.plugins as Array<{ id: string; sourceId: string; kind: string }>
+    const plugins = res.plugins as Array<{ id: string; sourceId: string; kind: string; source: string }>
     assert.equal(plugins.length, 1)
-    assert.equal(plugins[0]!.id, 'whale-girl')
+    assert.equal(plugins[0]!.id, '@dsh-external/whale-girl')
     assert.equal(plugins[0]!.kind, 'bundle')
-    assert.equal(readSources(home).some(s => s.locator.includes('catalog.json')), true)
+    // source 直接是 npm 包名——可喂给 plugin_install（格式统一）。
+    assert.equal(plugins[0]!.source, '@dsh-external/whale-girl')
+    assert.equal(readSources(home).some(s => s.locator.includes('index.json')), true)
   })
 
-  it('filters by query across enumerated sources', async () => {
-    const localIndex = join(home, 'catalog.json')
-    writeFileSync(localIndex, JSON.stringify({ repos: [
-      { name: 'whale-girl', url: 'https://github.com/vlln/whale-girl', description: '桌面宠物' },
-      { name: 'chat-width', url: 'https://github.com/dsh-external/chat-width.git', description: '消息宽度' },
+  it('filters by query and carries trust for registered sources', async () => {
+    const localIndex = join(home, 'index.json')
+    writeFileSync(localIndex, JSON.stringify({ plugins: [
+      { id: '@dsh-external/whale-girl', kind: 'bundle', source: '@dsh-external/whale-girl', description: '桌面宠物' },
+      { id: '@dsh-external/chat-width', kind: 'bundle', source: '@dsh-external/chat-width', description: '消息宽度' },
     ] }))
     const t = tools()
     await t['plugin_search']!.execute({ source: `file://${localIndex}` })
     const res = await t['plugin_search']!.execute({ query: 'whale' })
-    const plugins = res.plugins as Array<{ id: string }>
-    assert.deepEqual(plugins.map(p => p.id), ['whale-girl'])
+    const plugins = res.plugins as Array<{ id: string; trust?: string }>
+    assert.deepEqual(plugins.map(p => p.id), ['@dsh-external/whale-girl'])
+    // 已注册源按 sources.yml trust（缺省 community）输出（修复 PLUGIN_ITEM 缺 trust）。
+    assert.equal(plugins[0]!.trust, 'community')
   })
 })
 

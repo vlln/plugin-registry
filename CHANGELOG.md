@@ -2,6 +2,16 @@
 
 本仓库（plugin-registry：薄控制台 + 文档 + skill）的变更记录。机制件改动在官方 snapshot 宿主仓库的历史机制分支按提交记录（0809 转向后不再有机制件），本表汇总交付。
 
+## 2026-08（0813 格式统一——发现层读 index.json，source = npm 包名）
+
+官方「正式版」npm 公开发布（`@deepseek-ai/*` 全家族公开，`@deepseek-ai/dsh` latest `0.1.0-rc.6`）后，修掉发现层「格式还是最老」的问题——枚举半拉停在 0811 之前的 git 源格式（`github:owner/repo`），与安装半拉的 npm 格式（`plugin_install` 入参 = npm 包名）不一致。
+
+- ✅ **`enumerate.ts` 重写**：index 源从读 hub `catalog.json`（`repos` 格式）改为读 hub `index.json`（`plugin-sources/index/v1`，`plugins` 格式，`source` = npm 包名）；删 `parseGithubUrl`/`hubRepoToPlugin`/`facesOfDsh`，新映射 `indexEntryToPlugin` 只收 `bundle`（跳过已死的 `repository` kind），`id` 取 `source`（与 `plugin_install`/`plugin_status` 的 canonical 一致）
+- ✅ **`tools.ts` 修 issue #2**：`PLUGIN_ITEM` schema 补 `trust`（`official|community|untrusted`），`plugin_search` 描述改 index 格式
+- ✅ **hub `generate.mjs`**：index 改 bundle-only（删 `repository` kind，`.dsh-plugin` 已随 0811 移除），修 doc drift（注释曾指向不存在的章节）
+- ✅ **测试重写 + 产物重建**：enumerate/tools 测试改 index.json plugins fixture；32/32 node:test 通过；`lib/` 重建（产物入库）
+- ⚠️ **发现（另案）**：hub 重生成暴露单组织假设崩溃——大量仓库已迁出 `dsh-external` 组织（whale-girl/dsh-loop → `vlln/`，deepseek-manners → `Moeblack/` 等），`/orgs/dsh-external/repos` 只剩 192，generator 看不到迁出插件 → `index.json` 从 117 bundle 掉到 62。单组织 index 无法表达多 owner 分发，需另按「sources 多源」处理
+
 ## 2026-08（0812 基线适配——大规模服务重命名）
 
 官方发布 0812 快照（`snapshot-20260812T172954Z-final-unwatermarked-5fa48343c7`，提交 `40d214ce`，4548 文件大版本）后适配薄控制台。**0812 契约变化：大规模服务重命名**（17 个服务名变更）——`httpServer`→`webServer`、`tasks`→`jobs`、`bash`→`shell`、`compact`→`compaction` 等；`repository.ts` 无回归（0811 删除保持）。

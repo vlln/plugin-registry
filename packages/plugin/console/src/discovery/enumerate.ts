@@ -1,12 +1,12 @@
 /**
- * 发现层枚举（0811 适配）：单一 index 源——组织级 hub catalog
- * （`dsh-external/hub` 的 catalog.json，Agent Loop 每 2h 刷新）。条目
- * 转换 + 快照缓存（TTL 6h + ETag 条件刷新）。
+ * 发现层枚举（0813 适配）：单一 index 源——组织级 hub 的官方可装插件索引
+ * （`dsh-external/hub` 的 index.json，schema plugin-sources/index/v1，
+ * Agent Loop 每 2h 刷新）。条目转换 + 快照缓存（TTL 6h + ETag 条件刷新）。
  *
- * 0811 起 repository 插件机制移除，外部插件只有 profile bundle 一条安装
- * 路径；hub catalog 的 `bundle` 标记（仓库内 package.json 声明 dsh.bundle）
- * 决定可安装形态：bundle = 走 profile bundles 层，plugin = 走 insert 行。
- * catalog 是派生数据（聚合每个仓库的 manifest 字段），无需再逐仓库探测。
+ * 0811 起 repository 插件机制移除，外部插件只有 profile bundle 一条官方
+ * 安装路径；index.json 的 `plugins` 条目 `source` 直接就是 npm 包名
+ * （bundle 插件），可原样喂给 plugin_install。index 是派生数据（hub 聚合
+ * 各仓库 package.json 的 dsh.bundle 声明），无需逐仓库探测。
  */
 import { existsSync } from 'node:fs'
 import type { EnumerateSnapshot, PluginEntry, PluginFace, PluginSource } from './types.ts'
@@ -14,23 +14,22 @@ import { readSnapshot, writeSnapshot, snapshotFresh } from './store.ts'
 
 export const INDEX_TTL_MS = 6 * 60 * 60 * 1000 // 6h
 
-/** 解析 github 仓库 URL（https://github.com/o/r.git 或裸 https://github.com/o/r）。 */
-export function parseGithubUrl(url: string): { owner: string; repo: string } | null {
-  const m = /^https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(url.trim())
-  if (m === null) return null
-  return { owner: m[1]!, repo: m[2]!.replace(/\.git$/, '') }
-}
+const FACES: ReadonlySet<string> = new Set(['tool', 'skill', 'mcp', 'ui', 'bundle'])
 
-/** 从 catalog 的 dsh 字段派生能力面。 */
-export function facesOfDsh(dsh: unknown): PluginFace[] {
-  const faces: PluginFace[] = []
-  const d = (dsh ?? {}) as Record<string, unknown>
-  if (d.entry !== undefined) faces.push('tool')
-  if (d.skills !== undefined) faces.push('skill')
-  if (d.mcpServers !== undefined) faces.push('mcp')
-  if (d.client !== undefined) faces.push('ui')
-  if (d.bundle !== undefined) faces.push('bundle')
-  return faces
+/**
+ * index.json（plugin-sources/index/v1）插件条目 → 统一插件条目。
+ * 只收官方可装形态 `bundle`（source = npm 包名）；`repository` 已随 0811
+ * 移除，跳过。id 取 source（安装规范）而非仓库名——与 plugin_install /
+ * plugin_status 的 canonical 一致。
+ */
+export function indexEntryToPlugin(raw: Record<string, unknown>, sourceId: string): PluginEntry | null {
+  const source = typeof raw.source === 'string' ? raw.source : null
+  if (raw.kind !== 'bundle' || source === null || source.trim() === '') return null
+  const faces: PluginFace[] = Array.isArray(raw.faces)
+    ? raw.faces.filter((f): f is PluginFace => typeof f === 'string' && FACES.has(f))
+    : []
+  const description = typeof raw.description === 'string' ? raw.description : undefined
+  return { id: source, kind: 'bundle', source, faces, description, sourceId }
 }
 
 interface FetchResult {
@@ -57,36 +56,23 @@ const defaultFetch: FetchLike = async (url, init) => {
   }
 }
 
-/** hub catalog 仓库条目 → 统一插件条目。 */
-export function hubRepoToPlugin(raw: Record<string, unknown>, sourceId: string): PluginEntry | null {
-  const name = typeof raw.name === 'string' ? raw.name : null
-  const url = typeof raw.url === 'string' ? raw.url : null
-  if (name === null || url === null) return null
-  const gh = parseGithubUrl(url)
-  if (gh === null) return null
-  const description = typeof raw.description === 'string' ? raw.description : undefined
-  // catalog 的 manifest 聚合字段：bundle 标记仓库声明 dsh.bundle。
-  const isBundle = raw.bundle === true
-  const faces: PluginFace[] = []
-  if (raw.skill === true) faces.push('skill')
-  if (isBundle) faces.push('bundle')
-  return {
-    id: name,
-    kind: isBundle ? 'bundle' : 'plugin',
-    source: `github:${gh.owner}/${gh.repo}`,
-    faces,
-    description,
-    sourceId,
-  }
+/** 把 index.json 的 plugins 数组转成统一条目列表。 */
+function pluginsToEntries(body: unknown, sourceId: string): PluginEntry[] {
+  const rawPlugins = Array.isArray((body as { plugins?: unknown[] }).plugins)
+    ? (body as { plugins: unknown[] }).plugins
+    : []
+  return rawPlugins
+    .map((p) => indexEntryToPlugin((p ?? {}) as Record<string, unknown>, sourceId))
+    .filter((e): e is PluginEntry => e !== null)
 }
 
 /**
- * index 源枚举：读 hub catalog JSON（locator = URL 或本地文件路径），
+ * index 源枚举：读 hub index.json（locator = URL 或本地文件路径），
  * 条目转换，写快照。有新鲜快照 → 直接返回（不网络）；过期 → 拉取（带
  * ETag 条件刷新，304 时保留 entries 仅更新 fetchedAt）。
  *
  * locator 支持 file:///path 或裸本地路径（读文件，零网络——本机经 hub
- * clone 的 catalog.json 走此通道）。
+ * clone 的 index.json 走此通道）。
  */
 export async function enumerateIndex(
   dshHome: string,
@@ -108,10 +94,7 @@ export async function enumerateIndex(
     } catch (error) {
       throw new Error(`plugin-sources: index "${source.id}" local file unreadable (${filePath}): ${String(error)}`)
     }
-    const rawRepos = Array.isArray((body as { repos?: unknown[] }).repos) ? (body as { repos: unknown[] }).repos : []
-    const entries = rawRepos
-      .map((p) => hubRepoToPlugin((p ?? {}) as Record<string, unknown>, source.id))
-      .filter((e): e is PluginEntry => e !== null)
+    const entries = pluginsToEntries(body, source.id)
     const snapshot: EnumerateSnapshot = { fetchedAt: new Date(now).toISOString(), entries }
     writeSnapshot(dshHome, source.id, snapshot)
     return snapshot
@@ -129,17 +112,14 @@ export async function enumerateIndex(
   if (!res.ok) {
     throw new Error(`plugin-sources: index "${source.id}" fetch failed (${res.status}): ${source.locator}`)
   }
-  const body = (await res.json()) as { repos?: unknown[] }
-  const rawRepos = Array.isArray(body.repos) ? body.repos : []
-  const entries = rawRepos
-    .map((p) => hubRepoToPlugin((p ?? {}) as Record<string, unknown>, source.id))
-    .filter((e): e is PluginEntry => e !== null)
+  const body = (await res.json()) as { plugins?: unknown[] }
+  const entries = pluginsToEntries(body, source.id)
   const snapshot: EnumerateSnapshot = { fetchedAt: new Date(now).toISOString(), etag: res.etag ?? undefined, entries }
   writeSnapshot(dshHome, source.id, snapshot)
   return snapshot
 }
 
-/** 按源类型分发枚举（0811 仅 index）。 */
+/** 按源类型分发枚举（0811 起仅 index）。 */
 export async function enumerateSource(
   dshHome: string,
   source: PluginSource,
