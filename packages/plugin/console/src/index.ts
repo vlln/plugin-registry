@@ -614,6 +614,7 @@ export function apply(ctx: ConsoleCtx): void {
       dshHome: () => resolveDshHome(),
       isBundlePackage,
       readInsertRows,
+      readProfileManifest,
       writeInsertRow,
       removeInsertRow,
       bundleInstall: (source) => {

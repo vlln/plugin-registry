@@ -33,6 +33,8 @@ export interface PluginToolDeps {
   bundleRemove?(name: string): { names: string[]; output: string } | null
   /** 读 profile patch 的全部 insert 行（非 bundle 插件安装态）。 */
   readInsertRows(): { id: string; name: string }[]
+  /** 读 profile 清单（package.json）的 dsh.profile.bundles 层栈（bundle 插件安装态）。 */
+  readProfileManifest(): { dsh?: { profile?: { bundles?: string[] } } }
   /** 写一个 insert 行（新增或按 id 更新 name）；触发配置 HMR 实时挂载。 */
   writeInsertRow(id: string, name: string): void
   /** 按 id 移除 insert 行；不存在返回 false。 */
@@ -295,6 +297,16 @@ export function createPluginTools(deps: PluginToolDeps): ToolDefinition[] {
           rows.push({
             canonical: row.name,
             kind: 'plugin',
+            ...(lock !== undefined ? { resolved: lock.ref } : {}),
+          })
+        }
+        const manifest = deps.readProfileManifest()
+        const bundles = manifest.dsh?.profile?.bundles ?? []
+        for (const name of bundles) {
+          const lock = findLock(locks, name)
+          rows.push({
+            canonical: name,
+            kind: 'bundle',
             ...(lock !== undefined ? { resolved: lock.ref } : {}),
           })
         }
