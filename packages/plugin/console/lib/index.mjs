@@ -60,10 +60,10 @@ function readSources(dshHome) {
 	if (parsed === null || parsed === void 0) return [];
 	const root = parsed.sources;
 	if (!Array.isArray(root)) throw new Error(`plugin-sources: ${SOURCES_FILE} must be a YAML object with a "sources" list`);
-	return root.map((raw, i) => normalizeSource(raw, i));
+	return root.map((raw, i) => normalizeSource$1(raw, i));
 }
 /** 校验并规整一个源条目（0811 仅 index 一种）。 */
-function normalizeSource(raw, index) {
+function normalizeSource$1(raw, index) {
 	const r = raw ?? {};
 	if (typeof r.id !== "string" || r.id.trim() === "") throw new Error(`plugin-sources: sources[${index}] missing string "id"`);
 	if (r.kind !== void 0 && r.kind !== "index") throw new Error(`plugin-sources: sources[${index}] ("${r.id}") kind must be index (repository sources removed in 0811)`);
@@ -256,6 +256,44 @@ async function enumerateSource(dshHome, source, opts = {}) {
 	return enumerateIndex(dshHome, source, opts);
 }
 //#endregion
+//#region src/source.ts
+/**
+* 安装源规范化与已装包名解析（0817 修 #19 / #4 假成功部分）。
+*
+* - normalizeSource：把完整 GitHub 项目 URL（https://github.com/o/r、
+*   github.com/o/r）规范化为 pnpm 的 github:o/r 速记——pnpm 装完依赖值
+*   就是 github:o/r 形态，统一后依赖匹配、层栈登记与 lock 记录共用同一
+*   形态；npm 包名 / github:o/r / link: 等原样透传。保留 #ref（含
+*   &path: 子目录）后缀，/tree/<branch> 网页路径映射为 #branch。
+* - resolveInstalledName：pnpm add 后从 profile 依赖解析真实包名——源串
+*   可能是指向路径/git 的安装源（/path/to/pkg、github:o/r#ref），依赖
+*   key 才是包名（pnpm 按包的真实 name 写入 package.json）。先精确匹配，
+*   再回退到依赖值包含源串的 key。找不到返回 null。
+*
+* 工具面（discovery/tools.ts）与 HTTP 面（index.ts 安装路由）共用本模块，
+* 避免两处行为分叉（#19 根因之一）。
+*/
+function normalizeSource(source) {
+	const s = source.trim();
+	const m = /^(?:https?:\/\/)?(?:www\.)?github\.com\/([^/]+)\/([^/#?]+)(.*)$/.exec(s);
+	if (m === null) return s;
+	let repo = `${m[1]}/${m[2]}`;
+	if (repo.endsWith(".git")) repo = repo.slice(0, -4);
+	let suffix = m[3] ?? "";
+	const query = suffix.indexOf("?");
+	if (query !== -1) suffix = suffix.slice(0, query);
+	const tree = /^\/tree\/(.+)$/.exec(suffix);
+	if (tree !== null) suffix = `#${tree[1]}`;
+	else if (suffix.startsWith("/")) suffix = "";
+	return `github:${repo}${suffix}`;
+}
+/** 从 profile 依赖解析 pnpm add 后写入的真实包名；无匹配返回 null。 */
+function resolveInstalledName(manifest, source) {
+	const deps = manifest?.dependencies ?? {};
+	if (typeof deps[source] === "string") return source;
+	return Object.keys(deps).find((key) => deps[key] === source || deps[key]?.includes(source)) ?? null;
+}
+//#endregion
 //#region src/discovery/tools.ts
 /**
 * 插件管理工具（plugin_* ×4）：agent 的插件发现与安装面（0811 适配）。
@@ -420,7 +458,7 @@ function createPluginTools(deps) {
 			parameters: { source: {
 				type: "string",
 				required: true,
-				description: "Install source: an npm package name (bundle or plain plugin)."
+				description: "Install source: an npm package name (bundle or plain plugin), or a GitHub project — https://github.com/o/r, github.com/o/r or github:o/r (optional #ref or /tree/<branch>); URLs are normalized to github:o/r."
 			} },
 			output: {
 				schema: {
@@ -457,39 +495,41 @@ function createPluginTools(deps) {
 			},
 			async execute(args) {
 				const home = deps.dshHome();
-				const source = args.source.trim();
+				const source = normalizeSource(args.source);
 				if (source === "") throw new Error("plugin_install: source must be a non-empty package name");
 				if (deps.bundleInstall === void 0) throw new Error(`plugin_install: bundle install support unavailable (web profile required)`);
-				deps.bundleInstall(source);
-				if (deps.isBundlePackage?.(source) === true) {
+				if (deps.bundleInstall(source) === null) throw new Error(`plugin_install: pnpm add failed for "${source}" — nothing was installed, no install state written`);
+				const installedName = resolveInstalledName(deps.readProfileManifest(), source);
+				if (installedName === null) throw new Error(`plugin_install: pnpm add succeeded but ${source} is not in the profile dependencies`);
+				if (deps.isBundlePackage?.(installedName) === true) {
 					writeLock(home, upsertLock(readLock(home), {
-						canonical: source,
+						canonical: installedName,
 						kind: "bundle",
 						ref: source,
 						recordedAt: (/* @__PURE__ */ new Date()).toISOString()
 					}));
 					return {
 						ok: true,
-						canonical: source,
+						canonical: installedName,
 						kind: "bundle",
 						needsRestart: true,
-						message: `plugin_install: bundle ${source} added to the profile layer stack — restart the web app to load it.`
+						message: `plugin_install: bundle ${installedName} added to the profile layer stack — restart the web app to load it.`
 					};
 				}
-				const rowId = source.replace(/^@/, "").replace(/[^a-z0-9-]/gi, "-").toLowerCase();
-				deps.writeInsertRow(rowId, source);
+				const rowId = installedName.replace(/^@/, "").replace(/[^a-z0-9-]/gi, "-").toLowerCase();
+				deps.writeInsertRow(rowId, installedName);
 				writeLock(home, upsertLock(readLock(home), {
-					canonical: source,
+					canonical: installedName,
 					kind: "plugin",
 					ref: source,
 					recordedAt: (/* @__PURE__ */ new Date()).toISOString()
 				}));
 				return {
 					ok: true,
-					canonical: source,
+					canonical: installedName,
 					kind: "plugin",
 					needsRestart: false,
-					message: `plugin_install: plugin ${source} installed and mounted live (insert row ${rowId}) — config HMR applied it without a restart.`
+					message: `plugin_install: plugin ${installedName} installed and mounted live (insert row ${rowId}) — config HMR applied it without a restart.`
 				};
 			}
 		}),
@@ -877,17 +917,6 @@ function readProfileManifest() {
 function writeProfileManifest(manifest) {
 	writeFileSync(join(profileWebDir(), "package.json"), `${JSON.stringify(manifest, void 0, 2)}\n`);
 }
-/**
-* 解析 pnpm add 后 profile 依赖里的真实包名：源串可能是指向路径/git 的
-* 安装源（`/path/to/pkg`、`github:o/r#ref`），而依赖 key 才是包名
-* （pnpm 按包的真实 name 写入 package.json）。先精确匹配，再回退到
-* 依赖值包含源串的 key。找不到返回 null。
-*/
-function resolveInstalledName(source) {
-	const deps = readProfileManifest().dependencies ?? {};
-	if (typeof deps[source] === "string") return source;
-	return Object.keys(deps).find((key) => deps[key] === source || deps[key]?.includes(source)) ?? null;
-}
 /** 已安装包是否声明 dsh.bundle（profile 层候选）。 */
 function exportsBundlePatch(packageName) {
 	try {
@@ -1228,7 +1257,7 @@ function apply(ctx) {
 						req?.on?.("end", () => {
 							(async () => {
 								try {
-									const source = (JSON.parse(body).source ?? "").trim();
+									const source = normalizeSource((JSON.parse(body).source ?? "").trim());
 									if (source.length === 0) {
 										json(400, {
 											ok: false,
@@ -1244,7 +1273,7 @@ function apply(ctx) {
 										});
 										return;
 									}
-									const installedName = resolveInstalledName(source);
+									const installedName = resolveInstalledName(readProfileManifest(), source);
 									if (installedName === null) {
 										json(502, {
 											ok: false,

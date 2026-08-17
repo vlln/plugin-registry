@@ -15,6 +15,7 @@ import { homedir } from 'node:os'
 import type { Context } from 'cordis'
 import { createPluginTools } from './discovery/tools.ts'
 import { npmViewLatest } from './versions.ts'
+import { normalizeSource, resolveInstalledName } from './source.ts'
 
 /** 解析 resolveDshHome（官方 dsh-paths）。 */
 function resolveDshHome(): string {
@@ -317,20 +318,6 @@ function readProfileManifest(): { dependencies?: Record<string, string>; dsh?: {
 /** 写回 profile 清单。 */
 function writeProfileManifest(manifest: unknown): void {
   writeFileSync(join(profileWebDir(), 'package.json'), `${JSON.stringify(manifest, undefined, 2)}\n`)
-}
-
-/**
- * 解析 pnpm add 后 profile 依赖里的真实包名：源串可能是指向路径/git 的
- * 安装源（`/path/to/pkg`、`github:o/r#ref`），而依赖 key 才是包名
- * （pnpm 按包的真实 name 写入 package.json）。先精确匹配，再回退到
- * 依赖值包含源串的 key。找不到返回 null。
- */
-function resolveInstalledName(source: string): string | null {
-  const manifest = readProfileManifest() as { dependencies?: Record<string, string> }
-  const deps = manifest.dependencies ?? {}
-  if (typeof deps[source] === 'string') return source
-  const hit = Object.keys(deps).find(key => deps[key] === source || deps[key]?.includes(source))
-  return hit ?? null
 }
 
 /** 已安装包是否声明 dsh.bundle（profile 层候选）。 */
@@ -716,7 +703,9 @@ export function apply(ctx: ConsoleCtx): void {
               void (async () => {
                 try {
                   const parsed = JSON.parse(body) as { source?: string }
-                  const source = (parsed.source ?? '').trim()
+                  // 入口统一规范化：完整 GitHub URL → github:o/r（与工具面共用，
+                  // #19）——pnpm 装完依赖值即此形态，匹配不再 502。
+                  const source = normalizeSource((parsed.source ?? '').trim())
                   if (source.length === 0) {
                     json(400, { ok: false, message: 'install needs a source' })
                     return
@@ -728,7 +717,7 @@ export function apply(ctx: ConsoleCtx): void {
                   }
                   // 路径/git 源装完实际包名 ≠ 源串：从 profile 依赖解析真实包名
                   // （pnpm 已把依赖写进 package.json，key 即包名）。
-                  const installedName = resolveInstalledName(source)
+                  const installedName = resolveInstalledName(readProfileManifest(), source)
                   if (installedName === null) {
                     json(502, { ok: false, message: `pnpm add succeeded but ${source} is not in the profile dependencies` })
                     return

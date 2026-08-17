@@ -2,6 +2,15 @@
 
 本仓库（plugin-registry：薄控制台 + 文档 + skill）的变更记录。机制件改动在官方 snapshot 宿主仓库的历史机制分支按提交记录（0809 转向后不再有机制件），本表汇总交付。
 
+## 2026-08（0817 安装源规范化——修 #19 / #4 假成功部分）
+
+`plugin_install` 入参格式统一：完整 GitHub URL 不再 502 / 假成功。新增 `src/source.ts`（工具面与 HTTP 面共用，消除两处行为分叉）：
+
+- ✅ **`normalizeSource`**：`https://github.com/o/r`（含裸 `github.com/o/r`、`www.`、`.git` 后缀、`/tree/<branch>` 网页路径）规范化为 `github:o/r` 速记——与 pnpm 装完的依赖值同形态，`resolveInstalledName` 依赖值匹配不再落空（修 #19：`pnpm add succeeded but ... is not in the profile dependencies` 502）；保留 `#ref`（含 `&path:` 子目录），npm 包名 / `github:o/r` / `link:` 原样透传
+- ✅ **工具面失败显式化**（修 #4 假成功部分）：`plugin_install` 在 `bundleInstall` 返回 null（pnpm 失败）时抛错而非继续报成功；并改为从 profile 依赖解析真实包名后再判别 bundle/insert 落点（与 HTTP 面一致，URL 源不再把源串当 canonical 写 lock/insert）
+- ✅ **测试**：新增 `source.spec.ts`（normalize 8 例 + resolveInstalledName 4 例）、`tools.spec.ts` 补 URL 归一化 / pnpm 失败抛错 / 依赖解析失败抛错 3 例；全套 50/50 node:test 通过；`lib/` 重建（产物入库）
+- 🧹 **清理**：误留的 `packages/bundle/` 构建产物与 `packages/plugin/console/pnpm-workspace.yaml`（pnpm 11 交互提示误写）删除并 .gitignore 忽略；**lockfile 补 `@types/node`**（package.json 已声明但 lockfile 缺失，frozen 安装会失败——早前本地改动实为合法补丁）
+
 ## 2026-08（0813 格式统一——发现层读 index.json，source = npm 包名）
 
 官方「正式版」npm 公开发布（`@deepseek-ai/*` 全家族公开，`@deepseek-ai/dsh` latest `0.1.0-rc.6`）后，修掉发现层「格式还是最老」的问题——枚举半拉停在 0811 之前的 git 源格式（`github:owner/repo`），与安装半拉的 npm 格式（`plugin_install` 入参 = npm 包名）不一致。

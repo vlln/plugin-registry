@@ -21,6 +21,7 @@ import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
 import type { EnumerateSnapshot, PluginEntry, PluginSource } from './types.ts'
 import { enumerateSource } from './enumerate.ts'
 import { findLock, findSource, readLock, readSources, upsertLock, upsertSource, writeLock, writeSources } from './store.ts'
+import { normalizeSource, resolveInstalledName } from '../source.ts'
 
 /** tools 依赖（由 console apply 注入：安装态读写 + bundle 安装）。 */
 export interface PluginToolDeps {
@@ -33,8 +34,8 @@ export interface PluginToolDeps {
   bundleRemove?(name: string): { names: string[]; output: string } | null
   /** 读 profile patch 的全部 insert 行（非 bundle 插件安装态）。 */
   readInsertRows(): { id: string; name: string }[]
-  /** 读 profile 清单（package.json）的 dsh.profile.bundles 层栈（bundle 插件安装态）。 */
-  readProfileManifest(): { dsh?: { profile?: { bundles?: string[] } } }
+  /** 读 profile 清单（package.json）：dependencies（解析真实包名）+ dsh.profile.bundles 层栈（bundle 插件安装态）。 */
+  readProfileManifest(): { dependencies?: Record<string, string>; dsh?: { profile?: { bundles?: string[] } } }
   /** 写一个 insert 行（新增或按 id 更新 name）；触发配置 HMR 实时挂载。 */
   writeInsertRow(id: string, name: string): void
   /** 按 id 移除 insert 行；不存在返回 false。 */
@@ -160,7 +161,7 @@ export function createPluginTools(deps: PluginToolDeps): ToolDefinition[] {
         + 'profile cordis.patch.yml, which the config HMR applies live — no restart needed. The resolved '
         + 'ref is recorded (TOFU) in $DSH_HOME/plugin-sources/lock.yml.',
       parameters: {
-        source: { type: 'string', required: true, description: 'Install source: an npm package name (bundle or plain plugin).' },
+        source: { type: 'string', required: true, description: 'Install source: an npm package name (bundle or plain plugin), or a GitHub project — https://github.com/o/r, github.com/o/r or github:o/r (optional #ref or /tree/<branch>); URLs are normalized to github:o/r.' },
       },
       output: {
         schema: {
@@ -178,44 +179,56 @@ export function createPluginTools(deps: PluginToolDeps): ToolDefinition[] {
       },
       async execute(args) {
         const home = deps.dshHome()
-        const source = args.source.trim()
+        // 入口统一规范化：完整 GitHub URL（https://github.com/o/r）→ github:o/r，
+        // 与 pnpm 装完的依赖值同形态，后续匹配/登记用同一形态（#19）。
+        const source = normalizeSource(args.source)
         if (source === '') throw new Error('plugin_install: source must be a non-empty package name')
         if (deps.bundleInstall === undefined) {
           throw new Error(`plugin_install: bundle install support unavailable (web profile required)`)
         }
-        // pnpm add 装包（无论形态），随后按包的 dsh.bundle 声明判别安装态落点。
+        // pnpm add 装包（无论形态）。失败必须显式抛错——不能继续写安装态（#4 假成功）。
         const result = deps.bundleInstall(source)
-        const isBundle = deps.isBundlePackage?.(source) === true
+        if (result === null) {
+          throw new Error(`plugin_install: pnpm add failed for "${source}" — nothing was installed, no install state written`)
+        }
+        // pnpm add 后从 profile 依赖解析真实包名（git/路径源装完包名 ≠ 源串）；
+        // 依赖里找不到对应包视为安装未落盘，显式报错而非继续（#19 语义）。
+        const installedName = resolveInstalledName(deps.readProfileManifest(), source)
+        if (installedName === null) {
+          throw new Error(`plugin_install: pnpm add succeeded but ${source} is not in the profile dependencies`)
+        }
+        // 按真实包名的 dsh.bundle 声明判别安装态落点。
+        const isBundle = deps.isBundlePackage?.(installedName) === true
         if (isBundle) {
           writeLock(home, upsertLock(readLock(home), {
-            canonical: source,
+            canonical: installedName,
             kind: 'bundle',
             ref: source,
             recordedAt: new Date().toISOString(),
           }))
           return {
             ok: true,
-            canonical: source,
+            canonical: installedName,
             kind: 'bundle',
             needsRestart: true,
-            message: `plugin_install: bundle ${source} added to the profile layer stack — restart the web app to load it.`,
+            message: `plugin_install: bundle ${installedName} added to the profile layer stack — restart the web app to load it.`,
           }
         }
         // 非 bundle：pnpm add 已装包；写 insert 行 → 配置 HMR 实时挂载。
-        const rowId = source.replace(/^@/, '').replace(/[^a-z0-9-]/gi, '-').toLowerCase()
-        deps.writeInsertRow(rowId, source)
+        const rowId = installedName.replace(/^@/, '').replace(/[^a-z0-9-]/gi, '-').toLowerCase()
+        deps.writeInsertRow(rowId, installedName)
         writeLock(home, upsertLock(readLock(home), {
-          canonical: source,
+          canonical: installedName,
           kind: 'plugin',
           ref: source,
           recordedAt: new Date().toISOString(),
         }))
         return {
           ok: true,
-          canonical: source,
+          canonical: installedName,
           kind: 'plugin',
           needsRestart: false,
-          message: `plugin_install: plugin ${source} installed and mounted live (insert row ${rowId}) — config HMR applied it without a restart.`,
+          message: `plugin_install: plugin ${installedName} installed and mounted live (insert row ${rowId}) — config HMR applied it without a restart.`,
         }
       },
     }),
