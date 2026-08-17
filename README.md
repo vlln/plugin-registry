@@ -44,7 +44,7 @@ DeepSeek Harness 官方机制管「插件是什么、怎么跑」；本仓库补
 
 ![插件管理面板](screenshots/console-panel.png)
 
-设置页「插件」面板管理 profile 插件安装态：**insert 插件区**（非 bundle 插件实时挂载/移除，配置 HMR 零重启）+ **已加载插件区**（`disabled` 启停持久化 + bundle 更新/卸载）+ **bundle 安装区**（pnpm add + 层栈 reconcile）。
+设置页「插件管理」面板管理 profile 插件安装态：**安装插件区**（统一入口——输入 npm 包名或 GitHub 项目：`https://github.com/o/r` / `github.com/o/r` / `github:o/r`，URL 自动规范化——自动 pnpm add，bundle 插件进层栈、非 bundle 写 insert 行）+ **已加载插件区**（版本检查/更新、`disabled` 启停持久化、bundle 卸载）。
 
 ## 安装
 
@@ -64,7 +64,7 @@ cd plugin-registry/packages/plugin/console
 dsh plugin --profile web add .   # 产物已入库，无需构建；当前目录即 bundle 包子目录（dsh 锚定 . 为绝对路径）
 ```
 
-挂载后刷新 Web 页面，设置页出现「插件」面板。
+挂载后刷新 Web 页面，设置页出现「插件管理」面板。
 
 ## Agent Skills
 
