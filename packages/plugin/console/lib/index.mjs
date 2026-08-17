@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { homedir } from "node:os";
 import { defineTool } from "@deepseek-ai/dsh-tools";
 import { parse, stringify } from "yaml";
 //#region src/discovery/store.ts
@@ -616,7 +617,7 @@ function createPluginTools(deps) {
 */
 /** 解析 resolveDshHome（官方 dsh-paths）。 */
 function resolveDshHome() {
-	return process.env.DSH_HOME?.trim() !== "" && process.env.DSH_HOME !== void 0 ? process.env.DSH_HOME : join(process.env.HOME ?? "/tmp", ".dsh");
+	return process.env.DSH_HOME?.trim() !== "" && process.env.DSH_HOME !== void 0 ? process.env.DSH_HOME : join(homedir(), ".dsh");
 }
 /** 当前 profile（web 默认）目录。 */
 function profileWebDir() {
@@ -887,6 +888,26 @@ function reconcileBundles(added, beforeManifest) {
 	return joined;
 }
 /**
+* Windows 兼容执行 npm/pnpm：spawnSync 不能直接跑 .cmd 批处理垫片——
+* libuv 的批处理包装在本机 CreateProcessW 直接 EINVAL（沙箱与普通
+* web 进程均复现），而裸名又因不存在 .exe 而 ENOENT。win32 下改为用
+* node 直接执行各 CLI 的 JS 入口：npm 随 node 发行
+* （<node>\node_modules\npm\bin\npm-cli.js），pnpm 全局装在
+* %APPDATA%\npm\node_modules\pnpm\bin\pnpm.mjs；入口不存在时回退 .cmd。
+*/
+function cliCommand(cmd, args, options) {
+	if (process.platform !== "win32") return spawnSync(cmd, args, options);
+	let entry = null;
+	if (cmd === "npm") {
+		const candidate = join(dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js");
+		if (existsSync(candidate)) entry = candidate;
+	} else {
+		const candidate = join(process.env.APPDATA ?? "", "npm", "node_modules", "pnpm", "bin", "pnpm.mjs");
+		if (existsSync(candidate)) entry = candidate;
+	}
+	return entry === null ? spawnSync(`${cmd}.cmd`, args, options) : spawnSync(process.execPath, [entry, ...args], options);
+}
+/**
 * bundle 安装/更新/移除：在 profile 目录跑 pnpm 子命令，然后 reconcile 层栈。
 * 与官方 `dsh plugin <sub>`（pnpm forwarder + reconcile）同机制。
 * @param args - pnpm 子命令参数（add <source> / update <name> / remove <name>）。
@@ -895,7 +916,7 @@ function reconcileBundles(added, beforeManifest) {
 function runPnpm(args) {
 	const dir = profileWebDir();
 	const before = readProfileManifest();
-	const result = spawnSync("pnpm", args, {
+	const result = cliCommand("pnpm", args, {
 		cwd: dir,
 		encoding: "utf8",
 		timeout: 12e4
@@ -992,7 +1013,7 @@ let lastVersionRefreshAt = 0;
 function npmViewLatest(name) {
 	let latest = null;
 	try {
-		const result = spawnSync("npm", [
+		const result = cliCommand("npm", [
 			"view",
 			name,
 			"version"
