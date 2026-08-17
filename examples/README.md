@@ -39,3 +39,20 @@ dsh plugin --profile web add "github:vlln/dsh-task-status#main"   # 推荐：git
 ## 开发新插件
 
 创建官方 bundle 插件 / 纯 cordis 插件的契约与引导见 [skills/make-dsh-plugin](../skills/make-dsh-plugin/SKILL.md)。
+
+## 技能包示例：RaphaelLoop（dsh.skills 声明）
+
+纯技能包（无代码）示例：有界、证据驱动的 Loop Engineering 技能，已做 DSH 原生适配（`agents/dsh/*.md` 六个角色经内置子代理分发，无宿主级注册；`install-agents.sh` 支持 `--harness dsh`）。
+
+```sh
+# 官方插件通道（profile bundle；重启 dsh 生效）
+dsh plugin --profile web add @raphael-liu/raphael-loop
+
+# 文件系统技能根（立即生效）
+npx skills add https://github.com/raphael-liu/raphael-loop --skill raphael-loop
+cp -R skills/raphael-loop ~/.dsh/skills/raphael-loop
+```
+
+| 仓库 | npm | skills.sh |
+|---|---|---|
+| https://github.com/raphael-liu/raphael-loop | https://www.npmjs.com/package/@raphael-liu/raphael-loop | https://www.skills.sh/raphael-liu/raphael-loop/raphael-loop |
