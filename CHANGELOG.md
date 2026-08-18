@@ -19,14 +19,14 @@
 - ✅ **`tools.ts` 修 issue #2**：`PLUGIN_ITEM` schema 补 `trust`（`official|community|untrusted`），`plugin_search` 描述改 index 格式
 - ✅ **hub `generate.mjs`**：index 改 bundle-only（删 `repository` kind，`.dsh-plugin` 已随 0811 移除），修 doc drift（注释曾指向不存在的章节）
 - ✅ **测试重写 + 产物重建**：enumerate/tools 测试改 index.json plugins fixture；32/32 node:test 通过；`lib/` 重建（产物入库）
-- ⚠️ **发现（另案）**：hub 重生成暴露单组织假设崩溃——大量仓库已迁出 `dsh-external` 组织（whale-girl/dsh-loop → `vlln/`，deepseek-manners → `Moeblack/` 等），`/orgs/dsh-external/repos` 只剩 192，generator 看不到迁出插件 → `index.json` 从 117 bundle 掉到 62。单组织 index 无法表达多 owner 分发，需另按「sources 多源」处理
+- ⚠️ **发现（另案）**：hub 重生成暴露单组织假设崩溃——大量仓库已迁出原组织（whale-girl/dsh-loop → `vlln/`，deepseek-manners → `Moeblack/` 等），generator 看不到迁出插件 → `index.json` 从 117 bundle 掉到 62。单组织 index 无法表达多 owner 分发，需另按「sources 多源」处理
 
 ## 2026-08（0812 基线适配——大规模服务重命名）
 
 官方发布 0812 快照（`snapshot-20260812T172954Z-final-unwatermarked-5fa48343c7`，提交 `40d214ce`，4548 文件大版本）后适配薄控制台。**0812 契约变化：大规模服务重命名**（17 个服务名变更）——`httpServer`→`webServer`、`tasks`→`jobs`、`bash`→`shell`、`compact`→`compaction` 等；`repository.ts` 无回归（0811 删除保持）。
 
 - ✅ **console 适配**：`inject` 的 `httpServer`→`webServer`；`ctx.httpServer`→`ctx.webServer`（`webServer.register` 路由接口不变，仅服务名改）
-- ✅ **生态适配**（dsh-external 插件仓库同步）：whale-girl + dsh-task-status 改 `webServer`+`jobs`（`onTaskDone`→`onJobDone`）；dsh-loop 改 `webServer`；dsh-navbar 纯 client 无服务依赖不改
+- ✅ **生态适配**（外部插件仓库同步）：whale-girl + dsh-task-status 改 `webServer`+`jobs`（`onTaskDone`→`onJobDone`）；dsh-loop 改 `webServer`；dsh-navbar 纯 client 无服务依赖不改
 - ✅ **端到端验证（纯净 0812 + 构建产物）**：`dsh plugin --profile web add` 挂载 console + 4 插件 → 5 用户插件全激活 → client 全进 `__DSH_BOOT__` → 路由 200 → boot 无 `plugin tree failed to load`
 - **构建坑（0812 实证）**：本地仓库 symlink 官方包后 tsdown 会**误内联**依赖（lib 从 242 行膨胀到 7036 行）——Node half 的 tsdown 配置须显式 `external: [/@deepseek-ai\//]`（官方包由 profile 闭包注入，不内联）
 
@@ -36,7 +36,7 @@
 
 - **新契约确认**：外部插件只有 profile 一条官方路径——bundle 插件（npm 包声明 `dsh.bundle`）经 `dsh plugin --profile web add` 进 `dsh.profile.bundles` 层栈（重启生效）；非 bundle 插件（纯 cordis 插件）经 profile `cordis.patch.yml` 的 insert 行挂载。**0811 保留配置级 HMR**（web-app 禁用模块级 hmr 时 profile-boot 主动挂载 watch-only 实例，`profile-boot.ts:287-301`）——编辑 profile/home `cordis.patch.yml` **实时生效，无需重启**（已实测 insert 行写入即时挂载）
 - ✅ **console 重写**：`src/index.ts` 删 repository 机制（repositories 行读写、RepositoryCache 枚举、git ls-remote 更新检查），保留 bundle 管理（pnpm add/update/remove + reconcile 层栈）与 disabled 持久化；**新增 insert 行管理**（`readInsertRows`/`writeInsertRow`/`removeInsertRow`——写 profile patch 触发配置 HMR 实时挂载，移除后恢复 `[]` 模板）
-- ✅ **模型工具重写**：`plugin_search` 改搜 hub catalog（`dsh-external/hub` 的 catalog.json，repos 格式，index 源）；`plugin_install` 按包是否声明 `dsh.bundle` 分流——bundle → pnpm add + 层栈（重启生效），非 bundle → pnpm add + insert 行（**配置 HMR 实时挂载，零重启**）；`plugin_uninstall` 对称；`plugin_status` 列 insert 行 + TOFU lock
+- ✅ **模型工具重写**：`plugin_search` 改搜 hub catalog（index 源）；`plugin_install` 按包是否声明 `dsh.bundle` 分流——bundle → pnpm add + 层栈（重启生效），非 bundle → pnpm add + insert 行（**配置 HMR 实时挂载，零重启**）；`plugin_uninstall` 对称；`plugin_status` 列 insert 行 + TOFU lock
 - ✅ **client 面板适配**：删「repository 插件源」区，新增「insert 插件」区（包名输入 → 实时挂载/移除），保留已加载插件启停与 bundle 安装区
 - ✅ **发现层简化**：`enumerate.ts` 删 single（github raw 探测）与 manifest 源，仅保留 index（hub catalog）；`store.ts` 源 kind 收紧为 index，lock kind 收紧为 bundle|plugin
 - ✅ **端到端验证（纯净 0811 + 构建产物）**：`dsh plugin --profile web add` 挂载 console → 4 工具注册日志 → `/api/plugin-console/inserts` 写行 → web 日志 `[HMR-PROBE] applied`（**实时挂载，无重启**）→ 移除行 → patch 恢复 `[]` 模板 → disabled 启停 runtime+persisted → boot 无 `plugin tree failed to load`

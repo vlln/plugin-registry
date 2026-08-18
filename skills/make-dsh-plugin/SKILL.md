@@ -9,7 +9,7 @@ description: >
   dsh registry / repository-plugin）。
 license: MIT
 metadata:
-  author: dsh-external/plugin-registry
+  author: vlln/plugin-registry
   version: "3.0.0"
 requires:
   bins:
@@ -171,7 +171,7 @@ DSH 插件：<一句话功能>。官方 bundle 插件，dsh plugin --profile web
 
 **标题格式**（强制）：
 - `<h1 align="center">插件名</h1>`——**居中**；用仓库/插件名（如
-  `whale-girl`、`loop`），**不加 npm 前缀**（不要写 `@dsh-external/dsh-loop`
+  `whale-girl`、`loop`），**不加 npm 前缀**（不要写 `@vlln/dsh-loop`
   或 `@scope/name` 作为标题）。
 - 标题下加 `<p align="center">` 一句话价值主张（是什么 + 主要收益）+ 可选
   徽章（badgen：license/format）。

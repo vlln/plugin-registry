@@ -254,7 +254,7 @@ export function ConsolePanel(): React.ReactNode {
   const isOfficial = (p: LoadedPluginRow): boolean =>
     p.name.startsWith('@deepseek-ai/') || p.name.startsWith('@cordisjs/') || p.name.startsWith('cordis:')
   // 管理工具自身：禁用会卸载本面板（管理入口消失），不可停用。
-  const isSelf = (p: LoadedPluginRow): boolean => p.name === '@dsh-external/plugin-console'
+  const isSelf = (p: LoadedPluginRow): boolean => p.name === '@vlln/plugin-console'
   // 用户可管理项：非官方 + 非管理工具自身；默认展示（官方 124 个折叠）。
   const userRows = installed.filter(p => !isOfficial(p) && !isSelf(p))
   const officialRows = installed.filter(p => isOfficial(p))

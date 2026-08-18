@@ -32,13 +32,13 @@ function indexSource(home: string, file: string): PluginSource {
 describe('indexEntryToPlugin', () => {
   it('maps a bundle entry — id 取 source（npm 包名）', () => {
     const e = indexEntryToPlugin(
-      { id: '@dsh-external/whale-girl', kind: 'bundle', source: '@dsh-external/whale-girl', faces: ['ui', 'bundle'], description: '宠物' },
+      { id: '@vlln/whale-girl', kind: 'bundle', source: '@vlln/whale-girl', faces: ['ui', 'bundle'], description: '宠物' },
       'hub',
     )
     assert.ok(e !== null)
-    assert.equal(e.id, '@dsh-external/whale-girl')
+    assert.equal(e.id, '@vlln/whale-girl')
     assert.equal(e.kind, 'bundle')
-    assert.equal(e.source, '@dsh-external/whale-girl')
+    assert.equal(e.source, '@vlln/whale-girl')
     assert.deepEqual(e.faces, ['ui', 'bundle'])
     assert.equal(e.description, '宠物')
     assert.equal(e.sourceId, 'hub')
@@ -63,15 +63,15 @@ describe('enumerateIndex', () => {
     const home = freshHome()
     const index = join(home, 'index.json')
     writeFileSync(index, JSON.stringify({ plugins: [
-      { id: '@dsh-external/whale-girl', kind: 'bundle', source: '@dsh-external/whale-girl', description: '宠物', faces: ['ui', 'bundle'] },
-      { id: '@dsh-external/dsh-loop', kind: 'bundle', source: '@dsh-external/dsh-loop', faces: [] },
+      { id: '@vlln/whale-girl', kind: 'bundle', source: '@vlln/whale-girl', description: '宠物', faces: ['ui', 'bundle'] },
+      { id: '@vlln/dsh-loop', kind: 'bundle', source: '@vlln/dsh-loop', faces: [] },
       { id: 'stale', kind: 'repository', source: 'github:a/b&path:/.dsh-plugin' },
     ] }))
     const snap = await enumerateIndex(home, indexSource(home, index))
     assert.equal(snap.entries.length, 2)
-    assert.equal(snap.entries[0]!.id, '@dsh-external/whale-girl')
+    assert.equal(snap.entries[0]!.id, '@vlln/whale-girl')
     assert.equal(snap.entries[0]!.kind, 'bundle')
-    assert.equal(snap.entries[0]!.source, '@dsh-external/whale-girl')
+    assert.equal(snap.entries[0]!.source, '@vlln/whale-girl')
     // 快照已缓存
     assert.ok(readSnapshot(home, 'hub') !== null)
   })

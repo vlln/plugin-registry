@@ -68,29 +68,29 @@ describe('plugin_search', () => {
   it('enumerates a new index source (index.json plugins format) and remembers it in sources.yml', async () => {
     const localIndex = join(home, 'index.json')
     writeFileSync(localIndex, JSON.stringify({ plugins: [
-      { id: '@dsh-external/whale-girl', kind: 'bundle', source: '@dsh-external/whale-girl', description: '宠物', faces: ['ui', 'bundle'] },
+      { id: '@vlln/whale-girl', kind: 'bundle', source: '@vlln/whale-girl', description: '宠物', faces: ['ui', 'bundle'] },
     ] }))
     const res = await tools()['plugin_search']!.execute({ source: `file://${localIndex}` })
     const plugins = res.plugins as Array<{ id: string; sourceId: string; kind: string; source: string }>
     assert.equal(plugins.length, 1)
-    assert.equal(plugins[0]!.id, '@dsh-external/whale-girl')
+    assert.equal(plugins[0]!.id, '@vlln/whale-girl')
     assert.equal(plugins[0]!.kind, 'bundle')
     // source 直接是 npm 包名——可喂给 plugin_install（格式统一）。
-    assert.equal(plugins[0]!.source, '@dsh-external/whale-girl')
+    assert.equal(plugins[0]!.source, '@vlln/whale-girl')
     assert.equal(readSources(home).some(s => s.locator.includes('index.json')), true)
   })
 
   it('filters by query and carries trust for registered sources', async () => {
     const localIndex = join(home, 'index.json')
     writeFileSync(localIndex, JSON.stringify({ plugins: [
-      { id: '@dsh-external/whale-girl', kind: 'bundle', source: '@dsh-external/whale-girl', description: '桌面宠物' },
-      { id: '@dsh-external/chat-width', kind: 'bundle', source: '@dsh-external/chat-width', description: '消息宽度' },
+      { id: '@vlln/whale-girl', kind: 'bundle', source: '@vlln/whale-girl', description: '桌面宠物' },
+      { id: '@vlln/chat-width', kind: 'bundle', source: '@vlln/chat-width', description: '消息宽度' },
     ] }))
     const t = tools()
     await t['plugin_search']!.execute({ source: `file://${localIndex}` })
     const res = await t['plugin_search']!.execute({ query: 'whale' })
     const plugins = res.plugins as Array<{ id: string; trust?: string }>
-    assert.deepEqual(plugins.map(p => p.id), ['@dsh-external/whale-girl'])
+    assert.deepEqual(plugins.map(p => p.id), ['@vlln/whale-girl'])
     // 已注册源按 sources.yml trust（缺省 community）输出（修复 PLUGIN_ITEM 缺 trust）。
     assert.equal(plugins[0]!.trust, 'community')
   })

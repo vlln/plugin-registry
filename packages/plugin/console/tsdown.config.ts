@@ -17,7 +17,7 @@ export default [
     external: [/@deepseek-ai\//],
   },
   {
-    name: '@dsh-external/plugin-console/client',
+    name: '@vlln/plugin-console/client',
     entry: { client: 'src/client/index.ts' },
     format: 'cjs',
     platform: 'browser',
@@ -32,7 +32,7 @@ export default [
     external: [/@deepseek-ai\/dsh-client-/, 'react'],
     outputOptions: {
       entryFileNames: 'index.js',
-      banner: 'window.__ModuleLoader__.load({ id: "@dsh-external/plugin-console", factory: (require) => { var module = { exports: {} }; var exports = module.exports;',
+      banner: 'window.__ModuleLoader__.load({ id: "@vlln/plugin-console", factory: (require) => { var module = { exports: {} }; var exports = module.exports;',
       footer: 'return exports; } });',
     },
   },

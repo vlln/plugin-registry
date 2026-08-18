@@ -33,7 +33,7 @@ Web 面板：设置页「插件」区 → 目标插件 → 卸载。
 
 ```sh
 # 1. 移除 profile 挂载：从 profile 的 dsh.profile.bundles 去掉 registry bundle
-#    （或 dsh plugin --profile web remove @dsh-external/dsh-plugin-registry-bundle）
+#    （或 dsh plugin --profile web remove @vlln/plugin-console）
 
 # 2. 回滚接线补丁（与 install-into-dsh.mjs 的 git apply 相反）
 git apply -R patches/dsh-plugin-registry-0808.patch

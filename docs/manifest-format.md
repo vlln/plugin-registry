@@ -35,7 +35,7 @@ registry 插件的定义：**清单 + Cordis 入口**——`dsh.plugin.json` 声
 
 ```json
 {
-  "id": "@dsh-external/dsh-web-terminal",
+  "id": "@vlln/dsh-web-terminal",
   "version": "0.1.0",
   "main": "./registry.mjs",
   "engines": { "dsh": ">=0.0.1" },

@@ -1,4 +1,4 @@
 # 薄控制台 bundle：向组合挂 plugin-console（Node half 读写 cordis.patch.yml）
 - insert:
     - id: plugin-console
-      name: '@dsh-external/plugin-console'
+      name: '@vlln/plugin-console'

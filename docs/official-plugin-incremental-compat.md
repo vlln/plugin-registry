@@ -19,7 +19,7 @@ registry **不追求原生兼容**官方插件（不要求零改动自动推导�
 
 ```json
 {
-  "id": "@dsh-external/dsh-web-terminal",
+  "id": "@vlln/dsh-web-terminal",
   "version": "0.1.0",
   "main": "./lib/index.js",
   "client": { "main": "./lib/client.js", "inject": ["@deepseek-ai/dsh-client-runtime"] },

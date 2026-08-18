@@ -4,7 +4,7 @@
 
 ## 一句话定位
 
-`vlln/plugin-registry`（2026-08-12 从 dsh-external 转移）已转向：**0 patch 薄控制台**——管理官方 repository 插件（`.dsh-plugin`）的浏览器面板。不再含 patch/官方源码改动；交付物是官方 bundle 格式的独立包。
+`vlln/plugin-registry` 已转向：**0 patch 薄控制台**——管理官方 repository 插件（`.dsh-plugin`）的浏览器面板。不再含 patch/官方源码改动；交付物是官方 bundle 格式的独立包。
 
 ## 转向背景（2026-08）
 
@@ -38,5 +38,5 @@
 
 ## 相关仓库
 
-- `vlln/plugin-registry`：本仓库（薄控制台交付物，2026-08-12 从 dsh-external 转移并公开）。
+- `vlln/plugin-registry`：本仓库（薄控制台交付物）。
 - 历史机制：`dsh2026/test-vlln` 的 `feat/plugin-registry-mvp-0808` 分支（冻结保留，不再演进）。

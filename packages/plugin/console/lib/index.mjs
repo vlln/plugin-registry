@@ -399,7 +399,7 @@ function createPluginTools(deps) {
 	return [
 		defineTool({
 			name: "plugin_search",
-			description: "Search installable DSH plugins. Without `source`, searches every registered source (sources at $DSH_HOME/plugin-sources/sources.yml, enumeration cached; the default source is the dsh-external hub index). With `source`, probes that source — an index JSON file/URL (plugin index format: {\"plugins\": [...]}, schema plugin-sources/index/v1) is probed lazily and remembered for later searches. Each result's `source` is an install spec (npm package name) you can pass straight to plugin_install. Results carry the owning source and trust level.",
+			description: "Search installable DSH plugins. Without `source`, searches every registered source (sources at $DSH_HOME/plugin-sources/sources.yml, enumeration cached; the default source is the configured hub index). With `source`, probes that source — an index JSON file/URL (plugin index format: {\"plugins\": [...]}, schema plugin-sources/index/v1) is probed lazily and remembered for later searches. Each result's `source` is an install spec (npm package name) you can pass straight to plugin_install. Results carry the owning source and trust level.",
 			parameters: {
 				query: {
 					type: "string",
@@ -1322,7 +1322,7 @@ function apply(ctx) {
 							(async () => {
 								try {
 									const disabled = JSON.parse(body).disabled === true;
-									if (id === "@dsh-external/plugin-console") {
+									if (id === "@vlln/plugin-console") {
 										json(409, {
 											ok: false,
 											message: "管理工具自身不可停用"
@@ -1433,7 +1433,7 @@ function apply(ctx) {
 											});
 											return;
 										}
-										if (name === "@dsh-external/plugin-console") {
+										if (name === "@vlln/plugin-console") {
 											json(409, {
 												ok: false,
 												message: "管理工具自身不可卸载"

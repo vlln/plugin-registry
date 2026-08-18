@@ -85,7 +85,7 @@ client half 是浏览器端**完整 Cordis 插件**（`apply(ctx)` 在浏览器�
 
 ## 从官方 client 包转 registry 形态
 
-已有官方 client 插件（`@deepseek-ai/dsh-client-*` 双面包，Loader 树通道）想额外提供 registry 发布形态时，用**增量兼容**：加一个 `dsh.plugin.json` 增量清单即可，**bundle 零重构建**（规范见 [官方插件增量兼容](../official-plugin-incremental-compat.md)）。已实测实例：`dsh-subagent-tree` 的 `registry/` 目录（[仓库](https://github.com/dsh-external/dsh-subagent-tree)）。
+已有官方 client 插件（`@deepseek-ai/dsh-client-*` 双面包，Loader 树通道）想额外提供 registry 发布形态时，用**增量兼容**：加一个 `dsh.plugin.json` 增量清单即可，**bundle 零重构建**（规范见 [官方插件增量兼容](../official-plugin-incremental-compat.md)）。已实测实例：`dsh-subagent-tree` 的 `registry/` 目录。
 
 ### 增量清单
 

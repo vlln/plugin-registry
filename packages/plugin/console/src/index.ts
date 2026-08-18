@@ -431,7 +431,7 @@ function isBundlePackage(packageName: string): boolean {
 interface LoadedEntryRow {
   /** 条目短 id（EntryOptions.id）——profile patch 的 `- id:` 匹配这个。 */
   id: string
-  /** 包名（@dsh-external/* 等；@deepseek-ai/* = 官方内置）。 */
+  /** 包名（外部 scope 包；@deepseek-ai/* = 官方内置）。 */
   name: string
   /** 当前是否被禁用（含父条目禁用继承）。 */
   disabled: boolean
@@ -749,7 +749,7 @@ export function apply(ctx: ConsoleCtx): void {
                   const parsed = JSON.parse(body) as { disabled?: boolean }
                   const disabled = parsed.disabled === true
                   // 管理工具自身不可停用：禁用会卸载本面板（管理入口消失）。
-                  if (id === '@dsh-external/plugin-console') {
+                  if (id === '@vlln/plugin-console') {
                     json(409, { ok: false, message: '管理工具自身不可停用' })
                     return
                   }
@@ -823,7 +823,7 @@ export function apply(ctx: ConsoleCtx): void {
                       return
                     }
                     // 管理工具自身不可卸载（同 disable 自毁防护）。
-                    if (name === '@dsh-external/plugin-console') {
+                    if (name === '@vlln/plugin-console') {
                       json(409, { ok: false, message: '管理工具自身不可卸载' })
                       return
                     }

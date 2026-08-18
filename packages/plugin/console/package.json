@@ -1,5 +1,5 @@
 {
-  "name": "@dsh-external/plugin-console",
+  "name": "@vlln/plugin-console",
   "description": "薄控制台：浏览器 UI 管理 web profile 插件安装态（bundle 层栈 + cordis.patch.yml insert 行/disabled），0 patch",
   "version": "0.1.0",
   "license": "MIT",

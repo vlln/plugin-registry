@@ -51,7 +51,7 @@ dsh plugin --profile web add "github:vlln/plugin-registry#main&path:/packages/pl
 
 | 工具 | 参数 | 行为 |
 |---|---|---|
-| `plugin_search` | `query?`, `source?`, `refresh?` | 搜源集合（缓存枚举）；默认 hub catalog（`dsh-external/hub` 的 catalog.json）；`source` 给定新索引 JSON 文件/URL → 懒加载探测并记住 |
+| `plugin_search` | `query?`, `source?`, `refresh?` | 搜源集合（缓存枚举）；默认 hub catalog（配置的 index.json）；`source` 给定新索引 JSON 文件/URL → 懒加载探测并记住 |
 | `plugin_install` | `source` | npm 包名 / GitHub 项目（`https://github.com/o/r`、`github.com/o/r`、`github:o/r`，URL 自动规范化）：声明 `dsh.bundle` → pnpm add + 层栈（重启生效）；纯 cordis 包 → pnpm add + insert 行（**实时挂载**）；安装失败显式报错，不假成功 |
 | `plugin_uninstall` | `id` | 删 insert 行（实时）或 bundle 依赖（重启生效）；清单保留可再装 |
 | `plugin_status` | `id?` | 无参 list 已装；有参单查（含 TOFU resolved ref） |

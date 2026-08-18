@@ -1,6 +1,6 @@
 /**
  * 发现层枚举（0813 适配）：单一 index 源——组织级 hub 的官方可装插件索引
- * （`dsh-external/hub` 的 index.json，schema plugin-sources/index/v1，
+ * （默认源 locator 指向 hub index.json，schema plugin-sources/index/v1，
  * Agent Loop 每 2h 刷新）。条目转换 + 快照缓存（TTL 6h + ETag 条件刷新）。
  *
  * 0811 起 repository 插件机制移除，外部插件只有 profile bundle 一条官方

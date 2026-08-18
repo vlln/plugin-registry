@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-	id: "@dsh-external/plugin-console",
+	id: "@vlln/plugin-console",
 	factory: (require) => {
 		var exports = { exports: {} }.exports;
 		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
@@ -300,7 +300,7 @@ window.__ModuleLoader__.load({
 				children: "加载中…"
 			});
 			const isOfficial = (p) => p.name.startsWith("@deepseek-ai/") || p.name.startsWith("@cordisjs/") || p.name.startsWith("cordis:");
-			const isSelf = (p) => p.name === "@dsh-external/plugin-console";
+			const isSelf = (p) => p.name === "@vlln/plugin-console";
 			const userRows = installed.filter((p) => !isOfficial(p) && !isSelf(p));
 			const officialRows = installed.filter((p) => isOfficial(p));
 			const shown = showAll ? installed : userRows;

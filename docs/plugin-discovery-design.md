@@ -37,7 +37,7 @@ $DSH_HOME/
 sources:
   - id: hub
     kind: index                          # 读现成索引文件（hub index.json）
-    locator: https://raw.githubusercontent.com/dsh-external/hub/main/index.json
+    locator: <hub index.json 的 URL>
     trust: official                      # official / community / untrusted
   - id: my-catalog
     kind: index                         # 本地 catalog 文件（hub clone 或手写）
