@@ -1,6 +1,6 @@
 <h1 align="center">plugin-registry</h1>
 
-<p align="center">[中文](README.zh.md) | English</p>
+<p align="center"><a href="README.zh.md">中文</a> | English</p>
 
 <p align="center">
   <strong>DSH plugin ecosystem infrastructure: thin console + official plugin development guide</strong><br/>

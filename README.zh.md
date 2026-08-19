@@ -1,6 +1,6 @@
 <h1 align="center">plugin-registry</h1>
 
-<p align="center">中文 | [English](README.md)</p>
+<p align="center">中文 | <a href="README.md">English</a></p>
 
 <p align="center">
   <strong>DSH 插件生态基建：薄控制台 + 官方插件开发引导</strong><br/>
