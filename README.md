@@ -56,7 +56,13 @@ dsh plugin --profile web add "github:vlln/plugin-registry#main&path:/packages/pl
 
 构建产物已入库（git 源安装不触发构建），一行命令直接装（实测约 15 秒）。
 
-**方式二：本地目录（有源码时）**
+**方式二：npm 源**
+
+```sh
+dsh plugin --profile web add @vlln/plugin-console@0.1.0
+```
+
+**方式三：本地目录（有源码时）**
 
 ```sh
 git clone https://github.com/vlln/plugin-registry

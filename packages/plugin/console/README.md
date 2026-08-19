@@ -32,10 +32,11 @@ watch-only 实例）——profile `cordis.patch.yml` 编辑实时生效，insert
 
 ## 安装
 
-安装命令与方式（git 源真一行 / 本地目录）见仓库根 [README「安装」章节](../../../README.md)。构建产物已入库，git 源一行命令直接装（实测约 15 秒）：
+安装命令与方式（git 源真一行 / npm 源 / 本地目录）见仓库根 [README「安装」章节](../../../README.md)。构建产物已入库，git 源一行命令直接装（实测约 15 秒）；npm 源已发布（`@vlln/plugin-console`）：
 
 ```sh
-dsh plugin --profile web add "github:vlln/plugin-registry#main&path:/packages/plugin/console"
+dsh plugin --profile web add "github:vlln/plugin-registry#main&path:/packages/plugin/console"   # git 源（真一行）
+# 或 npm 源：dsh plugin --profile web add @vlln/plugin-console@0.1.0
 ```
 
 挂载后刷新 Web 页面，设置页出现「插件管理」面板（`settings.section` 插槽）。
