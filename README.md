@@ -1,9 +1,11 @@
 <h1 align="center">plugin-registry</h1>
 
+<p align="center">[中文](README.zh.md) | English</p>
+
 <p align="center">
-  <strong>DSH 插件生态基建：薄控制台 + 官方插件开发引导</strong><br/>
-  浏览器面板管理 profile 插件安装态（bundle 层栈 + insert 行 + 启停），零补丁；
-  `make-dsh-plugin` skill 引导开发者按官方格式写插件。
+  <strong>DSH plugin ecosystem infrastructure: thin console + official plugin development guide</strong><br/>
+  Browser panel managing a profile's plugin install state (bundle layer stack + insert rows + enable/disable), zero patches;
+  the `make-dsh-plugin` skill guides developers in writing official-format plugins.
 </p>
 
 <p align="center">
@@ -13,83 +15,82 @@
 
 ---
 
-> **转向（2026-08）**：官方 0809 推出仓库插件机制（`.dsh-plugin`）覆盖旧独立机制 ~95%，本仓库收敛为
-> **薄控制台 + 插件开发规范和引导**（旧 patch/CLI/面板已移除）。**0811 起官方删除
-> repository-plugins 机制**（`vendor/loader/src/repository.ts`），外部插件统一经 web profile 安装：
-> bundle 插件（`dsh.bundle` 包）进 `dsh.profile.bundles` 层栈；非 bundle 插件（纯 cordis 包）经
-> profile `cordis.patch.yml` insert 行挂载（配置 HMR 实时生效）。完整评估见 [官方 0809 覆盖度](docs/official-0809-coverage.md)。
+> **Pivot (2026-08)**: Official 0809 added a repository plugin mechanism (`.dsh-plugin`) covering ~95% of the old mechanism; this repo is now a
+> **thin console + plugin development spec and guidance** (old patches/CLI/panel removed). **Since 0811 the repository-plugins mechanism is gone**
+> (`vendor/loader/src/repository.ts`); external plugins install via the web profile only: bundles (`dsh.bundle`) join `dsh.profile.bundles`;
+> non-bundles (plain cordis packages) mount via insert rows in `cordis.patch.yml` (live via HMR). Full assessment: [official 0809 coverage](docs/official-0809-coverage.md).
 
-## 定位
+## Positioning
 
-DeepSeek Harness 官方机制管「插件是什么、怎么跑」；本仓库补两件事（面板结构见 [console README](packages/plugin/console/README.md)，开发引导见下文）：
+DeepSeek Harness's official mechanisms define "what a plugin is and how it runs"; this repository adds two things (panel structure: [console README](packages/plugin/console/README.md); guidance: below):
 
-1. **薄控制台**（`packages/plugin/console`）——管理 profile 插件安装态的浏览器面板 + 4 个 agent 工具
-2. **开发规范和引导**——`make-dsh-plugin` skill + cookbook，指导创建官方 bundle / cordis 插件
+1. **Thin console** (`packages/plugin/console`) — browser panel managing a profile's plugin install state + 4 agent tools
+2. **Development spec and guidance** — `make-dsh-plugin` skill + cookbook for creating official bundle/cordis plugins
 
-## 生态关系（谁能干什么）
+## Ecosystem relationships (who can do what)
 
 ```
-官方 DSH（DeepSeek Harness）     插件运行时 + profile bundle 机制（0811 起无 repository 机制）
+Official DSH (DeepSeek Harness)      plugin runtime + profile bundle mechanism (no repo mechanism since 0811)
    │
-   ├── 官方插件（bundle）        loop / task-status / navbar 等——`dsh plugin --profile web add` 装进 profile 层栈
-   ├── 第三方插件（bundle/纯插件）独立 GitHub 仓库或 npm 包——bundle 进层栈；纯插件走 insert 行（实时）
+   ├── Official plugins (bundle)     loop / task-status / navbar etc. — `dsh plugin --profile web add` install into profile layer stack
+   ├── Third-party plugins (bundle/plain)  standalone GitHub repos or npm packages — bundles enter the layer stack; plain plugins use insert rows (live)
    │
-   └── 本仓库（plugin-registry） ① 薄控制台：管理安装态的浏览器面板 + agent 工具
-                                ② make-dsh-plugin skill + cookbook：引导开发第三方插件
+   └── This repository (plugin-registry)  ① thin console: browser panel + agent tools for install-state management
+                                         ② make-dsh-plugin skill + cookbook: guides third-party plugin development
 ```
 
-插件形态与安装路径说明见 [插件类型对比](docs/plugin-types.md)；现有插件的安装示例见 [examples](examples/README.md)。
+Plugin forms and install paths: [plugin type comparison](docs/plugin-types.md); install examples: [examples](examples/README.md).
 
-## 薄控制台
+## Thin console
 
-![插件管理面板](screenshots/console-panel.png)
+![Plugin management panel](screenshots/console-panel.png)
 
-设置页「插件管理」面板管理 profile 插件安装态：**安装插件区**（统一入口——输入 npm 包名或 GitHub 项目：`https://github.com/o/r` / `github.com/o/r` / `github:o/r`，URL 自动规范化——自动 pnpm add，bundle 插件进层栈、非 bundle 写 insert 行）+ **已加载插件区**（版本检查/更新、`disabled` 启停持久化、bundle 卸载）。
+The settings page's "Plugin Management" panel manages a profile's plugin install state: **install area** (single entry — npm package name or GitHub project (`https://github.com/o/r` / `github.com/o/r` / `github:o/r`, URL auto-normalized) — automatic pnpm add; bundles enter the layer stack, non-bundles get insert rows) + **loaded area** (version check/update, `disabled` toggle, bundle uninstall).
 
-## 安装
+## Installation
 
-**方式一：git 源直接安装（推荐，真一行）**
+**Option 1: git source, direct install (recommended, one line)**
 
 ```sh
 dsh plugin --profile web add "github:vlln/plugin-registry#main&path:/packages/plugin/console"
 ```
 
-构建产物已入库（git 源安装不触发构建），一行命令直接装（实测约 15 秒）。
+Build artifacts are committed (git source skips the build); one command installs directly (~15 s).
 
-**方式二：npm 源**
+**Option 2: npm source**
 
 ```sh
 dsh plugin --profile web add @vlln/plugin-console@0.1.0
 ```
 
-**方式三：本地目录（有源码时）**
+**Option 3: local directory (source available)**
 
 ```sh
 git clone https://github.com/vlln/plugin-registry
 cd plugin-registry/packages/plugin/console
-dsh plugin --profile web add .   # 产物已入库，无需构建；当前目录即 bundle 包子目录（dsh 锚定 . 为绝对路径）
+dsh plugin --profile web add .   # artifacts are committed, no build needed; the current dir is the bundle package dir (dsh anchors . to an absolute path)
 ```
 
-挂载后刷新 Web 页面，设置页出现「插件管理」面板。
+Refresh the web page after mounting — the "Plugin Management" panel appears on the settings page.
 
 ## Agent Skills
 
-| Skill | 作用 |
+| Skill | Purpose |
 |---|---|
-| [make-dsh-plugin](skills/make-dsh-plugin/SKILL.md) | 创建官方 bundle / cordis 插件：先选形态（skill 包 / MCP / Node 工具 / 带 UI）→ 声明 `dsh.bundle` 或纯 apply → 安装验证纪律。详情分置 `references/`；仓库内参考实现 `packages/plugin/console` |
+| [make-dsh-plugin](skills/make-dsh-plugin/SKILL.md) | Create official bundle / cordis plugins: pick a form (skill package / MCP / Node tool / with UI) → declare `dsh.bundle` or plain apply → install-and-verify discipline. Details in `references/`; reference implementation: `packages/plugin/console` |
 
-## 开发前须知（踩过的坑）
+## Before you start developing (pitfalls we've hit)
 
-关键坑（官方包未发布、Node half 改动需重启、宿主 CSS 覆盖等）与完整清单见 [skill references/gotchas](skills/make-dsh-plugin/references/gotchas.md)——**开发前先读**。
+Key pitfalls (official packages not yet published, Node-half changes need a restart, host CSS overrides, etc.) and the full list: [skill references/gotchas](skills/make-dsh-plugin/references/gotchas.md) — **read before developing**.
 
-## 文档
+## Documentation
 
-- [插件类型对比](docs/plugin-types.md) — bundle 插件 vs 纯 cordis 插件：开发/分发/安装/管理四维 + 选型
-- [官方 0809 覆盖度评估](docs/official-0809-coverage.md) — 官方机制覆盖度、转向决策（含 0811 repository 移除说明见 CHANGELOG）
-- [薄控制台设计](docs/console-ui-plugin-management.md) — 统一管理安装态的设计
-- 历史机制文档（已转向，仅存档）：[架构（旧）](docs/architecture.md)、[创建插件（旧）](docs/cookbook/creating-a-plugin.md)、[清单格式（旧）](docs/manifest-format.md)、[创建 repository-plugin（旧）](docs/cookbook/creating-a-repository-plugin.md) 等
-- [变更记录](CHANGELOG.md) / [路线图](ROADMAP.md)
+- [Plugin type comparison](docs/plugin-types.md) — bundle vs plain cordis plugins: development/distribution/installation/management dimensions + how to choose
+- [Official 0809 coverage assessment](docs/official-0809-coverage.md) — official mechanism coverage, pivot decision (0811 repository removal: CHANGELOG)
+- [Thin console design](docs/console-ui-plugin-management.md) — design of unified installation-state management
+- Historical mechanism docs (archived after the pivot): [architecture (old)](docs/architecture.md), [creating a plugin (old)](docs/cookbook/creating-a-plugin.md), [manifest format (old)](docs/manifest-format.md), [creating a repository-plugin (old)](docs/cookbook/creating-a-repository-plugin.md), etc.
+- [Changelog](CHANGELOG.md) / [Roadmap](ROADMAP.md)
 
-## 版权
+## License
 
-MIT License。见 [LICENSE](LICENSE)。
+MIT License. See [LICENSE](LICENSE).

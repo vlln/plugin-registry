@@ -1,5 +1,5 @@
 {
-  "README.md": 4500,
+  "README.md": 6000,
   "AGENTS.md": 3000,
   "docs/AGENTS.md": 1500,
   "docs/architecture.md": 7000,
@@ -21,5 +21,6 @@
   "docs/cookbook/creating-a-repository-plugin.md": 3500,
   "docs/plugin-types.md": 4000,
   "docs/cookbook/migrating-legacy-plugins.md": 4000,
-  "docs/plugin-discovery-design.md": 7000
+  "docs/plugin-discovery-design.md": 7000,
+  "README.zh.md": 4500
 }
