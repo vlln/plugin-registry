@@ -2,6 +2,14 @@
 
 本仓库（plugin-registry：薄控制台 + 文档 + skill）的变更记录。机制件改动在官方 snapshot 宿主仓库的历史机制分支按提交记录（0809 转向后不再有机制件），本表汇总交付。
 
+## 2026-08（0819 安装命令跨平台化——修 #20 Windows 必失败）
+
+`dsh plugin --profile web add "github:vlln/plugin-registry#main&path:/packages/plugin/console"` 在 Windows 上必失败（`ERR_PNPM_INVALID_DEPENDENCY_NAME`）——根因在官方 dsh CLI：win32 下 `dsh plugin` 经 cmd.exe 转发 pnpm 参数（`spawnSync(..., { shell: process.platform === "win32" })`，已在安装的 rc.8 `lib/plugin-9h8shc4d.js:108` 核对），`&` 是 cmd 命令分隔符，`&path:...` 被拆成第二条命令（恰好命中 cmd 内置 `path`，静默无报错），pnpm 只收到 `github:vlln/plugin-registry#main` → 仓库根无 package.json → 合成非法包名 `plugin-registry#main`。本仓库无法改官方 CLI，按 issue 建议先文档兜底：
+
+- ✅ **文档改跨平台写法**：README / console README / examples / skill 参考的 git 源安装命令统一改 **`#path:/<子目录>` 形式**（pnpm 原生语法、**不含 `&`**，取默认分支 HEAD）——实测 pnpm 11.10 与 `#main&path:` 解析同一提交（`b0ae1ea`）、同一子目录，`dsh plugin --profile web add "github:vlln/plugin-registry#path:/packages/plugin/console"` 端到端通过（隔离 `DSH_HOME`，`@vlln/plugin-console` 正确登记进 `dependencies` + `dsh.profile.bundles`）；`#main&path:` 钉分支写法保留（仅 POSIX 可用），Windows 用户绕开 dsh 转发的直装路径写入 skill 参考
+- ✅ **console 代码零改动**：`normalizeSource`/`resolveInstalledName` 对 `#path:` 后缀原样透传（`source.spec.ts` 场景已覆盖），面板/工具面无需适配
+- 📌 **另案**：win32 `shell: true` 转发缺陷建议向官方 dsh 反馈（issues 已关闭，走 Discussion），本仓库已记录
+
 ## 2026-08（0817 安装源规范化——修 #19 / #4 假成功部分）
 
 `plugin_install` 入参格式统一：完整 GitHub URL 不再 502 / 假成功。新增 `src/source.ts`（工具面与 HTTP 面共用，消除两处行为分叉）：

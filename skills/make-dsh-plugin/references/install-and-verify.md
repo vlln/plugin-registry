@@ -8,7 +8,7 @@
 dsh plugin --profile web add <包路径>
 ```
 
-`<包路径>` = 含 `package.json#dsh.bundle` 的 npm 包目录/git 源（`dsh plugin add` 转发 pnpm + 按已安装状态把声明 `dsh.bundle` 的依赖加进 profile 层栈）。本地目录 `cd` 到包目录后 `add .`（dsh 锚定 `.` 为绝对路径）；git 源 monorepo 子目录 `#<commit>&path:/<子目录>`，**产物入库（推荐）→ 真一行**，不入库则 `prepare` + `allowBuilds` 放行——写法细则与坑见 [bundle-plugins.md](bundle-plugins.md)「安装与管理」与 [gotchas.md](gotchas.md) 1c；bundle 不声明官方包依赖（见 [gotchas.md](gotchas.md) 1）。装完**重启 web**（层栈在 boot 合成）。
+`<包路径>` = 含 `package.json#dsh.bundle` 的 npm 包目录/git 源（`dsh plugin add` 转发 pnpm + 按已安装状态把声明 `dsh.bundle` 的依赖加进 profile 层栈）。本地目录 `cd` 到包目录后 `add .`（dsh 锚定 `.` 为绝对路径）；git 源 monorepo 子目录 `#<commit>&path:/<子目录>`（**Windows 注意：`dsh plugin` 经 cmd.exe 转发，`&` 是命令分隔符会拆开命令——给用户的安装说明写不带 `&` 的 `#path:/<子目录>` 形式，取默认分支 HEAD，跨平台；钉分支需绕开 dsh 转发，见 [gotchas.md](gotchas.md) 1c**），**产物入库（推荐）→ 真一行**，不入库则 `prepare` + `allowBuilds` 放行——写法细则与坑见 [bundle-plugins.md](bundle-plugins.md)「安装与管理」与 [gotchas.md](gotchas.md) 1c；bundle 不声明官方包依赖（见 [gotchas.md](gotchas.md) 1）。装完**重启 web**（层栈在 boot 合成）。
 
 ## 纯 cordis 插件安装（实时生效）
 

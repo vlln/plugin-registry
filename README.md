@@ -52,10 +52,15 @@ The settings page's "Plugin Management" panel manages a profile's plugin install
 **Option 1: git source, direct install (recommended, one line)**
 
 ```sh
-dsh plugin --profile web add "github:vlln/plugin-registry#main&path:/packages/plugin/console"
+dsh plugin --profile web add "github:vlln/plugin-registry#path:/packages/plugin/console"
 ```
 
 Build artifacts are committed (git source skips the build); one command installs directly (~15 s).
+
+> **Windows note**: this uses the `#path:` form (no `&`) on purpose — on win32 `dsh plugin` forwards
+> args through cmd.exe, where `&` is a command separator, so `#main&path:...` gets split and fails
+> with `ERR_PNPM_INVALID_DEPENDENCY_NAME`. `#path:` resolves the default branch (main) HEAD; the
+> branch-pinned `#main&path:...` only works on POSIX shells.
 
 **Option 2: npm source**
 

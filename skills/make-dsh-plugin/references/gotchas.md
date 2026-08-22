@@ -33,6 +33,7 @@ bundle（见 whale-girl 仓库决策记录）。
 - **构建产物已入库**（`lib/` 提交进仓库，无 prepare 或 prepare 非必需）——不受影响，git 源直接可用。
 
 另两个 git 安装实测坑：monorepo 子目录语法是 `#<ref>&path:/<子目录>`（`path:` 前缀 + 前导 `/`，漏写或写成 `&path=dir` 都解析失败）；bundle 的 peer **不要声明 `@deepseek-ai/*` 官方包**——git 安装时 prepare 的 `npm install` 会解析 peer 404 失败（见 1）。
+**Windows 专属坑（#20）**：`dsh plugin` 在 win32 经 cmd.exe 转发参数，`&` 是命令分隔符——`#<ref>&path:/...` 会被拆开而失败（`ERR_PNPM_INVALID_DEPENDENCY_NAME`）。给用户的安装说明用**不带 `&` 的 `#path:/<子目录>` 形式**（pnpm 原生语法，取默认分支 HEAD，跨平台）；钉分支的 `#<commit>&path:/...` 仅 POSIX 可用，Windows 需绕开 dsh 转发（profile 目录内 `pnpm add "github:...#<commit>&path:/..."` 再 `dsh plugin --profile web install`）。
 
 安装说明应写清子目录语法与 allowBuilds 步骤（见 [bundle-plugins.md](bundle-plugins.md)「安装与管理」）。
 

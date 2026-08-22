@@ -55,6 +55,7 @@ bundle 插件是**独立 npm 包**（或包目录），声明 `dsh.bundle`：
   dsh plugin --profile web add "github:owner/my-bundle#<commit>&path:/packages/my-bundle"
   ```
   ❌ 不要写未构建且无 prepare 的 git 源（缺产物挂载失败）；`git+file://` 本地可达但不是分发形态（对远端用户不可用），别写进安装说明。
+  ⚠️ **Windows**：`dsh plugin` 在 win32 经 cmd.exe 转发参数，`&` 是命令分隔符——`#<commit>&path:/...` 会被拆开而失败（`ERR_PNPM_INVALID_DEPENDENCY_NAME`）。**给用户的安装说明应写不带 `&` 的 `#path:/<子目录>` 形式**（pnpm 原生语法，取默认分支 HEAD，实测 plugin-registry console 即 `github:vlln/plugin-registry#path:/packages/plugin/console`，跨平台可用）；需钉分支时 POSIX 用 `#<commit>&path:/...`，Windows 用户在 profile 目录内直接 `pnpm add "github:...#<commit>&path:/..."` 再 `dsh plugin --profile web install`（绕开 dsh 转发）。
 
 **写安装说明时**（README/skill 输出）：给出**用户能直接复制执行**的命令——本地路径写清 bundle 子目录与构建前提；git 源写清子目录语法（`&path:/`）、prepare 构建与 `allowBuilds` 放行。不要给「指向仓库根」或「臆造协议」的说明。
 

@@ -53,10 +53,12 @@ DeepSeek Harness 官方机制管「插件是什么、怎么跑」；本仓库补
 **方式一：git 源直接安装（推荐，真一行）**
 
 ```sh
-dsh plugin --profile web add "github:vlln/plugin-registry#main&path:/packages/plugin/console"
+dsh plugin --profile web add "github:vlln/plugin-registry#path:/packages/plugin/console"
 ```
 
 构建产物已入库（git 源安装不触发构建），一行命令直接装（实测约 15 秒）。
+
+> **Windows 注意**：这里刻意用不带 `&` 的 `#path:` 写法——win32 下 `dsh plugin` 经 cmd.exe 转发参数，`&` 是命令分隔符，`#main&path:...` 会被拆开而失败（`ERR_PNPM_INVALID_DEPENDENCY_NAME`）。`#path:` 取默认分支（main）HEAD；钉分支的 `#main&path:...` 只在 POSIX shell 下可用。
 
 **方式二：npm 源**
 

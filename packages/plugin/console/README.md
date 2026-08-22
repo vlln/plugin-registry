@@ -38,7 +38,7 @@ insert rows mount **without a restart** (verified in practice).
 Install commands and options (git-source one-liner / npm source / local directory) are in the [README "Installation" section](../../../README.md) at the repository root. Build artifacts are committed, so the git-source one-liner installs directly (measured ~15 s); the npm source is published (`@vlln/plugin-console`):
 
 ```sh
-dsh plugin --profile web add "github:vlln/plugin-registry#main&path:/packages/plugin/console"   # git source (true one-liner)
+dsh plugin --profile web add "github:vlln/plugin-registry#path:/packages/plugin/console"   # git source (true one-liner; #path: form — no & — so it also works when dsh forwards args through cmd.exe on Windows)
 # or npm source: dsh plugin --profile web add @vlln/plugin-console@0.1.0
 ```
 
