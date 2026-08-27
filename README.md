@@ -11,6 +11,8 @@
 <p align="center">
   <img src="https://badgen.net/badge/license/MIT/green" alt="license" />
   <img src="https://badgen.net/badge/format/official%20plugin/8257D0" alt="official plugin" />
+  [![dshfind](https://dshfind.com/api/badge/vlln/plugin-registry)](https://dshfind.com/en/plugins/vlln/plugin-registry?ref=badge)
+  [![dsh.so security](https://www.dsh.so/badge/plugin-registry.svg)](https://www.dsh.so/artifact/plugin-registry)
 </p>
 
 ---
