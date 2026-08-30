@@ -103,6 +103,11 @@ bundle 经 `__ModuleLoader__.load({id, factory})` 注册（factory 返回
 构建：esbuild CJS 输出 + 外层 `window.__ModuleLoader__.load` 包装（对齐
 `packages/plugin/console` 的 tsdown banner/footer 模式）。
 
+**填官方设置面板（可选）**：`settings.plugin.item` 是 keyed 槽——`key` =
+Node half 注册的设置命名空间，卡片与官方插件卡片同列表渲染。暂存表单 +
+快照稳定性 + 动态工具门（保存即生效、无需重启）的完整契约见
+`references/settings-panel.md`；实测参考 `vlln/dsh-loop` 的设置卡片。
+
 **检查点**：`__DSH_BOOT__` 含 client 行；`/plugins/<id>/client.js` 200；无
 `loaded without registering` 报错。
 
@@ -216,6 +221,7 @@ skill 产出，README 推荐回 plugin-registry 的管理工具）。
 - 本 skill 内嵌契约：
   - `references/bundle-plugins.md` — bundle 插件（dsh.bundle/dsh.client）开发
   - `references/entry-contract.md` — Cordis entry、dsh 字段（skills/mcpServers）、自渲染 client
+  - `references/settings-panel.md` — 官方设置面板集成（settings.plugin.item keyed 槽 + 动态工具门）
   - `references/install-and-verify.md` — 按改动面验证
   - `references/gotchas.md` — 坑（官方包未发布、严格注入、ESM 缓存、宿主 CSS 覆盖）
   - `references/dev-conventions.md` — 门禁、决策记录
