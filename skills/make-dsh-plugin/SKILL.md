@@ -91,7 +91,14 @@ make-skill）见 `references/entry-contract.md` 对应小节——不要发明�
 运行时的职责（`@deepseek-ai/*`、`cordis`——profile pnpm 闭包注入，勿声明）。
 在 `ctx.effect()`/`ctx.on()` 内注册，disable 时清理。
 
-**检查点**：entry 可解析；工具已注册；inject 声明完整。
+**工具的 `output` 必须声明 `{ schema, render }`**（`presentationMeta` 可选）——
+缺 `render` 在 boot 挂载时抛 `tool ... must declare output { schema, render, presentationMeta? }`
+并导致整棵插件树加载失败（web 起不来）。写法：
+`output: { schema: {...}, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }] }`。
+`defineTool` 来自 `@deepseek-ai/dsh-tools`（公共 npm 不存在、仅运行时闭包可解析）——本地独立验证
+用原生 ToolDefinition 对象更稳（`ctx.tools.register` 原生接受，参照 `dsh-chatdata-plugin`）。
+
+**检查点**：entry 可解析；工具已注册且 `output` 含 `schema + render`；inject 声明完整。
 
 ## Step 4：Client half（可选）——自渲染
 

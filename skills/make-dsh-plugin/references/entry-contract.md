@@ -77,13 +77,24 @@ export function apply(ctx) {
     name: 'my_tool',
     description: 'What it does.',
     parameters: { type: 'object', properties: {} },
-    output: { schema: { type: 'string' } },
-    execute: async () => 'result',
+    output: {
+      schema: { type: 'object' },
+      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
+    },
+    execute: async () => ({ ok: true }),
   }))
 }
 ```
 
 - 能力上限是完整 Cordis——事件（`ctx.on`）、服务（`ctx.provide`）、命令、system prompt、TUI，无需声明。
+- **`output` 必须声明 `{ schema, render }`（`presentationMeta` 可选）**：运行时 `ctx.tools.register`
+  强制校验，缺 `render` 在 boot 挂载时抛 `tool "<name>" must declare output { schema, render, presentationMeta? }`
+  并导致整棵插件树加载失败（`plugin tree failed to load`，web 起不来）。`schema` 须通过官方
+  `assertSupportedJsonSchema`（纯 JSON Schema 可用）；`render(args, value)` 返回渲染块数组
+  （`[{ type: 'text', text: ... }]`）。此坑曾因示例漏写 `render` 真实踩到（见 gotchas §6）。
+- **`defineTool` 仅运行时闭包可解析**：`@deepseek-ai/dsh-tools` 不在公共 npm，本地独立 `import` 失败——
+  本地验证时直接注册原生 ToolDefinition 对象（`ctx.tools.register` 原生接受），参照 `dsh-chatdata-plugin`；
+  正式分发仍由运行时经闭包注入解析。
 - **依赖解析**：entry 可 import 官方包（`@deepseek-ai/*`、`cordis`），官方运行时经 profile pnpm 闭包注入（`$DSH_HOME/profiles/node_modules` flat fallback）；**不要声明这些依赖**（声明了公共 npm 解析不到反而失败）。
 - **注册是 effect**：`ctx.tools.register` 返回 disposer，用 `ctx.effect()`/`ctx.on()` 持有生命周期，disable 时清理。
 
