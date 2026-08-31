@@ -86,3 +86,22 @@ bundle 插件的**启停覆盖写 profile 层**，不要写进 bundle 包内层�
 - **client 经 `__ModuleLoader__.load` 注册**：0811 client-modules 只扫描声明 `dsh.client` 的包，client bundle 必须 `__ModuleLoader__.load({id, factory})`——否则报 `loaded without registering`。
 - **严格注入**：`ctx.get` 未在 `inject` 声明的服务 → `cannot get property without inject`，apply 开头即抛、整个 effect 不注册（路由全 fallback 成 SPA 主页）。
 - **工具 schema DSL 违规在挂载时暴露**：CLI enable 只校验名称，`defineTool` value-schema 违规在 web boot/面板 enable（reconcile）时暴露——发现后重启 web 确认日志。
+
+## 6. 工具 `output` 缺 `render` → boot 硬失败（实测 2026-08-31）
+
+ToolDefinition 的 `output` 只写 `schema` 不写 `render`（`presentationMeta` 可选）时，boot 挂载即抛：
+
+```
+TypeError: tool "<name>" must declare output { schema, render, presentationMeta? }
+```
+
+→ `plugin tree failed to load` → **web 启动失败**。要点：
+
+- **CLI enable 查不出、mock ctx 独立验证也查不出**（假 ctx 不跑运行时校验）——只有真实挂载
+  冒烟（装 → 挂载 → boot log 干净）能抓到；本地快速自证可用官方
+  `assertSupportedJsonSchema`（从已安装 dsh 的 `@deepseek-ai/dsh-tools` import）+ 按
+  `register()` 源码复刻 output 条件校验。
+- 正确写法：`output: { schema: {...}, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }] }`
+  （对照本部署 `dsh-chatdata-plugin`）。
+- 环境事实：`entry-contract.md` 的示例曾漏写 `render`（已修）——照旧示例原样抄会复现此坑；
+  这也是「挂载失败排查顺序」（§3）之外的另一个 boot 失败入口。
