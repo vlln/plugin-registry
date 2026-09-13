@@ -128,23 +128,26 @@ web vs 只刷新）与挂载失败排查见 `references/install-and-verify.md`�
 
 npm 包（或 git 源）是分发单元——设置好让用户能找到并安装。
 
-**仓库 description**（一行：是什么 + 怎么装），具体模板：
+**仓库 description**——**只写"这是什么、能干什么"，一句话让用户在搜索结果里一眼看懂**：
 
 ```
-DSH 插件：<一句话功能>。官方 bundle 插件，dsh plugin --profile web add：github:owner/repo#<ref>
+<插件做什么>：<用户视角的收益/场景>（DeepSeek Harness 插件）
 ```
 
-遵循形态 "DSH plugin: <what it does>; official bundle, install via
-`dsh plugin --profile web add` `<repo-ref>`"。双语可选（英文在前利于国际发现）。
+- **不要往里塞安装命令、包名、生态术语堆砌**（`dsh plugin --profile web add github:…`
+  这类样板属于 README 的安装节，不属于 description）——搜索列表里只有一行位置，
+  塞进去的都是用户读不完、也用不上的字节。用户 2026-09 拍板：
+  "description 中应该仅有让用户一眼清晰理解项目的描述"。
+- 中文优先（受众主要是中文用户）；双语可选，英文在前利于国际发现——但**别把两句都写进去挤成一段**。
+- 例（`dsh-autofork`）：`Agent 忙时自动分叉会话：你新发的指令立刻在新会话里得到响应，旧会话留在后台跑完并把结果回注（DeepSeek Harness 插件）`
 
-**仓库 topics（GitHub 标签）**：打标签便于 `gh`/搜索/发现。**标签要描述插件
-实际做什么，而非只贴生态通用词**。两类组合：
+**仓库 topics（GitHub 标签）**：打标签便于 `gh`/搜索/发现。两类组合：
 
-**生态标签**（固定少量，标识 dsh 生态身份）：
-- `dsh` / `dsh-bundle`
-- `deepseek-harness`
+**必选 2 个**（生态身份，一个都不能少）：
+- `dsh-plugin`——dsh 插件的通用检索词（用户会直接搜它）
+- `deepseek-harness`——标明上游宿主
 
-**功能标签**（有意义——描述插件能力/领域，按插件实际内容定）：
+**功能标签 1-3 个**（描述插件实际做什么，是区分度的来源）：
 - 能力：`tool` / `skill` / `mcp` / `command` / `ui`（按插件含什么）
 - **领域/用途**（关键——让搜索命中「能干什么」）：如 `pet`（宠物）、
   `loop`（定时循环）、`terminal`（终端）、`status`（状态条）、`automation`
@@ -152,17 +155,18 @@ DSH 插件：<一句话功能>。官方 bundle 插件，dsh plugin --profile web
   领域词，避免泛词
 - 形态：`agent` / `agents`（agentic 上下文，可选）
 
-**原则**：想象用户搜什么词能找到这个插件——`dsh-plugin` 人人都有，
-`<你的功能词>` 才是区分度。标签总数 3-6 个（生态 2-3 + 功能 2-3）。
+**原则**：想象用户搜什么词能找到这个插件——`dsh-plugin` 是身份，
+`<你的功能词>` 才是区分度。标签总数 3-6 个（必选 2 + 功能 1-3）。
 
-用 `gh repo edit <owner>/<repo> --add-topic dsh --add-topic <功能词> ...`
-打标签。
+用 `gh repo edit <owner>/<repo> --add-topic dsh-plugin --add-topic deepseek-harness
+--add-topic <功能词> ...` 打标签。
 
 **发布检查清单**（分享仓库前）：
 - [ ] `package.json#main`/`exports` 指向 entry；`dsh.bundle.patch` → `cordis.patch.yml`
 - [ ] 门禁通过（`scripts/gates/run.mjs`）——仓库自带门禁
 - [ ] README 有安装（`dsh plugin --profile web add` 含具体 ref）、使用、能力表
-- [ ] 仓库 description + topics 已设置（见上）
+- [ ] 仓库 description = 一句话"是什么 + 能干什么"（**无安装命令样板**）
+- [ ] 仓库 topics 至少含 `dsh-plugin` 与 `deepseek-harness`，另加 1-3 个功能词
 - [ ] 安装冒烟：装 → 挂载 → boot log 干净
 
 ## Step 6：开发规范
