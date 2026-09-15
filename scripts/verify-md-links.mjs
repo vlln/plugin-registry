@@ -15,7 +15,11 @@ const mdFiles = globSync('**/*.md', { cwd: repoRoot, ignore: ['node_modules/**',
 const failures = []
 
 for (const file of mdFiles) {
-  const text = readFileSync(join(repoRoot, file), 'utf8')
+  const raw = readFileSync(join(repoRoot, file), 'utf8')
+  // 先跳过**围栏代码块**：里面的"链接"是示例文本，不是真链接。文档模板里常有一行
+  // 就是 `<占位符>` 的写法，它会被下面的 autolink 规则误吞（本脚本曾经因此直接抛
+  // TypeError 而不是报错——坏的不是文档，是匹配）。
+  const text = raw.replace(/^(?:```|~~~)[\s\S]*?^(?:```|~~~)/gm, '')
   // Markdown link destinations: [text](dest) and bare <dest> in link position.
   // The bare form excludes HTML tags (<p …>, </div>, <br>): a tag name is a
   // letter run followed by whitespace or '>', which a URL/relative path never
@@ -23,7 +27,9 @@ for (const file of mdFiles) {
   const linkRe = /\[[^\]]*\]\(([^)]+)\)|^<(?!\/?[a-zA-Z]+[\s>])[^>]+>$/gm
   let match
   while ((match = linkRe.exec(text)) !== null) {
-    const dest = (match[1] ?? match[2]).trim()
+    // 裸形式 `^<dest>$` 整段都在 match[0] 里（没有捕获组）——旧写法只读 match[1]/[2]，
+    // 命中裸形式时两者都是 undefined，于是 .trim() 抛 TypeError。
+    const dest = (match[1] ?? match[2] ?? match[0].replace(/^</, '').replace(/>$/, '')).trim()
     if (dest === '' || dest.startsWith('#')) continue
     if (/^[a-z]+:/i.test(dest)) continue // external URL or mailto
     const [pathPart, anchor] = dest.split('#')

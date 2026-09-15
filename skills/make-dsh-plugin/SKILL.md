@@ -170,6 +170,51 @@ npm 包（或 git 源）是分发单元——设置好让用户能找到并安�
 - [ ] 仓库 description = 一句话"是什么 + 能干什么"（**无安装命令样板**）
 - [ ] 仓库 topics 至少含 `dsh-plugin` 与 `deepseek-harness`，另加 1-3 个功能词
 - [ ] 安装冒烟：装 → 挂载 → boot log 干净
+- [ ] **在官方 Discussions 发一条介绍**（见下）——仓库建好不等于有人知道
+
+### 发布后：在官方 Discussions 发一条介绍
+
+官方仓库的 Discussions 有专门的 **`Show Your Plugins!`** 分类（`deepseek-harness`
+的 discussion 列表：<https://github.com/deepseek-ai/deepseek-harness/discussions>）。
+仓库建好只等于"可以被装"，而用户实际是在那里发现插件的——**发一条介绍是发布流程的
+最后一格**，不是可选项。
+
+**发之前先核实分类还在**（分类名会被维护者改，写死中文名会发错板块）：
+
+```sh
+gh api graphql -f query='{ repository(owner: "deepseek-ai", name: "deepseek-harness") {
+  hasDiscussionsEnabled discussionCategories(first: 20) { nodes { name slug } } } }'
+```
+
+**发**（`gh discussion` 是 preview 命令，但非交互用法稳定；`-c` 收分类名或 slug）：
+
+```sh
+gh discussion create --repo deepseek-ai/deepseek-harness \
+  --category show-your-plugins \
+  --title "<插件名>：<一句话价值主张>" \
+  --body-file /tmp/plugin-announce.md
+```
+
+正文骨架（**一屏读完**，比 README 短得多——这里只是"要不要点进去"的入口）：
+
+    一句话：这是什么、解决什么问题
+
+    安装：dsh plugin --profile web add github:<owner>/<repo>（装完重启 web）
+
+    一张截图，或两三行"用起来是什么样"——有 UI 的插件放图，纯 CLI 放示例输出
+
+    仓库：https://github.com/<owner>/<repo>
+
+**etiquette（这几条比格式重要）**：
+
+- **一个插件一条**：更新插件就**编辑原帖**（`gh discussion` 目前没有 edit 子命令，
+  用网页编辑），不要重复发新帖刷屏。
+- **先确认仓库已公开**：讨论帖指向的仓库必须已经 push 且 public，否则点进去是 404。
+- **一条帖 = 一个动作**：标题别堆关键词（`<名为> <best> <plugin>` 那种），
+  与仓库 description 同一条纪律——一句话是什么 + 能干什么。
+- **认真回答问题**：有人在帖子里提问就是最常见的反馈来源，回帖比再发一条介绍有用。
+- ⚠️ **这是对外可见的动作**（公开仓库的公开帖），发布前要有用户的明确同意；
+  本机验证通过不等于可以发帖。
 
 ## Step 6：开发规范
 
