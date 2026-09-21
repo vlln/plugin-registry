@@ -2,6 +2,14 @@
 
 本仓库（plugin-registry：薄控制台 + 文档 + skill）的变更记录。机制件改动在官方 snapshot 宿主仓库的历史机制分支按提交记录（0809 转向后不再有机制件），本表汇总交付。
 
+## 2026-09（make-dsh-plugin：补「源码/master ≠ 已发布 rc」——v3.3.0）
+
+在 0.1.5-rc.2 上做一次真实插件发布冒烟时踩到的跨版本陷阱，回灌为 gotchas 8：
+
+- ⚠️ **同一事实在 master 与发布 rc 之间可以完全相反**（实测三例）：`.credentials.yaml` 的 `version` 在**发布版 0.1.5-rc.2 要数字 `1`**、同时刻 master 源码**要字符串 `"1"`**（两种报错文案都拿到过）；headless 组合是否含 workflow 引擎 provider 随版本变（0.1.2 无 / 0.1.5 有）；`dsh web --no-open` 在 0.1.2 是 web 选项、0.1.5 的 web 与启动器 help 里都没有
+- ⚠️ **验证环境用安装版 rc，不要用源码 checkout**：直接 `node apps/cli/lib/bin.js` 跑源码时，隔离 `DSH_HOME` 的 profiles 层 fallback 只镜像到**安装目录**的依赖，而仓库根 `node_modules/@deepseek-ai` 只有零星几个包（安装版 200+）⇒ 官方包集体解析失败、整树 `plugin tree failed to load` 且错误全指向官方包，极易误判成自己的插件坏了
+- 📌 SKILL.md「版本与权威来源」加注：官方文档跟 master、可能领先于已安装 rc，冲突时**以安装的运行时为准**并把差异与版本号写回来；install-and-verify 的验证纪律同步指向 gotchas 8
+
 ## 2026-09（make-dsh-plugin 对齐 0.1.5-rc.2——官方文档已成契约权威，skill 改定位，v3.2.0）
 
 以本地 0.1.5-rc.2 源码（harness clone，root version 与发布版一致）+ 官方 `docs/user/develop/` 逐条核对 skill 断言：

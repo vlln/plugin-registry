@@ -10,7 +10,7 @@ description: >
 license: MIT
 metadata:
   author: vlln/plugin-registry
-  version: "3.2.0"
+  version: "3.3.0"
 requires:
   bins:
     - dsh
@@ -31,7 +31,8 @@ repository-plugin、`__ModuleLoader__` 之外的旧协议、`dsh registry` CLI�
 
 ## 版本与权威来源
 
-**机制契约的版本权威是官方文档**（随基线更新，优先于本 skill 的复述；发现冲突时以官方为准并回来更新本 skill）：
+**机制契约的版本权威是官方文档**（随基线更新，优先于本 skill 的复述；发现冲突时以官方为准并回来更新本 skill）。
+⚠️ 但**官方文档与源码 checkout 跟的是 master，可能领先于用户实际安装的 rc**——两者冲突时以**安装的运行时**为准，并把差异与版本号写回来（实例见 [gotchas.md](references/gotchas.md) 8）。
 
 | 主题 | 官方位置（`deepseek-ai/deepseek-harness` 仓库内） |
 |---|---|

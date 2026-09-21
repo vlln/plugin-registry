@@ -140,3 +140,19 @@ grep -rn "workflowEngine" <dsh 安装>/node_modules/@deepseek-ai/*/lib/*.js | he
 ```
 
 **纪律**：服务名与 `inject` 声明都以**当前安装的基线**为准，逐条核实；升级基线时把这类字面量当回归点重查（`grep -rn "ctx.get('" src/`）。
+
+## 8. 源码/master ≠ 已发布 rc（同一条事实可以完全相反）
+
+官方文档与源码 checkout 跟的是 **master**，而用户装的是**已发布的 rc**——两者会不一致，且不一致处往往就在你最需要确定的那一格。三个实测实例（都在 0.1.5-rc.2 时段）：
+
+| 事实 | 发布版 0.1.5-rc.2 | 同时刻的 master 源码 |
+|---|---|---|
+| `.credentials.yaml` 的 `version` | 要**数字** `1`（报 `declares version "1"; this build reads version 1`） | 要**字符串** `"1"`（报 `must be a string`） |
+| headless 组合是否含 workflow 引擎 provider | **含**（`--dump-config` 可见 `dsh-workflow-worker-thread` + `dsh-tool-workflow`） | — |
+| `dsh web --no-open` | web 与启动器的 `--help` 里都**没有**该 flag，启动会直接开浏览器 | — |
+
+**纪律**：
+
+- 结论**绑定具体基线版本号**（"0.1.5-rc.2 实测"而不是"最新版"）；跨 rc 复核前不要把旧结论当事实用。
+- 与官方文档冲突时，**以实际安装的运行时为准**（文档领先是常态），并把差异写回来。
+- 验证环境用**安装版 dsh**（`npm i @deepseek-ai/dsh@<rc>` / `npx -p … dsh`）。直接跑源码 checkout（`node apps/cli/lib/bin.js`）在隔离 `DSH_HOME` 里会失败：profiles 层 fallback 镜像的是**安装目录**的依赖，而仓库根 `node_modules/@deepseek-ai` 只有零星几个包（安装版有 200+），于是官方包集体解析失败、整树 `plugin tree failed to load`，错误全指向官方包——**极易误判成自己的插件坏了**。
