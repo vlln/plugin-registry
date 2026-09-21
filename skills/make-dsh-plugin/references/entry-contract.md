@@ -39,7 +39,7 @@ my-plugin/
 ```
 
 - **`dsh.bundle.patch`**：指向 `cordis.patch.yml`（组合层，含 `- insert: - id: <自身> name: <包名>`）——声明即 bundle，进 profile 层栈
-- **`dsh.client`**：`platform: web`——client-modules 只扫描声明它的包（0811 起无声明不进 `__DSH_BOOT__`）
+- **`dsh.client`**：`platform: web`——client-modules 只扫描声明它的包（0811 起无声明不进 `__DSH_BOOT__`）。其余现行字段：`inject`（消费的其他 client 模块）、`external`（本行消费的 client 包，用于排模块图顺序；**不得声明自己**）。client 包 extends `tsconfig.base.client.json` 并用共享 tsdown preset（`packages/client/tsdown.client.ts`）
 - **`exports["./client"]`**：client bundle 路径（`__ModuleLoader__.load` 注册的构建产物）
 - **`main`/`exports["."]`**：指向 Cordis entry（`name`/`inject`/`apply`）
 - **`inject` 声明 `ctx.get` 用到的全部服务**（`settings`/`httpServer` 等）——0811 cordis 严格注入，未声明即抛错
@@ -53,7 +53,7 @@ my-plugin/
 "dsh": { "skills": ["./skills/foo/SKILL.md", "./skills/bar/SKILL.md"] }
 ```
 
-**当前基线的实测事实（2026-09，dsh 0.1.2-rc.1）**：`dsh.skills` **没有任何消费方**，声明它不会注册 skill；skill 的实际发现路径是**文件系统根**（`<项目>/.dsh/skills`、`<项目>/.agents/skills`、`$DSH_HOME/skills`、`~/.agents/skills`，外加 custom 与 bundled 两类）。核实某基线是否已支持，用一次全量搜（零命中 = 未支持）：
+**实测事实（0.1.2-rc.1 与 0.1.5-rc.2 两版均核实）**：`dsh.skills` **没有任何消费方**——声明它不会注册 skill。skill 的实际发现路径是**文件系统根**（`<项目>/.dsh/skills`、`<项目>/.agents/skills`、`$DSH_HOME/skills`、`~/.agents/skills`，外加 custom 与 bundled 两类）。核实某基线是否已支持，用一次全量搜（零命中 = 未支持）：
 
 ```sh
 grep -rln "dsh\.skills" <dsh 安装>/node_modules/@deepseek-ai/ | head
@@ -63,15 +63,11 @@ grep -rln "dsh\.skills" <dsh 安装>/node_modules/@deepseek-ai/ | head
 
 **SKILL.md 写法**（make-skill 规范）：frontmatter（`name` 1-64 小写连字符、`description` 祈使句「Use this skill when...」、可选 `metadata`/`requires`）+ 正文结构（Tool Wrapper / Generator / Reviewer / Inversion / Pipeline 模式），<500 行，细节 progressive disclosure 到 `references/`。仓库 README 用表格列 skill。
 
-### dsh.mcpServers（MCP server）
+### MCP server
 
-```json
-"dsh": { "mcpServers": {
-  "my-server": { "command": "node", "args": ["./mcp/my-server.js"], "env": {} }
-} }
-```
+**MCP 不是包 manifest 字段**——不存在 `dsh.mcpServers`（0.1.5-rc.2 全仓 `ts`/`json`/`md` 零命中）。现行可用形态：CLI 随附 **`@deepseek-ai/dsh-mcp-client`**，由 **patch 层的行**逐台配置服务器，把外部 MCP 工具桥接进 `ctx.tools`（名称形如 `mcp__<server>__<tool>`）；**默认不启用任何服务器**，且只桥接工具（资源与提示词不支持）。每条服务器命令都是 agent 沙箱之外的受信任可执行代码，因此由用户显式开启。
 
-server 是 stdio MCP server（stdin/stdout 上 JSON-RPC），逻辑在 `mcp/`。**确切的 schema 字段（`command`/`args`/`env`、允许的 transport）是官方格式细节——发布前对照当前官方 spec 验证**（本文件给出标准 MCP 形态，官方字段以实证为准）。
+另注：Session／SDK 层确有 `mcpServers` 参数，但**非空值未实现**（会话桥以"扩大 workspace scope"为由拒绝）。配置字段以 `packages/mcp/mcp-client/README.md` 与 CLI 行为参考为准。
 
 ## Node half——Cordis entry
 

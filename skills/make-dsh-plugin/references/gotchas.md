@@ -2,6 +2,8 @@
 
 领域特定事实，违反合理假设——**先读本文再动手**。每条都是插件开发实测踩过并修复的（决策记录可溯）。本文件是 SKILL.md 的深读材料。
 
+**事实带基线**：条目内标注核实时的 dsh 版本（无标注者已在 **0.1.5-rc.2** 复核；写明 0.1.2-rc.1 等早期版本的条目为当时实测）。机制契约以官方文档为准（见 SKILL.md「版本与权威来源」）；升级基线时逐条重核。
+
 ## 1. 官方包在公共 npm 可见，但仍不可单独安装（依赖闭包由挂载环境提供）
 
 `@deepseek-ai/*` 官方包在公共 npm 可见（`latest` = `0.0.1-rc.1`，另有 `next`/`alpha` 与各 rc 线，如 `0.1.2-rc.1`），但**单独安装不成立**：`@deepseek-ai/dsh-tools@0.1.2-rc.1` 自带 9 个 peer（`@deepseek-ai/cordis`、`dsh-agent`、`dsh-code-runtime`、`dsh-invariants`、`dsh-llm`、`dsh-session`、`dsh-scope`、`dsh-system-prompt`、`dsh-user-approval`）——`npm install` 直接 ERESOLVE 失败（`Could not resolve dependency: peer @deepseek-ai/cordis@"^4.0.2" from @deepseek-ai/dsh-agent`）；要装通就得把整条闭包声明进来，等于把插件版本号与官方版本硬耦合，且每次基线升级都要重对齐。
@@ -40,18 +42,26 @@ bundle（见 whale-girl 仓库决策记录）。
 另两个 git 安装实测坑：monorepo 子目录语法是 `#<ref>&path:/<子目录>`（`path:` 前缀 + 前导 `/`，漏写或写成 `&path=dir` 都解析失败）；bundle 的 peer **不要声明 `@deepseek-ai/*` 官方包**——git 安装时若有 prepare 构建，`npm install` 会在官方包的 peer 闭包上 ERESOLVE 失败（见 1）。
 **Windows 专属坑（#20）**：`dsh plugin` 在 win32 经 cmd.exe 转发参数，`&` 是命令分隔符——`#<ref>&path:/...` 会被拆开而失败（`ERR_PNPM_INVALID_DEPENDENCY_NAME`）。给用户的安装说明用**不带 `&` 的 `#path:/<子目录>` 形式**（pnpm 原生语法，取默认分支 HEAD，跨平台）；钉分支的 `#<commit>&path:/...` 仅 POSIX 可用，Windows 需绕开 dsh 转发（profile 目录内 `pnpm add "github:...#<commit>&path:/..."` 再 `dsh plugin --profile web install`）。
 
-安装说明应写清子目录语法与 allowBuilds 步骤（见 [bundle-plugins.md](bundle-plugins.md)「安装与管理」）。
+安装说明应写清所选渠道与相应前置条件（见 [bundle-plugins.md](bundle-plugins.md)「安装与管理」与官方 publish 文档）。
+
+**另两条渠道（不需要用户放行构建权限）**：**npm 预构建**（`pnpm publish` 时构建好 `lib/`，用户 `dsh plugin add <pkg>` 拿到的是产物）；**tarball**（`pnpm pack` 出包，用户 `dsh plugin add ./x-0.1.0.tgz`）。
+
+**`allowBuilds` 的安全语义必须写进安装说明**：它是**允许该包在安装时于用户机器上执行代码**，且不在 agent 运行的任何沙箱之内——只对源码可信的包放行，并建议用户钉 commit（`github:you/plugin#<sha>`）让后续推送无法悄悄改变实际运行的内容。
 
 ## 1b. bundle 插件的 patch 层语义
 
-同名 `cordis.patch.yml` 出现在**三个层**，属主不同，写错层是 bundle 特有坑：
+同名 `cordis.patch.yml` 出现在**多个层**，属主不同，写错层是 bundle 特有坑。生效顺序（后应用者按行胜出）：
 
-| 层 | 位置 | 属主 | 用途 |
-|---|---|---|---|
-| bundle 包内 | `packages/bundle/*/cordis.patch.yml` | 产品开发者 | 定义组合行（插件声明） |
-| profile 层 | `$DSH_HOME/profiles/web/cordis.patch.yml` | 用户 | insert 行（纯插件挂载）+ 启停覆盖（`disabled` 标记），配置 HMR watched |
+| # | 层 | 位置 | 属主 | 用途 |
+|---|---|---|---|---|
+| 1 | 各组合包 patch | 各 bundle 包内 `cordis.patch.yml`，按 `dsh.profile.bundles` 列表顺序 | 产品开发者 | 定义组合行（插件声明） |
+| 2 | profile 层 | `$DSH_HOME/profiles/<name>/cordis.patch.yml` | 用户 | insert 行（纯插件挂载）+ 启停覆盖（`disabled` 标记） |
+| 3 | home 层 | `$DSH_HOME/cordis.patch.yml` | 用户 | 各 profile 共享的机器本地偏好 |
+| 4 | `--patch <path>` overlay | 按 argv 顺序 | 用户 | 一次性实验覆盖 |
 
-bundle 插件的**启停覆盖写 profile 层**，不要写进 bundle 包内层（产品层不该动）。0811 起无 home 层 repository 列表。
+两条语义容易踩：**patch 按行（`id`）覆盖，且替换该行的整个 `config`——不是深合并各键**，所以覆盖别人的行必须重述它需要的每一个键；**bundle 的启停覆盖写 profile 层**，不要写进 bundle 包内层（产品层不该动）。
+
+**`patchReload` 的作用域**：它管的是**用户 patch 文件**的热重载（web profile 模板默认 `live`），**不含** `dsh.profile.bundles` 层栈——装/删 bundle 后层栈仍在 boot 时合成，需重启 web（见 2）。
 
 ## 1d. npm 版 dsh 兼容性（2026-08-11 实测，0.0.1-rc.1）
 

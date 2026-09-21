@@ -10,7 +10,7 @@ description: >
 license: MIT
 metadata:
   author: vlln/plugin-registry
-  version: "3.1.0"
+  version: "3.2.0"
 requires:
   bins:
     - dsh
@@ -29,6 +29,32 @@ repository-plugin、`__ModuleLoader__` 之外的旧协议、`dsh registry` CLI�
 规范在 `dev-conventions.md`、坑在 `gotchas.md`）——开发不需要任何仓库文档。
 到达对应阶段时读对应 reference。
 
+## 版本与权威来源
+
+**机制契约的版本权威是官方文档**（随基线更新，优先于本 skill 的复述；发现冲突时以官方为准并回来更新本 skill）：
+
+| 主题 | 官方位置（`deepseek-ai/deepseek-harness` 仓库内） |
+|---|---|
+| 插件配置 / 打包 / 安装 / 发布 | `docs/user/develop/basic/config.md`、`basic/publish.md`、`basic/tool.md` |
+| 插件生命周期（服务 / 事件） | `docs/user/develop/framework/*` |
+| 运行时元数据、动态 Cordis | `docs/user/develop/practice/dynamic-cordis.md` |
+| 新增包 / 设置卡 | `docs/cookbook/adding-a-package.md`、`adding-a-settings-card.md` |
+| 层优先级 / flag / profile 机制 | `apps/cli/reference/README.md` |
+| 子系统地图 | `docs/subsystems/*.md`（extensions / skills / web-client / tools …） |
+
+**本 skill 保留两类官方文档不写的内容**：
+
+1. **发布与生态纪律**——发布检查清单、仓库 description/topics 规则、README 读者规则、门禁与决策记录、安装说明纪律（Step 5b / Step 6）；
+2. **实测坑与验证纪律**——`references/gotchas.md`（踩出来的领域事实）与 `references/install-and-verify.md`（含"负控"这类方法论）。
+
+**事实带基线**：本 skill 的实测事实标注核实时的 dsh 版本（当前 **0.1.5-rc.2**；带日期的早期条目为 0.1.2-rc.1）。
+升级基线时逐条重核——服务名、manifest 字段与安装行为都会变。
+
+**0.1.5 起官方新增的相邻能力**（本 skill 不展开，需要时读官方文档）：bundle 行可自带 CLI
+（`inject = ['cmdlineArgs']` + `parseCmdline`，启动器把同一份不可变参数快照交给每个插件）；
+`--from-default-profile <template>` 从随附模板建 profile；**extensions 子系统**（agent 定义带版本的
+Cordis 包并运行其 host 与浏览器两半，`tool-cordis` 查询运行时元数据）；**dynamic Cordis**（运行时写插件）。
+
 ## 何时使用
 
 - 用户想为 dsh 开发新插件（工具、skill 包、MCP server、事件监听、服务、
@@ -42,8 +68,8 @@ repository-plugin、`__ModuleLoader__` 之外的旧协议、`dsh registry` CLI�
 
 | 需求 | 官方路径 | 安装通道 | 起点 |
 |---|---|---|---|
-| 纯 skill 包（无代码） | npm 包 + `dsh.skills` | bundle（或 insert 行） | Step 2（skills） |
-| MCP server | npm 包 + `dsh.mcpServers` | bundle（或 insert 行） | Step 2（mcp） |
+| 纯 skill 包（无代码） | skill 走**文件系统发现根**（`dsh.skills` 字段在当前基线无消费方，见 [entry-contract.md](references/entry-contract.md)） | 复制/链接进发现根（`<项目>/.dsh/skills`、`.agents/skills`、`$DSH_HOME/skills`、`~/.agents/skills`） | Step 2（skills） |
+| MCP server | **不是包 manifest 字段**：CLI 随附 `@deepseek-ai/dsh-mcp-client` 供 **patch 层**使用，默认禁用（每条服务器命令是 agent 沙箱之外的受信任可执行代码） | patch 层 config | `apps/cli/reference/README.md` |
 | Node 工具 / 事件 / 服务 | npm 包 + Cordis entry（`main`） | insert 行（实时） | Step 3 |
 | Node + 浏览器 UI | npm 包 + Cordis entry + `dsh.client` | bundle | Step 3 + 4 |
 | 带组合层（多行 insert/config/disabled 随包分发） | npm 包 + `dsh.bundle` | bundle 层栈 | 读 `references/bundle-plugins.md` |
@@ -106,8 +132,13 @@ bundle 经 `__ModuleLoader__.load({id, factory})` 注册（factory 返回
 `{name, apply}`，由 client 内核挂载时调用 `apply(ctx)`）。自渲染 DOM 逻辑
 放 `apply` 内——**与填官方 hole 正交**（自渲染跑 bundle 照常，参考实现 `packages/plugin/console`）。
 
-构建：esbuild CJS 输出 + 外层 `window.__ModuleLoader__.load` 包装（对齐
-`packages/plugin/console` 的 tsdown banner/footer 模式）。
+`dsh.client` 的其余现行字段：`inject`（声明消费的其他 client 模块）、**`external`**
+（声明本行消费的 client 包，client-modules 用它排模块图顺序；**不得声明自己**——同包自引用会抛
+`a row must not declare its own package in dsh.client.external`）。client 包用共享构建形态：
+extends `tsconfig.base.client.json` + 共享 tsdown preset（`packages/client/tsdown.client.ts`）。
+
+构建：esbuild/tsdown CJS 输出 + 外层 `window.__ModuleLoader__.load` 包装（对齐
+官方 preset 的 banner/footer 模式）。
 
 **填官方设置面板（可选）**：`settings.plugin.item` 是 keyed 槽——`key` =
 Node half 注册的设置命名空间，卡片与官方插件卡片同列表渲染。暂存表单 +
@@ -122,10 +153,15 @@ Node half 注册的设置命名空间，卡片与官方插件卡片同列表渲�
 安装通道（写法细则见 `references/install-and-verify.md` 与
 `references/bundle-plugins.md`）：
 
-- **bundle**：`dsh plugin --profile web add <包路径/git 源>`——声明 `dsh.bundle`
-  的 npm 包；git 源一行（产物入库）或本地目录；装完**重启 web**
+- **bundle**：`dsh plugin --profile web add <包路径/git 源/npm 包/tarball>`——声明 `dsh.bundle`
+  的包；装完**重启 web**（层栈在 boot 合成；`patchReload` 只覆盖**用户 patch 文件**，不含
+  bundles 层栈）
 - **纯 cordis**：`dsh plugin --profile web add <包>` 装依赖 + profile
   `cordis.patch.yml` insert 行——**配置 HMR 实时挂载，零重启**
+- **四条发布渠道**（官方 [publish 文档](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.md)）：
+  ① 产物入库 + git 源（真一行）② `prepare` 脚本 + 用户为该包放行 `allowBuilds`
+  ③ npm 预构建 ④ `pnpm pack` 出的 tarball（`dsh plugin --profile web add ./x-0.1.0.tgz`）。
+  ②的授权语义是**允许该包在安装时于用户机器上执行代码**（不在 agent 沙箱内）——安装说明里要写明并建议钉 commit。
 
 **写安装说明时必须给出用户可直接复制的命令**；验证按改动面（哪些需重启
 web vs 只刷新）与挂载失败排查见 `references/install-and-verify.md`。

@@ -2,6 +2,18 @@
 
 本仓库（plugin-registry：薄控制台 + 文档 + skill）的变更记录。机制件改动在官方 snapshot 宿主仓库的历史机制分支按提交记录（0809 转向后不再有机制件），本表汇总交付。
 
+## 2026-09（make-dsh-plugin 对齐 0.1.5-rc.2——官方文档已成契约权威，skill 改定位，v3.2.0）
+
+以本地 0.1.5-rc.2 源码（harness clone，root version 与发布版一致）+ 官方 `docs/user/develop/` 逐条核对 skill 断言：
+
+- ⚠️ **删除不存在的字段**：`dsh.mcpServers` 不是包 manifest 字段（0.1.5 官方仓库全量搜零命中）。现行形态是 CLI 随附 `@deepseek-ai/dsh-mcp-client` 供 **patch 层**配置、**默认不启用**（每条服务器命令是 agent 沙箱之外的受信任可执行代码）。SKILL Step 0 形态表与 entry-contract 同步改写
+- ⚠️ **`dsh.client` 补现行要素**：`external`（本行消费的 client 包，用于排模块图顺序；**不得声明自己**，否则 client-modules 抛错）；client 包 extends `tsconfig.base.client.json` + 共享 tsdown preset
+- ⚠️ **patch 层语义补全（gotchas 1b）**：生效顺序是 4 层——profile bundles → profile `cordis.patch.yml` → **home 层 `$DSH_HOME/cordis.patch.yml`** → `--patch` overlay；**patch 按行覆盖并替换整行 `config`（不是深合并）**；`patchReload` 只覆盖**用户 patch 文件**，bundles 层栈仍 boot 合成（故装/删 bundle 需重启 web）
+- ⚠️ **安装渠道与安全语义（gotchas 1c / bundle-plugins）**：四条渠道——产物入库 git 源 / `prepare`+`allowBuilds` / npm 预构建 / `pnpm pack` tarball；`allowBuilds` 的语义是**允许该包在安装时于用户机器上执行代码（沙箱之外）**，安装说明须写明并建议钉 commit
+- 📌 **skill 改定位（SKILL.md 新增「版本与权威来源」）**：机制契约交给官方文档（`docs/user/develop/basic/{config,tool,publish}`、`framework/*`、`practice/*`、`docs/cookbook/adding-a-*`、`apps/cli/reference/README.md`、`docs/subsystems/*`），skill 只保留官方不写的两类——**发布与生态纪律**（检查清单/description·topics/README 读者规则/门禁/决策记录/安装说明纪律）与**实测坑与验证纪律**；事实一律带基线标注
+- 📌 **记录 0.1.5 新增的相邻能力**：bundle 行自带 CLI（`cmdlineArgs` + `parseCmdline`）、`--from-default-profile <template>`、extensions 子系统（agent 定义带版本 Cordis 包、host/浏览器两半、`tool-cordis`）、dynamic Cordis
+- ✅ **复核后仍然成立的断言**：`dsh.skills` 两版（0.1.2-rc.1 / 0.1.5-rc.2）皆无消费方，skill 走文件系统发现根；依赖三字段全空 + `$DSH_HOME/profiles/node_modules` 扁平 fallback 与安装位置可达性；严格注入（缺 `inject` 启动即崩）；服务名 `workflowEngine`；repository 插件机制仍未回归
+
 ## 2026-09（make-dsh-plugin 回灌——一次真实发布暴露的 4 条新坑 + 验证三条硬规矩，skill v3.1.0）
 
 一次实际发布（`vlln/evo-engineering`：零依赖 bundle 插件 + 随包 skill）暴露的规范缺口，逐条回灌进 skill：

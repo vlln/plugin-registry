@@ -4,6 +4,10 @@
 reference 实现：`vlln/dsh-loop` 的设置卡片 + 动态工具门）。分两个 half：
 Node half 注册设置命名空间；client half 注册 keyed 槽卡片 + 传输。零官方改动。
 
+> 官方文档现已覆盖同一主题：[`docs/cookbook/adding-a-settings-card.md`](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cookbook/adding-a-settings-card.md)
+> （`settings.plugin.item` 槽名与 `ctx.settingsScope` 读写语义一致，0.1.5-rc.2 核实）。
+> 与官方冲突时以官方为准；本文件保留的是实测细节与踩坑。
+
 ## 1. 契约锚点（当前态）
 
 - `settings.plugin.item` 是 **keyed 槽**（ui-settings-plugins 的

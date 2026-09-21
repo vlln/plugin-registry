@@ -35,6 +35,8 @@ dsh plugin --profile web add <包>       # 装依赖（进 profile node_modules�
 
 bundle 插件同此表；额外确认挂载后 `__DSH_BOOT__` 含 client 行、`/plugins/<id>/client.js` 200（若带 client half）、无 `loaded without registering` 报错。
 
+**装/删 bundle 需重启 web**：层栈（`dsh.profile.bundles`）在 boot 时合成；`patchReload` 只覆盖**用户 patch 文件**的热重载，不含层栈。精确的层优先级、flag 与 profile 机制以官方 [CLI 行为参考](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/cli/reference/README.md)为准。
+
 ## 验证的三条硬规矩
 
 1. **boot 干净 ≠ 功能可用**。依赖解析失败与服务名写错在 boot 期**看不见**（服务惰性读取，错误只在调用时抛）——插件照样装载、工具照样注册。因此「URL 正常输出 + 日志无 `plugin tree failed to load`」是必要不充分，**必须真调一次工具/命令**看返回。

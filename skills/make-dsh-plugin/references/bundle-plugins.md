@@ -59,9 +59,12 @@ bundle 插件是**独立 npm 包**（或包目录），声明 `dsh.bundle`：
   ❌ 不要写未构建且无 prepare 的 git 源（缺产物挂载失败）；`git+file://` 本地可达但不是分发形态（对远端用户不可用），别写进安装说明。
   ⚠️ **Windows**：`dsh plugin` 在 win32 经 cmd.exe 转发参数，`&` 是命令分隔符——`#<commit>&path:/...` 会被拆开而失败（`ERR_PNPM_INVALID_DEPENDENCY_NAME`）。**给用户的安装说明应写不带 `&` 的 `#path:/<子目录>` 形式**（pnpm 原生语法，取默认分支 HEAD，实测 plugin-registry console 即 `github:vlln/plugin-registry#path:/packages/plugin/console`，跨平台可用）；需钉分支时 POSIX 用 `#<commit>&path:/...`，Windows 用户在 profile 目录内直接 `pnpm add "github:...#<commit>&path:/..."` 再 `dsh plugin --profile web install`（绕开 dsh 转发）。
 
-**写安装说明时**（README/skill 输出）：给出**用户能直接复制执行**的命令——本地路径写清 bundle 子目录与构建前提；git 源写清子目录语法（`&path:/`）、prepare 构建与 `allowBuilds` 放行。不要给「指向仓库根」或「臆造协议」的说明。
+- **两条不需要构建授权的渠道**：**npm 预构建**（`pnpm publish` 时构建好 `lib/`，用户 `dsh plugin add <pkg>` 拿到产物）与 **tarball**（`pnpm pack` 出包，用户 `dsh plugin add ./x-0.1.0.tgz`）。
+- **`allowBuilds` 的安全语义要写进安装说明**：放行 = 允许该包在安装时于用户机器上执行代码，且不在 agent 沙箱内；只对可信源码放行，并建议钉 commit（细节见 [gotchas.md](gotchas.md) 1c）。
 
-- **启停/两层归属**：同名 `cordis.patch.yml` 两层（bundle 包内声明 / profile 层用户 insert+启停）别写错层，见 [gotchas.md](gotchas.md) 1b
+**写安装说明时**（README/skill 输出）：给出**用户能直接复制执行**的命令——本地路径写清 bundle 子目录与构建前提；git 源写清子目录语法（`&path:/`）、prepare 构建与 `allowBuilds` 放行；并说明**装完要重启 web**（层栈 boot 合成）。不要给「指向仓库根」「裸本地目录」或「臆造协议」的说明。
+
+- **启停/多层归属**：同名 `cordis.patch.yml` 出现在多个层（bundle 包内声明 / profile 层 / home 层 / `--patch` overlay）别写错层，见 [gotchas.md](gotchas.md) 1b
 
 ## 验证
 
