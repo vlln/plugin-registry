@@ -6,7 +6,9 @@
 
 - 机械检查 + 自证测试：每个门禁有用非法样例证明会拒绝的测试。
 - 门禁清单权威在 `scripts/gates/run.mjs`；按改动面跑**最窄**证据，不默认跑全套。
-- 常见门禁：md-links / decisions / assets / spec-states / config-sync / generated-freshness / unit-tests / gate-self-tests。
+- 常见门禁：md-links / decisions / assets / spec-states / config-sync / generated-freshness / unit-tests / gate-self-tests，外加两类实战发现值得默认带的：
+  - `package-contract`——入口与 bundle patch 指向真实文件、`cordis.patch.yml` 的 insert 行与包名**同源**、`dependencies`/`peerDependencies` 不得出现官方包（见 [gotchas.md](gotchas.md) 1）。这类"包名三处同名"的契约靠人眼盯很容易漏。
+  - `no-machine-paths`——**发布卫生**：入库文件不得含本机绝对路径与凭据（发布前扫一遍，比事后从历史里清便宜得多）。
 
 ## 决策记录
 

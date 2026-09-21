@@ -10,7 +10,7 @@ description: >
 license: MIT
 metadata:
   author: vlln/plugin-registry
-  version: "3.0.0"
+  version: "3.1.0"
 requires:
   bins:
     - dsh
@@ -75,8 +75,13 @@ my-plugin/
 - `dsh.bundle.patch` → `cordis.patch.yml`（组合层，含 `- insert: - id: <自身> name: <包名>`）
 - `dsh.client` 声明（platform web）+ `exports["./client"]`（有 client half 时）
 - `main`/`exports["."]` 指向 Cordis entry（`name`/`inject`/`apply`）
+- `dependencies`/`peerDependencies`/`devDependencies` **三处都留空**——官方包由挂载环境注入（理由与本地 link 配方见 [gotchas.md](references/gotchas.md) 1）
 - `inject` 声明 `ctx.get` 用到的全部服务（`settings`/`httpServer` 等）——
-  **0811 cordis 严格注入**：未声明即抛 `cannot get property without inject`
+  **0811 cordis 严格注入**：未声明即抛 `cannot get property without inject`。
+  缺 `inject` 不是"某个功能不可用"，而是**启动即崩**（整个 entry 装载失败、profile 起不来），
+  而手写 mock ctx 的单测**照不出来**——必须真启动一次 profile 才算验证过（Step 5）
+- 服务名字面量（`ctx.get('…')`）以**当前基线**为准逐条核实：官方会跨 rc 改名，
+  写错的症状是"boot 干净但调用时报缺服务"（[gotchas.md](references/gotchas.md) 7）
 
 ### Skill 包（`dsh.skills`）与 MCP server（`dsh.mcpServers`）
 
@@ -91,7 +96,8 @@ make-skill）见 `references/entry-contract.md` 对应小节——不要发明�
 运行时的职责（`@deepseek-ai/*`、`cordis`——profile pnpm 闭包注入，勿声明）。
 在 `ctx.effect()`/`ctx.on()` 内注册，disable 时清理。
 
-**检查点**：entry 可解析；工具已注册；inject 声明完整。
+**检查点**：entry 可解析；工具已注册；inject 声明完整；**在真实 profile 里启动过一次**
+（boot 不报 `plugin tree failed to load`）——缺 `inject`、服务名写错这类问题只有真启动才暴露。
 
 ## Step 4：Client half（可选）——自渲染
 
@@ -123,6 +129,19 @@ Node half 注册的设置命名空间，卡片与官方插件卡片同列表渲�
 
 **写安装说明时必须给出用户可直接复制的命令**；验证按改动面（哪些需重启
 web vs 只刷新）与挂载失败排查见 `references/install-and-verify.md`。
+
+**三条硬规矩**（该文件详述，这里先记住结论）：
+
+1. **boot 干净 ≠ 功能可用**——依赖解析失败、服务名写错在 boot 期看不见（服务惰性读取），
+   **必须真调一次工具/命令**；
+2. **先做负控**——装一份故意弄坏的副本，确认日志会响亮报错；只有负控响过，"干净日志"
+   才算证据；
+3. **mock ctx 单测不能替代真实装载**——它不施加严格注入门禁，缺 `inject` 的启动即崩
+   照不出来。
+
+**零依赖包的安装说明只给 git 源**：本地目录装的包落在 profile 树外时官方包解析不到，
+会拖垮整个 profile 启动（[gotchas.md](references/gotchas.md) 6）；本地目录安装只用于开发自测，
+且要先 link SDK。
 
 ## Step 5b：发布到 GitHub
 
@@ -162,14 +181,18 @@ npm 包（或 git 源）是分发单元——设置好让用户能找到并安�
 --add-topic <功能词> ...` 打标签。
 
 **发布检查清单**（分享仓库前）：
-- [ ] `package.json#main`/`exports` 指向 entry；`dsh.bundle.patch` → `cordis.patch.yml`
-- [ ] 门禁通过（`scripts/gates/run.mjs`）——仓库自带门禁
+- [ ] `package.json#main`/`exports` 指向 entry；`dsh.bundle.patch` → `cordis.patch.yml`；
+      `dsh.bundle.patch` 的 insert 行与包名同源；**依赖三字段为空**（[gotchas.md](references/gotchas.md) 1）
+- [ ] 门禁通过（`scripts/gates/run.mjs`）——仓库自带门禁，含自证测试
 - [ ] README 有安装（`dsh plugin --profile web add` 含具体 ref）、使用、能力表
 - [ ] README **只含面向使用者的内容**——工程备忘录（机制/验证证据/踩坑）已移到
       `AGENTS.local.md`、代码注释或 `docs/engineering-notes.md`，README 只留一句指针
+- [ ] **安装冒烟含一次真实工具/命令调用**（boot 干净 ≠ 功能可用），且做过负控
+      （[install-and-verify.md](references/install-and-verify.md)「三条硬规矩」）
+- [ ] 面向用户的安装说明**只给 git 源**（零依赖包的本地目录装有前置条件，见
+      [gotchas.md](references/gotchas.md) 6）
 - [ ] 仓库 description = 一句话"是什么 + 能干什么"（**无安装命令样板**）
 - [ ] 仓库 topics 至少含 `dsh-plugin` 与 `deepseek-harness`，另加 1-3 个功能词
-- [ ] 安装冒烟：装 → 挂载 → boot log 干净
 - [ ] **在官方 Discussions 发一条介绍**（见下）——仓库建好不等于有人知道
 
 ### 发布后：在官方 Discussions 发一条介绍

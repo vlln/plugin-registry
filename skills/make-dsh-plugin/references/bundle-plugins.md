@@ -37,9 +37,10 @@ bundle 插件是**独立 npm 包**（或包目录），声明 `dsh.bundle`：
 
 ## 依赖解析
 
-- bundle 插件 `dependencies` **声明为空是设计**——`@deepseek-ai/*` 官方包由 profile 的 pnpm 闭包在挂载时注入
-- **不要声明官方包**：声明了公共 npm 解析不到反而失败——官方包由 profile 的 pnpm 闭包挂载时注入（`$DSH_HOME/profiles/node_modules` flat fallback）
-- 本地装 bundle 需官方 monorepo 构建产物 link 进 profile（见 [gotchas.md](gotchas.md) 1）
+- `dependencies` / `peerDependencies` / `devDependencies` **三处都留空是设计**——`@deepseek-ai/*` 与 `cordis` 由 profile 的 pnpm 闭包在挂载时注入（`$DSH_HOME/profiles/node_modules` 扁平 fallback）
+- **不要声明官方包**：它们在公共 npm 虽可见，但自带整条 peer 闭包，单独安装必然 ERESOLVE 失败（理由、semver 预发布坑与本地 link 配方见 [gotchas.md](gotchas.md) 1）
+- 解析可达性取决于**安装位置**：只有装在 profile 树内的包能向上找到那个 fallback（见 [gotchas.md](gotchas.md) 6）
+- 本地开发要跑插件代码时，把 SDK link 进**该包自己的** `node_modules`（配方见 [gotchas.md](gotchas.md) 1），再按下面的「本地目录」安装
 
 ## 安装与管理
 
@@ -50,6 +51,7 @@ bundle 插件是**独立 npm 包**（或包目录），声明 `dsh.bundle`：
   cd packages/my-bundle && dsh plugin --profile web add .   # 包目录内 add .（dsh 锚定 . 为绝对路径）
   ```
   ❌ 不要写仓库根（`dsh plugin --profile web add ./`）——根不是 npm 包，无 `dsh.bundle`。
+  ⚠️ **零依赖包的本地目录装有一个前置条件**：包的真实路径必须在 profile 树**外**时，官方包解析不到（Node 从包的真实路径向上找 `node_modules`）⇒ 装载期抛错、**整个 profile 起不来**。所以本地试装前先把 SDK link 进该包 `node_modules`（[gotchas.md](gotchas.md) 1），再按上面命令 add。**面向用户的安装说明只给 git 源**——别把裸的 `add .` / `add <绝对路径>` 写进 README（[gotchas.md](gotchas.md) 6）。
 - **git 源**：官方经 npm git 依赖语法解析（`github:owner/repo#<commit>&path:/<子目录>`、`git+https://github.com/owner/my-bundle.git#<commit>` 等 pnpm 语法均可用）。bundle 在 monorepo 子目录时用 **`#<commit>&path:/<子目录>`**（注意 `path:` 前缀 + 前导 `/`，实测 plugin-registry 的 console 即 `github:vlln/plugin-registry#main&path:/packages/plugin/console`）。**产物入库是推荐做法**（`lib/` 等构建产物提交进仓库，`files` 声明）——git 源安装不跑构建，产物直接可用，**真一行安装**（`dsh plugin --profile web add "github:owner/repo#ref&path:/packages/my-bundle"`，无额外步骤）。**产物不入库的备选**：带 `prepare` 脚本（如 `"prepare": "tsdown --config tsdown.config.ts"`）让 git 安装时自动构建——但 pnpm ≥10 默认阻止 git 依赖的 prepare，需按 dsh 提示把精确 key（**写入 yaml 时加引号**——含冒号，无引号 YAML 解析失败）加入 profile 的 `pnpm-workspace.yaml` `allowBuilds` 后重跑（多一步交互）。
   ```sh
   dsh plugin --profile web add "github:owner/my-bundle#<commit>&path:/packages/my-bundle"

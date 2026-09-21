@@ -2,6 +2,18 @@
 
 本仓库（plugin-registry：薄控制台 + 文档 + skill）的变更记录。机制件改动在官方 snapshot 宿主仓库的历史机制分支按提交记录（0809 转向后不再有机制件），本表汇总交付。
 
+## 2026-09（make-dsh-plugin 回灌——一次真实发布暴露的 4 条新坑 + 验证三条硬规矩，skill v3.1.0）
+
+一次实际发布（`vlln/evo-engineering`：零依赖 bundle 插件 + 随包 skill）暴露的规范缺口，逐条回灌进 skill：
+
+- ⚠️ **坑 1 重写（官方包可见但仍不可单独安装）**：`@deepseek-ai/*` 在公共 npm 可见（`latest` = `0.0.1-rc.1`，另有 `next`/`alpha` 与各 rc 线），但 `@deepseek-ai/dsh-tools@0.1.2-rc.1` 自带 9 个 peer（cordis / dsh-agent / dsh-llm / …）⇒ 单独 `npm install` 必 ERESOLVE。规范从"不要声明官方包（公共 npm 解析不到）"改为准确表述 + **依赖三字段全空** + 本地 link 配方 + "需要 SDK 的测试要能在缺席时优雅跳过"
+- ⚠️ **新坑 6（安装位置决定官方包可达性）**：真实解析源是 `$DSH_HOME/profiles/node_modules`（profiles 层扁平 fallback）；Node 从包的**真实路径**逐级向上找 `node_modules` ⇒ git 源装（包在 profile 树内）可达 ✓；本地目录装（包在树外）不可达 ⇒ `plugin tree failed to load` 且**整个 profile 起不来**（退出码 1），不是"插件不可用"。推论写进规范：面向用户的安装说明**只给 git 源**，本地目录装属开发自测且要先 link SDK
+- ⚠️ **新坑 7（服务名跨 rc 漂移）**：`workflows` → `workflowEngine`（0.1.2-rc.1）。症状是 boot 干净、工具注册成功、**调用时才报缺服务**（静默功能死）；给了核实命令与"服务名字面量按当前基线逐条核实、升级基线当回归点重查"的纪律
+- ⚠️ **`dsh.skills` 的现状写进 entry-contract**：该字段在当前基线**无消费方**（全量搜零命中），声明不生效；skill 实际走**文件系统发现根**（项目 `.dsh/skills`/`.agents/skills`、用户 `$DSH_HOME/skills`/`~/.agents/skills`，外加 custom/bundled），并给出可直接复制的链接命令模板
+- ⚠️ **验证三条硬规矩（install-and-verify）**：① boot 干净 ≠ 功能可用（依赖/服务名类失败在 boot 期不可见）→ 必须真调一次工具/命令；② **先做负控**——装一份故意弄坏的副本确认日志会响亮报错，否则"干净日志"不构成证据；③ mock ctx 单测不能替代真实装载（mock 不施加严格注入门禁，缺 `inject` 的启动即崩照不出来）
+- 📌 **dev-conventions 门禁清单补两类**：`package-contract`（入口/bundle patch 存在、insert 行与包名同源、不声明官方包）与 `no-machine-paths`（发布卫生：入库文件不得含本机绝对路径与凭据）
+- 📌 **SKILL.md 同步**：Step 2 加"依赖三字段留空 + 服务名按当前基线核实"；Step 3 检查点加"在真实 profile 启动过一次"；Step 5 加三条硬规矩与"安装说明只给 git 源"；发布检查清单加"真实调用 + 负控"与"依赖三字段为空"两项；版本 3.0.0 → 3.1.0
+
 ## 2026-08（0819 安装命令跨平台化——修 #20 Windows 必失败）
 
 `dsh plugin --profile web add "github:vlln/plugin-registry#main&path:/packages/plugin/console"` 在 Windows 上必失败（`ERR_PNPM_INVALID_DEPENDENCY_NAME`）——根因在官方 dsh CLI：win32 下 `dsh plugin` 经 cmd.exe 转发 pnpm 参数（`spawnSync(..., { shell: process.platform === "win32" })`，已在安装的 rc.8 `lib/plugin-9h8shc4d.js:108` 核对），`&` 是 cmd 命令分隔符，`&path:...` 被拆成第二条命令（恰好命中 cmd 内置 `path`，静默无报错），pnpm 只收到 `github:vlln/plugin-registry#main` → 仓库根无 package.json → 合成非法包名 `plugin-registry#main`。本仓库无法改官方 CLI，按 issue 建议先文档兜底：

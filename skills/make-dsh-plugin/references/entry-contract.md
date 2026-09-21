@@ -53,6 +53,14 @@ my-plugin/
 "dsh": { "skills": ["./skills/foo/SKILL.md", "./skills/bar/SKILL.md"] }
 ```
 
+**当前基线的实测事实（2026-09，dsh 0.1.2-rc.1）**：`dsh.skills` **没有任何消费方**，声明它不会注册 skill；skill 的实际发现路径是**文件系统根**（`<项目>/.dsh/skills`、`<项目>/.agents/skills`、`$DSH_HOME/skills`、`~/.agents/skills`，外加 custom 与 bundled 两类）。核实某基线是否已支持，用一次全量搜（零命中 = 未支持）：
+
+```sh
+grep -rln "dsh\.skills" <dsh 安装>/node_modules/@deepseek-ai/ | head
+```
+
+**分发动作**：随包分发靠**复制或链接 `skills/<name>/` 进发现根**（命令见 [install-and-verify.md](install-and-verify.md)「随包分发 skill」）；`dsh.skills` 声明可保留作前向声明（不做严格校验，无害），但安装说明**不能**只靠它。
+
 **SKILL.md 写法**（make-skill 规范）：frontmatter（`name` 1-64 小写连字符、`description` 祈使句「Use this skill when...」、可选 `metadata`/`requires`）+ 正文结构（Tool Wrapper / Generator / Reviewer / Inversion / Pipeline 模式），<500 行，细节 progressive disclosure 到 `references/`。仓库 README 用表格列 skill。
 
 ### dsh.mcpServers（MCP server）
@@ -84,7 +92,7 @@ export function apply(ctx) {
 ```
 
 - 能力上限是完整 Cordis——事件（`ctx.on`）、服务（`ctx.provide`）、命令、system prompt、TUI，无需声明。
-- **依赖解析**：entry 可 import 官方包（`@deepseek-ai/*`、`cordis`），官方运行时经 profile pnpm 闭包注入（`$DSH_HOME/profiles/node_modules` flat fallback）；**不要声明这些依赖**（声明了公共 npm 解析不到反而失败）。
+- **依赖解析**：entry 可 import 官方包（`@deepseek-ai/*`、`cordis`），官方运行时经 profile pnpm 闭包注入（`$DSH_HOME/profiles/node_modules` 扁平 fallback）；**`dependencies`/`peerDependencies`/`devDependencies` 三处都留空**——官方包虽在公共 npm 可见，但自带整条 peer 闭包，单独安装一定失败（细节与本地 link 配方见 [gotchas.md](gotchas.md) 1）。解析可达性依赖安装位置（profile 树内可达），见 [gotchas.md](gotchas.md) 6。
 - **注册是 effect**：`ctx.tools.register` 返回 disposer，用 `ctx.effect()`/`ctx.on()` 持有生命周期，disable 时清理。
 
 ## client half（可选）——自渲染
