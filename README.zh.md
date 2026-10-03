@@ -1,3 +1,5 @@
+> **已归档（2026-10-03）**：薄控制台（`packages/plugin/console`）停止维护——官方 Plugins 页已覆盖已装插件管理与逐插件配置。`make-dsh-plugin` skill 已迁至 **[vlln/dsh-skills](https://github.com/vlln/dsh-skills)**；本仓 `skills/` 下留存的副本冻结在 dsh 0.1.5 基线，请从新仓安装。
+
 <h1 align="center">plugin-registry</h1>
 
 <p align="center">中文 | <a href="README.md">English</a></p>

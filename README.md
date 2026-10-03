@@ -1,3 +1,5 @@
+> **Archived（2026-10-03）.** The thin console (`packages/plugin/console`) is no longer maintained — the official Plugins page now covers installed-plugin management and per-plugin settings. The `make-dsh-plugin` skill moved to **[vlln/dsh-skills](https://github.com/vlln/dsh-skills)**; the copy left under `skills/` here is frozen at the dsh 0.1.5 baseline — install the skill from the new repository instead.
+
 <h1 align="center">plugin-registry</h1>
 
 <p align="center"><a href="README.zh.md">中文</a> | English</p>
