@@ -94,6 +94,7 @@
         "en": "Scheduled loops: a /loop command, a loop tool and a live activity bar, so a task reruns on its own cadence.",
         "zh": "定时循环：/loop 命令 + loop 工具 + 活动状态条，让任务按自己的节奏反复跑。"
       },
+      "icon": "icons/dsh-loop.svg",
       "author": "vlln",
       "homepage": "https://github.com/vlln/dsh-loop#readme",
       "repository": {
@@ -348,6 +349,7 @@
         "en": "Improve any artifact in rounds: define the standard, iterate, review independently — with /evo and evo_* tools, and a rollback for every round.",
         "zh": "让 agent 把任意产物一轮轮改得更好：先定标准、再自动改进与独立评审，人类随时能看、能喊停、能回滚。"
       },
+      "icon": "icons/evo-engineering.svg",
       "author": "vlln",
       "homepage": "https://github.com/vlln/evo-engineering#readme",
       "repository": {
@@ -367,12 +369,12 @@
       },
       "versions": [
         {
-          "version": "0.1.0",
-          "publishTimestamp": 1789984822,
+          "version": "0.1.1",
+          "publishTimestamp": 1792592447,
           "source": {
             "type": "git",
             "url": "https://github.com/vlln/evo-engineering",
-            "commit": "183139317141d08929be72aa71e2c684ee1824ed"
+            "commit": "a0da9564a3f6129094730309107fef0836b96d81"
           }
         }
       ]
@@ -387,6 +389,7 @@
         "en": "A desktop pet for the DSH Web GUI: a docked companion you can drag, feed and play with.",
         "zh": "DSH Web GUI 里的桌面宠物：右下角悬浮、可拖拽投喂玩耍的成长型伙伴。"
       },
+      "icon": "icons/whale-girl.svg",
       "author": "vlln",
       "homepage": "https://github.com/vlln/whale-girl#readme",
       "repository": {

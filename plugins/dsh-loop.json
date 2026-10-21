@@ -2,13 +2,23 @@
   "name": "@vlln/dsh-loop",
   "repo": "vlln/dsh-loop",
   "source": "npm",
-  "title": { "en": "Loop", "zh": "定时循环" },
+  "title": {
+    "en": "Loop",
+    "zh": "定时循环"
+  },
   "description": {
     "en": "Scheduled loops: a /loop command, a loop tool and a live activity bar, so a task reruns on its own cadence.",
     "zh": "定时循环：/loop 命令 + loop 工具 + 活动状态条，让任务按自己的节奏反复跑。"
   },
   "author": "vlln",
+  "icon": "icons/dsh-loop.svg",
   "homepage": "https://github.com/vlln/dsh-loop#readme",
   "category": "workflow",
-  "keywords": ["loop", "schedule", "cron", "timer", "automation"]
+  "keywords": [
+    "loop",
+    "schedule",
+    "cron",
+    "timer",
+    "automation"
+  ]
 }

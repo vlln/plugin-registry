@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" fill="none">
+  <defs>
+    <linearGradient id="whale" x1="6" y1="10" x2="30" y2="28" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4D6BFE"/>
+      <stop offset="1" stop-color="#2BC4D8"/>
+    </linearGradient>
+  </defs>
+  <path d="M11 15.5c0-2.2 1.8-4 4-4h8.5c4.4 0 8 3.6 8 8s-3.6 8-8 8H15c-2.2 0-4-1.8-4-4v-8z" stroke="url(#whale)" stroke-width="2.6" stroke-linejoin="round"/>
+  <path d="M11 17.5 7.5 14.8v7.4L11 19.5" stroke="url(#whale)" stroke-width="2.6" stroke-linejoin="round"/>
+  <circle cx="25" cy="18.5" r="1.6" fill="url(#whale)"/>
+  <path d="M18.5 11.5c0-2 .9-3.1.9-4.5M15.2 10.6c-.6-1.6-1.6-2.4-1.8-3.6" stroke="url(#whale)" stroke-width="2.2" stroke-linecap="round"/>
+</svg>
