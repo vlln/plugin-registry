@@ -1,0 +1,15 @@
+{
+  "name": "dsh-pr-inbox",
+  "repo": "omdsh-dev/dsh-pr-inbox",
+  "source": "git",
+  "title": { "en": "PR Inbox", "zh": "PR 收件箱" },
+  "description": {
+    "en": "A sidebar PR panel bound to the current workspace: the PRs you opened, must review and merged, rendered natively over your local gh login — read-only.",
+    "zh": "侧边栏 PR 面板：自动绑定当前工作区的项目，按「我提的 / 待我审 / 我合并的」三桶渲染 GitHub PR，复用本机 gh 登录，只读。"
+  },
+  "author": "vlln",
+  "icon": "icons/dsh-pr-inbox.svg",
+  "homepage": "https://github.com/omdsh-dev/dsh-pr-inbox#readme",
+  "category": "workspace",
+  "keywords": ["github", "pull request", "review", "sidebar", "gh"]
+}

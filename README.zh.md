@@ -35,6 +35,8 @@ dsh plugin --profile web add github:vlln/dsh-share-link
 | **自动分叉** `@vlln/dsh-autofork` | Agent 忙时自动分叉会话：新指令立刻响应，旧会话跑完再回注。 | `github:vlln/dsh-autofork` |
 | **鲸鱼少女** `whale-girl` | DSH Web GUI 里的桌面宠物。 | `whale-girl` |
 | **进化工程** `@vlln/evo-engineering` | 任意产物一轮轮改得更好：定标准、迭代、独立评审、可回滚。 | `github:vlln/evo-engineering` |
+| **PR 收件箱** `dsh-pr-inbox` | 侧栏里看与你相关的 GitHub PR：我提的 / 待我审 / 我合并的，复用本机 `gh` 登录。 | `github:omdsh-dev/dsh-pr-inbox` |
+| **Preset 检查器** `dsh-preset-inspector` | 看清一个 agent preset 的每一行来自哪层补丁、哪个包、什么配置。 | `github:omdsh-dev/dsh-preset-inspector` |
 
 两个更早的插件已归档，因此**不在**索引里（仍可按包名安装，只是不再维护）：`@vlln/dsh-navbar`、`@vlln/dsh-task-status`。
 

@@ -1,0 +1,15 @@
+{
+  "name": "dsh-preset-inspector",
+  "repo": "omdsh-dev/dsh-preset-inspector",
+  "source": "git",
+  "title": { "en": "Preset Inspector", "zh": "Preset 检查器" },
+  "description": {
+    "en": "See where every line of an agent preset comes from: which patch layer, which package, which config.",
+    "zh": "Agent preset 检查器：看清一个 preset 的每一行来自哪一层补丁、是什么包、配置是什么。"
+  },
+  "author": "vlln",
+  "icon": "icons/dsh-preset-inspector.svg",
+  "homepage": "https://github.com/omdsh-dev/dsh-preset-inspector#readme",
+  "category": "workflow",
+  "keywords": ["preset", "agent", "debug", "inspector", "plugin"]
+}

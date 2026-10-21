@@ -36,6 +36,8 @@ dsh plugin --profile web add github:vlln/dsh-share-link
 | **Auto Fork** `@vlln/dsh-autofork` | When the agent is busy, fork the session: the new instruction runs now, the old turn reports back later. | `github:vlln/dsh-autofork` |
 | **Whale Girl** `whale-girl` | A desktop pet for the DSH Web GUI. | `whale-girl` |
 | **Evolution Engineering** `@vlln/evo-engineering` | Improve any artifact in rounds: standard, iterate, independent review, rollback. | `github:vlln/evo-engineering` |
+| **PR Inbox** `dsh-pr-inbox` | A sidebar panel for the GitHub PRs that concern you: opened, to review, merged — over your local `gh` login. | `github:omdsh-dev/dsh-pr-inbox` |
+| **Preset Inspector** `dsh-preset-inspector` | See where every line of an agent preset comes from: patch layer, package, config. | `github:omdsh-dev/dsh-preset-inspector` |
 
 Two older plugins are archived and therefore **not** in the index (they are still installable by name, just not
 maintained): `@vlln/dsh-navbar`, `@vlln/dsh-task-status`.

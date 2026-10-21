@@ -175,6 +175,86 @@
       ]
     },
     {
+      "name": "dsh-pr-inbox",
+      "title": {
+        "en": "PR Inbox",
+        "zh": "PR 收件箱"
+      },
+      "description": {
+        "en": "A sidebar PR panel bound to the current workspace: the PRs you opened, must review and merged, rendered natively over your local gh login — read-only.",
+        "zh": "侧边栏 PR 面板：自动绑定当前工作区的项目，按「我提的 / 待我审 / 我合并的」三桶渲染 GitHub PR，复用本机 gh 登录，只读。"
+      },
+      "icon": "icons/dsh-pr-inbox.svg",
+      "author": "vlln",
+      "homepage": "https://github.com/omdsh-dev/dsh-pr-inbox#readme",
+      "repository": {
+        "url": "https://github.com/omdsh-dev/dsh-pr-inbox"
+      },
+      "metadata": {
+        "category": "workspace",
+        "keywords": [
+          "github",
+          "pull request",
+          "review",
+          "sidebar",
+          "gh"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.1.1",
+          "publishTimestamp": 1792230858,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/omdsh-dev/dsh-pr-inbox",
+            "commit": "7b2a166d6f21029eb3744806999cbe177f7aa35b"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dsh-preset-inspector",
+      "title": {
+        "en": "Preset Inspector",
+        "zh": "Preset 检查器"
+      },
+      "description": {
+        "en": "See where every line of an agent preset comes from: which patch layer, which package, which config.",
+        "zh": "Agent preset 检查器：看清一个 preset 的每一行来自哪一层补丁、是什么包、配置是什么。"
+      },
+      "icon": "icons/dsh-preset-inspector.svg",
+      "author": "vlln",
+      "homepage": "https://github.com/omdsh-dev/dsh-preset-inspector#readme",
+      "repository": {
+        "url": "https://github.com/omdsh-dev/dsh-preset-inspector"
+      },
+      "metadata": {
+        "category": "workflow",
+        "keywords": [
+          "preset",
+          "agent",
+          "debug",
+          "inspector",
+          "plugin"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.20.0",
+          "publishTimestamp": 1792236731,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/omdsh-dev/dsh-preset-inspector",
+            "commit": "98d9cd5d459f99084894612df66710866d191956"
+          }
+        }
+      ]
+    },
+    {
       "name": "@vlln/dsh-share-link",
       "title": {
         "en": "Share Link",
