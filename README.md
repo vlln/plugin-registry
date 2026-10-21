@@ -1,105 +1,64 @@
-> **Archived（2026-10-03）.** The thin console (`packages/plugin/console`) is no longer maintained — the official Plugins page now covers installed-plugin management and per-plugin settings. The `make-dsh-plugin` skill moved to **[vlln/dsh-skills](https://github.com/vlln/dsh-skills)**; the copy left under `skills/` here is frozen at the dsh 0.1.5 baseline — install the skill from the new repository instead.
-
-<h1 align="center">plugin-registry</h1>
-
-<p align="center"><a href="README.zh.md">中文</a> | English</p>
+<h1 align="center">vlln's DSH plugins</h1>
 
 <p align="center">
-  <strong>DSH plugin ecosystem infrastructure: thin console + official plugin development guide</strong><br/>
-  Browser panel managing a profile's plugin install state (bundle layer stack + insert rows + enable/disable), zero patches;
-  the `make-dsh-plugin` skill guides developers in writing official-format plugins.
+  <strong>Plugins I build for DeepSeek Harness (dsh), published as a plugin market index.</strong><br/>
+  English | <a href="README.zh.md">中文</a>
 </p>
 
-<p align="center">
-  <img src="https://badgen.net/badge/license/MIT/green" alt="license" />
-  <img src="https://badgen.net/badge/format/official%20plugin/8257D0" alt="official plugin" />
-  <a href="https://dshfind.com/en/plugins/vlln/plugin-registry?ref=badge"><img src="https://dshfind.com/api/badge/vlln/plugin-registry" alt="dshfind" /></a>
-  <a href="https://www.dsh.so/artifact/plugin-registry"><img src="https://www.dsh.so/badge/plugin-registry.svg" alt="dsh.so security" /></a>
-</p>
+The index is one JSON file in **format 1** — the format `dsh` reads itself — so any dsh 0.2.1+ can browse and
+install from it without a middle layer.
 
----
+## Use it as an index source
 
-> **Pivot (2026-08)**: Official 0809 added a repository plugin mechanism (`.dsh-plugin`) covering ~95% of the old mechanism; this repo is now a
-> **thin console + plugin development spec and guidance** (old patches/CLI/panel removed). **Since 0811 the repository-plugins mechanism is gone**
-> (`vendor/loader/src/repository.ts`); external plugins install via the web profile only: bundles (`dsh.bundle`) join `dsh.profile.bundles`;
-> non-bundles (plain cordis packages) mount via insert rows in `cordis.patch.yml` (live via HMR). Full assessment: [official 0809 coverage](docs/official-0809-coverage.md).
+1. **Plugins → Discover → Manage index sources**
+2. Add:
 
-## Positioning
+   ```
+   https://raw.githubusercontent.com/vlln/plugin-registry/main/index.json
+   ```
 
-DeepSeek Harness's official mechanisms define "what a plugin is and how it runs"; this repository adds two things (panel structure: [console README](packages/plugin/console/README.md); guidance: below):
+3. Search, pick a version, install.
 
-1. **Thin console** (`packages/plugin/console`) — browser panel managing a profile's plugin install state + 4 agent tools
-2. **Development spec and guidance** — `make-dsh-plugin` skill + cookbook for creating official bundle/cordis plugins
-
-## Ecosystem relationships (who can do what)
-
-```
-Official DSH (DeepSeek Harness)      plugin runtime + profile bundle mechanism (no repo mechanism since 0811)
-   │
-   ├── Official plugins (bundle)     loop / task-status / navbar etc. — `dsh plugin --profile web add` install into profile layer stack
-   ├── Third-party plugins (bundle/plain)  standalone GitHub repos or npm packages — bundles enter the layer stack; plain plugins use insert rows (live)
-   │
-   └── This repository (plugin-registry)  ① thin console: browser panel + agent tools for install-state management
-                                         ② make-dsh-plugin skill + cookbook: guides third-party plugin development
-```
-
-Plugin forms and install paths: [plugin type comparison](docs/plugin-types.md); install examples: [examples](examples/README.md).
-
-## Thin console
-
-![Plugin management panel](screenshots/console-panel.png)
-
-The settings page's "Plugin Management" panel manages a profile's plugin install state: **install area** (single entry — npm package name or GitHub project (`https://github.com/o/r` / `github.com/o/r` / `github:o/r`, URL auto-normalized) — automatic pnpm add; bundles enter the layer stack, non-bundles get insert rows) + **loaded area** (version check/update, `disabled` toggle, bundle uninstall).
-
-## Installation
-
-**Option 1: git source, direct install (recommended, one line)**
+Or install by hand with the same specs the index lists:
 
 ```sh
-dsh plugin --profile web add "github:vlln/plugin-registry#path:/packages/plugin/console"
+dsh plugin --profile web add github:vlln/dsh-share-link
 ```
 
-Build artifacts are committed (git source skips the build); one command installs directly (~15 s).
+## What's inside
 
-> **Windows note**: this uses the `#path:` form (no `&`) on purpose — on win32 `dsh plugin` forwards
-> args through cmd.exe, where `&` is a command separator, so `#main&path:...` gets split and fails
-> with `ERR_PNPM_INVALID_DEPENDENCY_NAME`. `#path:` resolves the default branch (main) HEAD; the
-> branch-pinned `#main&path:...` only works on POSIX shells.
+| Plugin | What it does | Install |
+|---|---|---|
+| **Share Link** `@vlln/dsh-share-link` | Publish a conversation or an artifact as a read-only public link; revoke anytime. | `github:vlln/dsh-share-link` |
+| **Video to Text** `dsh-video2text` | Video link → script: sidebar player, transcript, export; bundles the `video2text` skill. | `github:vlln/dsh-video2text` |
+| **Pancha** `dsh-pancha` | A directory as a board you can audit, annotate and act on — the agent labels, you decide. | `github:vlln/dsh-pancha` |
+| **Loop** `@vlln/dsh-loop` | Scheduled loops: `/loop` command, `loop` tool and a live activity bar. | `@vlln/dsh-loop` |
+| **Auto Fork** `@vlln/dsh-autofork` | When the agent is busy, fork the session: the new instruction runs now, the old turn reports back later. | `github:vlln/dsh-autofork` |
+| **Whale Girl** `whale-girl` | A desktop pet for the DSH Web GUI. | `whale-girl` |
+| **Evolution Engineering** `@vlln/evo-engineering` | Improve any artifact in rounds: standard, iterate, independent review, rollback. | `github:vlln/evo-engineering` |
 
-**Option 2: npm source**
+Two older plugins are archived and therefore **not** in the index (they are still installable by name, just not
+maintained): `@vlln/dsh-navbar`, `@vlln/dsh-task-status`.
 
-```sh
-dsh plugin --profile web add @vlln/plugin-console@0.1.0
-```
+## How this repo works
 
-**Option 3: local directory (source available)**
-
-```sh
-git clone https://github.com/vlln/plugin-registry
-cd plugin-registry/packages/plugin/console
-dsh plugin --profile web add .   # artifacts are committed, no build needed; the current dir is the bundle package dir (dsh anchors . to an absolute path)
-```
-
-Refresh the web page after mounting — the "Plugin Management" panel appears on the settings page.
-
-## Agent Skills
-
-| Skill | Purpose |
+| Path | Role |
 |---|---|
-| [make-dsh-plugin](skills/make-dsh-plugin/SKILL.md) | Create official bundle / cordis plugins: pick a form (skill package / MCP / Node tool / with UI) → declare `dsh.bundle` or plain apply → install-and-verify discipline. Details in `references/`; reference implementation: `packages/plugin/console` |
+| `plugins/*.json` | Hand-written display facts only: title, description, category, keywords, icon |
+| `scripts/build-index.mjs` | Probes the real facts (npm versions + publish times, or the default-branch HEAD commit and its manifest), merges, validates with `@deepseek-ai/dsh-plugin-market-index`, writes `index.json` |
+| `index.json` | The generated index — the only file a client reads |
+| `.github/workflows/index.yml` | Daily rebuild; commits only when `index.json` actually changed |
 
-## Before you start developing (pitfalls we've hit)
+Versions are what is actually published: npm-published plugins list their npm versions, git-only plugins list the
+default-branch HEAD commit. When a repo is ahead of npm, the index keeps the published version — install from git if
+you want the bleeding edge.
 
-Key pitfalls (official packages not yet published, Node-half changes need a restart, host CSS overrides, etc.) and the full list: [skill references/gotchas](skills/make-dsh-plugin/references/gotchas.md) — **read before developing**.
+## History
 
-## Documentation
-
-- [Plugin type comparison](docs/plugin-types.md) — bundle vs plain cordis plugins: development/distribution/installation/management dimensions + how to choose
-- [Official 0809 coverage assessment](docs/official-0809-coverage.md) — official mechanism coverage, pivot decision (0811 repository removal: CHANGELOG)
-- [Thin console design](docs/console-ui-plugin-management.md) — design of unified installation-state management
-- Historical mechanism docs (archived after the pivot): [architecture (old)](docs/architecture.md), [creating a plugin (old)](docs/cookbook/creating-a-plugin.md), [manifest format (old)](docs/manifest-format.md), [creating a repository-plugin (old)](docs/cookbook/creating-a-repository-plugin.md), etc.
-- [Changelog](CHANGELOG.md) / [Roadmap](ROADMAP.md)
+Until 2026-10-03 this repo hosted a **thin console** (a browser panel managing a profile's plugin install state) and a
+copy of the `make-dsh-plugin` skill. DSH's own Plugins page took over the console's job, the skill moved to
+[vlln/dsh-skills](https://github.com/vlln/dsh-skills), and on 2026-10-21 the repo became this index.
 
 ## License
 
-MIT License. See [LICENSE](LICENSE).
+MIT

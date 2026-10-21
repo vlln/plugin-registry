@@ -1,0 +1,15 @@
+{
+  "name": "dsh-pancha",
+  "repo": "vlln/dsh-pancha",
+  "source": "git",
+  "title": { "en": "Pancha", "zh": "盘查" },
+  "description": {
+    "en": "Turn a directory into a board you can audit, annotate and act on: the agent labels, you decide.",
+    "zh": "把磁盘变成一张可审查、可批注、可执行的盘面：Agent 标注，你来做决定。"
+  },
+  "author": "vlln",
+  "icon": "icons/dsh-pancha.svg",
+  "homepage": "https://github.com/vlln/dsh-pancha#readme",
+  "category": "workspace",
+  "keywords": ["disk", "audit", "annotation", "cleanup", "files"]
+}

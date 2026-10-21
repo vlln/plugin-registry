@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" fill="none">
+  <title>Autofork</title>
+  <defs>
+    <linearGradient id="fork" x1="10" y1="8" x2="27" y2="28" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#52CED8"/>
+      <stop offset="1" stop-color="#617BEB"/>
+    </linearGradient>
+  </defs>
+  <path d="M12 9V27M24 9V13C24 17.5 12 18.5 12 23" stroke="url(#fork)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

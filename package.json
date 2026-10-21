@@ -1,0 +1,17 @@
+{
+  "name": "vlln-dsh-plugin-index",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Index of vlln's DeepSeek Harness (dsh) plugins, in the plugin market index format 1.",
+  "scripts": {
+    "build": "node scripts/build-index.mjs"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-plugin-market-index": "0.2.1-rc.2"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}

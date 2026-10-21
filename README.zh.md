@@ -1,101 +1,58 @@
-> **已归档（2026-10-03）**：薄控制台（`packages/plugin/console`）停止维护——官方 Plugins 页已覆盖已装插件管理与逐插件配置。`make-dsh-plugin` skill 已迁至 **[vlln/dsh-skills](https://github.com/vlln/dsh-skills)**；本仓 `skills/` 下留存的副本冻结在 dsh 0.1.5 基线，请从新仓安装。
-
-<h1 align="center">plugin-registry</h1>
-
-<p align="center">中文 | <a href="README.md">English</a></p>
+<h1 align="center">vlln 的 dsh 插件</h1>
 
 <p align="center">
-  <strong>DSH 插件生态基建：薄控制台 + 官方插件开发引导</strong><br/>
-  浏览器面板管理 profile 插件安装态（bundle 层栈 + insert 行 + 启停），零补丁；
-  `make-dsh-plugin` skill 引导开发者按官方格式写插件。
+  <strong>我为 DeepSeek Harness（dsh）写的插件，发布成一个插件市场索引。</strong><br/>
+  中文 | <a href="README.md">English</a>
 </p>
 
-<p align="center">
-  <img src="https://badgen.net/badge/license/MIT/green" alt="license" />
-  <img src="https://badgen.net/badge/format/official%20plugin/8257D0" alt="official plugin" />
-</p>
+索引就是一个 **format 1** 的 JSON 文件——dsh 自己读的格式——所以任何 dsh 0.2.1+ 都能直接浏览、直接装，中间不需要任何服务。
 
----
+## 当成索引源用
 
-> **转向（2026-08）**：官方 0809 推出仓库插件机制（`.dsh-plugin`）覆盖旧独立机制 ~95%，本仓库收敛为
-> **薄控制台 + 插件开发规范和引导**（旧 patch/CLI/面板已移除）。**0811 起官方删除
-> repository-plugins 机制**（`vendor/loader/src/repository.ts`），外部插件统一经 web profile 安装：
-> bundle 插件（`dsh.bundle` 包）进 `dsh.profile.bundles` 层栈；非 bundle 插件（纯 cordis 包）经
-> profile `cordis.patch.yml` insert 行挂载（配置 HMR 实时生效）。完整评估见 [官方 0809 覆盖度](docs/official-0809-coverage.md)。
+1. **Plugins → Discover → 管理索引源**
+2. 添加：
 
-## 定位
+   ```
+   https://raw.githubusercontent.com/vlln/plugin-registry/main/index.json
+   ```
 
-DeepSeek Harness 官方机制管「插件是什么、怎么跑」；本仓库补两件事（面板结构见 [console README](packages/plugin/console/README.md)，开发引导见下文）：
+3. 搜索、选版本、安装。
 
-1. **薄控制台**（`packages/plugin/console`）——管理 profile 插件安装态的浏览器面板 + 4 个 agent 工具
-2. **开发规范和引导**——`make-dsh-plugin` skill + cookbook，指导创建官方 bundle / cordis 插件
-
-## 生态关系（谁能干什么）
-
-```
-官方 DSH（DeepSeek Harness）     插件运行时 + profile bundle 机制（0811 起无 repository 机制）
-   │
-   ├── 官方插件（bundle）        loop / task-status / navbar 等——`dsh plugin --profile web add` 装进 profile 层栈
-   ├── 第三方插件（bundle/纯插件）独立 GitHub 仓库或 npm 包——bundle 进层栈；纯插件走 insert 行（实时）
-   │
-   └── 本仓库（plugin-registry） ① 薄控制台：管理安装态的浏览器面板 + agent 工具
-                                ② make-dsh-plugin skill + cookbook：引导开发第三方插件
-```
-
-插件形态与安装路径说明见 [插件类型对比](docs/plugin-types.md)；现有插件的安装示例见 [examples](examples/README.md)。
-
-## 薄控制台
-
-![插件管理面板](screenshots/console-panel.png)
-
-设置页「插件管理」面板管理 profile 插件安装态：**安装插件区**（统一入口——输入 npm 包名或 GitHub 项目：`https://github.com/o/r` / `github.com/o/r` / `github:o/r`，URL 自动规范化——自动 pnpm add，bundle 插件进层栈、非 bundle 写 insert 行）+ **已加载插件区**（版本检查/更新、`disabled` 启停持久化、bundle 卸载）。
-
-## 安装
-
-**方式一：git 源直接安装（推荐，真一行）**
+也可以按索引里同样的 spec 手装：
 
 ```sh
-dsh plugin --profile web add "github:vlln/plugin-registry#path:/packages/plugin/console"
+dsh plugin --profile web add github:vlln/dsh-share-link
 ```
 
-构建产物已入库（git 源安装不触发构建），一行命令直接装（实测约 15 秒）。
+## 收录了什么
 
-> **Windows 注意**：这里刻意用不带 `&` 的 `#path:` 写法——win32 下 `dsh plugin` 经 cmd.exe 转发参数，`&` 是命令分隔符，`#main&path:...` 会被拆开而失败（`ERR_PNPM_INVALID_DEPENDENCY_NAME`）。`#path:` 取默认分支（main）HEAD；钉分支的 `#main&path:...` 只在 POSIX shell 下可用。
+| 插件 | 作用 | 安装 |
+|---|---|---|
+| **分享链接** `@vlln/dsh-share-link` | 把一段对话或一个产物发布成只读公网链接，随时可撤销。 | `github:vlln/dsh-share-link` |
+| **视频转文案** `dsh-video2text` | 视频链接转文案：侧栏播放器 + 逐字稿 + 导出，自带 `video2text` skill。 | `github:vlln/dsh-video2text` |
+| **盘查** `dsh-pancha` | 把目录变成一张可审查、可批注、可执行的盘面——Agent 标注，你决定。 | `github:vlln/dsh-pancha` |
+| **定时循环** `@vlln/dsh-loop` | `/loop` 命令 + `loop` 工具 + 活动状态条，让任务按自己的节奏反复跑。 | `@vlln/dsh-loop` |
+| **自动分叉** `@vlln/dsh-autofork` | Agent 忙时自动分叉会话：新指令立刻响应，旧会话跑完再回注。 | `github:vlln/dsh-autofork` |
+| **鲸鱼少女** `whale-girl` | DSH Web GUI 里的桌面宠物。 | `whale-girl` |
+| **进化工程** `@vlln/evo-engineering` | 任意产物一轮轮改得更好：定标准、迭代、独立评审、可回滚。 | `github:vlln/evo-engineering` |
 
-**方式二：npm 源**
+两个更早的插件已归档，因此**不在**索引里（仍可按包名安装，只是不再维护）：`@vlln/dsh-navbar`、`@vlln/dsh-task-status`。
 
-```sh
-dsh plugin --profile web add @vlln/plugin-console@0.1.0
-```
+## 这个仓库怎么运转
 
-**方式三：本地目录（有源码时）**
-
-```sh
-git clone https://github.com/vlln/plugin-registry
-cd plugin-registry/packages/plugin/console
-dsh plugin --profile web add .   # 产物已入库，无需构建；当前目录即 bundle 包子目录（dsh 锚定 . 为绝对路径）
-```
-
-挂载后刷新 Web 页面，设置页出现「插件管理」面板。
-
-## Agent Skills
-
-| Skill | 作用 |
+| 路径 | 作用 |
 |---|---|
-| [make-dsh-plugin](skills/make-dsh-plugin/SKILL.md) | 创建官方 bundle / cordis 插件：先选形态（skill 包 / MCP / Node 工具 / 带 UI）→ 声明 `dsh.bundle` 或纯 apply → 安装验证纪律。详情分置 `references/`；仓库内参考实现 `packages/plugin/console` |
+| `plugins/*.json` | 只写展示层：标题、描述、分类、关键词、图标 |
+| `scripts/build-index.mjs` | 探测真实事实（npm 版本与发布时间，或默认分支 HEAD commit 及其 manifest），合并后用 `@deepseek-ai/dsh-plugin-market-index` 校验，写出 `index.json` |
+| `index.json` | 生成物——客户端唯一读取的文件 |
+| `.github/workflows/index.yml` | 每天重建一次；`index.json` 真变了才提交 |
 
-## 开发前须知（踩过的坑）
+版本以**实际发布**为准：发过 npm 的列 npm 版本，只在 git 上的列默认分支 HEAD commit。仓库比 npm 新时，索引仍给已发布版本；想追最新就按 git 装。
 
-关键坑（官方包未发布、Node half 改动需重启、宿主 CSS 覆盖等）与完整清单见 [skill references/gotchas](skills/make-dsh-plugin/references/gotchas.md)——**开发前先读**。
+## 历史
 
-## 文档
+这个仓库到 2026-10-03 为止是**薄控制台**（浏览器面板管理 profile 的插件安装状态）+ `make-dsh-plugin` skill 的副本。控制台的活被 DSH 自己的 Plugins 页接走，skill 迁到 [vlln/dsh-skills](https://github.com/vlln/dsh-skills)，2026-10-21 仓库改成现在这个索引。
 
-- [插件类型对比](docs/plugin-types.md) — bundle 插件 vs 纯 cordis 插件：开发/分发/安装/管理四维 + 选型
-- [官方 0809 覆盖度评估](docs/official-0809-coverage.md) — 官方机制覆盖度、转向决策（含 0811 repository 移除说明见 CHANGELOG）
-- [薄控制台设计](docs/console-ui-plugin-management.md) — 统一管理安装态的设计
-- 历史机制文档（已转向，仅存档）：[架构（旧）](docs/architecture.md)、[创建插件（旧）](docs/cookbook/creating-a-plugin.md)、[清单格式（旧）](docs/manifest-format.md)、[创建 repository-plugin（旧）](docs/cookbook/creating-a-repository-plugin.md) 等
-- [变更记录](CHANGELOG.md) / [路线图](ROADMAP.md)
+## License
 
-## 版权
-
-MIT License。见 [LICENSE](LICENSE)。
+MIT

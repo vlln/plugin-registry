@@ -1,0 +1,338 @@
+{
+  "format": 1,
+  "title": {
+    "en": "vlln's DSH plugins",
+    "zh": "vlln 的 dsh 插件"
+  },
+  "description": {
+    "en": "DeepSeek Harness plugins by vlln. Add this file as an index source under Plugins → Discover.",
+    "zh": "vlln 开发的 DeepSeek Harness 插件。把本文件加成 Plugins → Discover 里的索引源即可浏览。"
+  },
+  "metadata": {
+    "categories": {
+      "content": {
+        "title": {
+          "en": "Content",
+          "zh": "内容"
+        }
+      },
+      "conversation": {
+        "title": {
+          "en": "Conversation",
+          "zh": "会话"
+        }
+      },
+      "workspace": {
+        "title": {
+          "en": "Workspace",
+          "zh": "工作区"
+        }
+      },
+      "workflow": {
+        "title": {
+          "en": "Workflow",
+          "zh": "工作流"
+        }
+      },
+      "interface": {
+        "title": {
+          "en": "Interface",
+          "zh": "界面"
+        }
+      }
+    },
+    "labels": {},
+    "sortKeys": {}
+  },
+  "plugins": [
+    {
+      "name": "@vlln/dsh-autofork",
+      "title": {
+        "en": "Auto Fork",
+        "zh": "自动分叉"
+      },
+      "description": {
+        "en": "When the agent is busy, fork the session: your new instruction runs immediately while the old turn finishes in the background and reports back.",
+        "zh": "Agent 忙时自动分叉会话：新指令立刻在新会话里得到响应，旧会话留在后台跑完并把结果回注。"
+      },
+      "icon": "icons/dsh-autofork.svg",
+      "author": "vlln",
+      "homepage": "https://github.com/vlln/dsh-autofork#readme",
+      "repository": {
+        "url": "https://github.com/vlln/dsh-autofork"
+      },
+      "metadata": {
+        "category": "conversation",
+        "keywords": [
+          "fork",
+          "session",
+          "concurrency",
+          "background"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.15.0",
+          "publishTimestamp": 1792066928,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/vlln/dsh-autofork",
+            "commit": "66f5e4265b84e48b7e5966fcea4dccd7789e9501"
+          }
+        }
+      ]
+    },
+    {
+      "name": "@vlln/dsh-loop",
+      "title": {
+        "en": "Loop",
+        "zh": "定时循环"
+      },
+      "description": {
+        "en": "Scheduled loops: a /loop command, a loop tool and a live activity bar, so a task reruns on its own cadence.",
+        "zh": "定时循环：/loop 命令 + loop 工具 + 活动状态条，让任务按自己的节奏反复跑。"
+      },
+      "author": "vlln",
+      "homepage": "https://github.com/vlln/dsh-loop#readme",
+      "repository": {
+        "url": "https://github.com/vlln/dsh-loop"
+      },
+      "metadata": {
+        "category": "workflow",
+        "keywords": [
+          "loop",
+          "schedule",
+          "cron",
+          "timer",
+          "automation"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.4.1",
+          "publishTimestamp": 1788959575,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.1.0-rc.5"
+          }
+        },
+        {
+          "version": "0.3.0",
+          "publishTimestamp": 1787158048,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.1.0-rc.5"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dsh-pancha",
+      "title": {
+        "en": "Pancha",
+        "zh": "盘查"
+      },
+      "description": {
+        "en": "Turn a directory into a board you can audit, annotate and act on: the agent labels, you decide.",
+        "zh": "把磁盘变成一张可审查、可批注、可执行的盘面：Agent 标注，你来做决定。"
+      },
+      "icon": "icons/dsh-pancha.svg",
+      "author": "vlln",
+      "homepage": "https://github.com/vlln/dsh-pancha#readme",
+      "repository": {
+        "url": "https://github.com/vlln/dsh-pancha"
+      },
+      "metadata": {
+        "category": "workspace",
+        "keywords": [
+          "disk",
+          "audit",
+          "annotation",
+          "cleanup",
+          "files"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "3.0.2",
+          "publishTimestamp": 1792494636,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/vlln/dsh-pancha",
+            "commit": "d7ffdc0f101e1bfce25d27c63683f3e7609c1ad7"
+          }
+        }
+      ]
+    },
+    {
+      "name": "@vlln/dsh-share-link",
+      "title": {
+        "en": "Share Link",
+        "zh": "分享链接"
+      },
+      "description": {
+        "en": "Publish a conversation or an artifact as a read-only public link — no dsh needed on the reader's side, revoke anytime.",
+        "zh": "把一段对话或一个产物发布成只读公网链接：对方无需安装 dsh，随时可撤销。"
+      },
+      "icon": "icons/dsh-share-link.svg",
+      "author": "vlln",
+      "homepage": "https://github.com/vlln/dsh-share-link#readme",
+      "repository": {
+        "url": "https://github.com/vlln/dsh-share-link"
+      },
+      "metadata": {
+        "category": "content",
+        "keywords": [
+          "share",
+          "publish",
+          "link",
+          "snapshot",
+          "cloudflared",
+          "surge"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.1.1",
+          "publishTimestamp": 1792589313,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/vlln/dsh-share-link",
+            "commit": "e51eb428fe8d3969144d52c1c395d47775202ad7"
+          },
+          "engines": {
+            "dsh": ">=0.2.0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dsh-video2text",
+      "title": {
+        "en": "Video to Text",
+        "zh": "视频转文案"
+      },
+      "description": {
+        "en": "Turn a video link into a script: sidebar workspace with player, transcript and export, plus a bundled video2text skill.",
+        "zh": "视频链接转文案：侧栏工作台（播放器 + 逐字稿 + 发布导出），自带 video2text skill。"
+      },
+      "icon": "icons/dsh-video2text.svg",
+      "author": "vlln",
+      "homepage": "https://github.com/vlln/dsh-video2text#readme",
+      "repository": {
+        "url": "https://github.com/vlln/dsh-video2text"
+      },
+      "metadata": {
+        "category": "content",
+        "keywords": [
+          "video",
+          "transcript",
+          "asr",
+          "subtitle",
+          "skill"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1792551195,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/vlln/dsh-video2text",
+            "commit": "6e0d625e7d29b0cf4863608ac56f04d22fca183e"
+          }
+        }
+      ]
+    },
+    {
+      "name": "@vlln/evo-engineering",
+      "title": {
+        "en": "Evolution Engineering",
+        "zh": "进化工程"
+      },
+      "description": {
+        "en": "Improve any artifact in rounds: define the standard, iterate, review independently — with /evo and evo_* tools, and a rollback for every round.",
+        "zh": "让 agent 把任意产物一轮轮改得更好：先定标准、再自动改进与独立评审，人类随时能看、能喊停、能回滚。"
+      },
+      "author": "vlln",
+      "homepage": "https://github.com/vlln/evo-engineering#readme",
+      "repository": {
+        "url": "https://github.com/vlln/evo-engineering"
+      },
+      "metadata": {
+        "category": "workflow",
+        "keywords": [
+          "evolution",
+          "review",
+          "iteration",
+          "rsi",
+          "rollback"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1789984822,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/vlln/evo-engineering",
+            "commit": "183139317141d08929be72aa71e2c684ee1824ed"
+          }
+        }
+      ]
+    },
+    {
+      "name": "whale-girl",
+      "title": {
+        "en": "Whale Girl",
+        "zh": "鲸鱼少女"
+      },
+      "description": {
+        "en": "A desktop pet for the DSH Web GUI: a docked companion you can drag, feed and play with.",
+        "zh": "DSH Web GUI 里的桌面宠物：右下角悬浮、可拖拽投喂玩耍的成长型伙伴。"
+      },
+      "author": "vlln",
+      "homepage": "https://github.com/vlln/whale-girl#readme",
+      "repository": {
+        "url": "https://github.com/vlln/whale-girl"
+      },
+      "metadata": {
+        "category": "interface",
+        "keywords": [
+          "pet",
+          "desktop",
+          "companion",
+          "ui",
+          "fun"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1787158008,
+          "source": {
+            "type": "npm"
+          }
+        }
+      ]
+    }
+  ]
+}

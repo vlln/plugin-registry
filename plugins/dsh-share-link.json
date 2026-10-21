@@ -1,0 +1,15 @@
+{
+  "name": "@vlln/dsh-share-link",
+  "repo": "vlln/dsh-share-link",
+  "source": "git",
+  "title": { "en": "Share Link", "zh": "分享链接" },
+  "description": {
+    "en": "Publish a conversation or an artifact as a read-only public link — no dsh needed on the reader's side, revoke anytime.",
+    "zh": "把一段对话或一个产物发布成只读公网链接：对方无需安装 dsh，随时可撤销。"
+  },
+  "author": "vlln",
+  "icon": "icons/dsh-share-link.svg",
+  "homepage": "https://github.com/vlln/dsh-share-link#readme",
+  "category": "content",
+  "keywords": ["share", "publish", "link", "snapshot", "cloudflared", "surge"]
+}

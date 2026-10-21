@@ -1,0 +1,15 @@
+{
+  "name": "dsh-video2text",
+  "repo": "vlln/dsh-video2text",
+  "source": "git",
+  "title": { "en": "Video to Text", "zh": "视频转文案" },
+  "description": {
+    "en": "Turn a video link into a script: sidebar workspace with player, transcript and export, plus a bundled video2text skill.",
+    "zh": "视频链接转文案：侧栏工作台（播放器 + 逐字稿 + 发布导出），自带 video2text skill。"
+  },
+  "author": "vlln",
+  "icon": "icons/dsh-video2text.svg",
+  "homepage": "https://github.com/vlln/dsh-video2text#readme",
+  "category": "content",
+  "keywords": ["video", "transcript", "asr", "subtitle", "skill"]
+}

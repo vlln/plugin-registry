@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-10-21（仓库转为「vlln 的 dsh 插件索引」）
+
+薄控制台归档三周后，仓库换了职责：不再提供面板，只提供**一个插件市场索引文件**。
+
+- `index.json` 用官方 **format 1**（`dsh` 0.2.1+ 的 Plugins → Discover 直接读），收录 7 个在维护的插件；
+  已归档的 `@vlln/dsh-navbar`、`@vlln/dsh-task-status` 只在 README 列出，不进索引。
+- `plugins/*.json` 只手写展示层；`scripts/build-index.mjs` 探测 npm 版本/发布时间或默认分支 HEAD commit，
+  合并后用 `@deepseek-ai/dsh-plugin-market-index` 的 `parseMarketIndex` 自检，校验不过不写盘。
+- `.github/workflows/index.yml` 每天重建一次，`index.json` 真变了才提交。
+- 移除旧控制台（`packages/plugin/console`）、旧文档/截图/示例/脚本、`ROADMAP.md`、`AGENTS.md` 与
+  `skills/make-dsh-plugin` 的冻结副本（真身在 `vlln/dsh-skills`）；代码仍在 git 历史里。
+
 本仓库（plugin-registry：薄控制台 + 文档 + skill）的变更记录。机制件改动在官方 snapshot 宿主仓库的历史机制分支按提交记录（0809 转向后不再有机制件），本表汇总交付。
 
 ## 2026-09（make-dsh-plugin：补「源码/master ≠ 已发布 rc」——v3.3.0）

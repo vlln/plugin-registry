@@ -1,0 +1,45 @@
+name: index
+
+# 每天重建一次 index.json：探测每个插件的真实发布事实（npm 版本 / git HEAD），
+# 校验通过才提交。索引内容不变时这一步是空提交，不会有噪音。
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: index
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+
+      # 生成器自带校验：parseMarketIndex 不过就非零退出，不会写出坏索引。
+      - run: node scripts/build-index.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Commit a changed index
+        run: |
+          if git diff --quiet -- index.json; then
+            echo "index.json is unchanged"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.json
+          git commit -m 'chore(index): refresh from npm and git'
+          git push

@@ -1,0 +1,15 @@
+{
+  "name": "@vlln/dsh-autofork",
+  "repo": "vlln/dsh-autofork",
+  "source": "git",
+  "title": { "en": "Auto Fork", "zh": "自动分叉" },
+  "description": {
+    "en": "When the agent is busy, fork the session: your new instruction runs immediately while the old turn finishes in the background and reports back.",
+    "zh": "Agent 忙时自动分叉会话：新指令立刻在新会话里得到响应，旧会话留在后台跑完并把结果回注。"
+  },
+  "author": "vlln",
+  "icon": "icons/dsh-autofork.svg",
+  "homepage": "https://github.com/vlln/dsh-autofork#readme",
+  "category": "conversation",
+  "keywords": ["fork", "session", "concurrency", "background"]
+}
