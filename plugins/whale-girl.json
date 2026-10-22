@@ -11,7 +11,7 @@
     "zh": "DSH Web GUI 里的桌面宠物：右下角悬浮、可拖拽投喂玩耍的成长型伙伴。"
   },
   "author": "vlln",
-  "icon": "icons/whale-girl.svg",
+  "icon": "icons/whale-girl.png",
   "homepage": "https://github.com/vlln/whale-girl#readme",
   "category": "interface",
   "keywords": [
