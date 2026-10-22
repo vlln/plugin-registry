@@ -5,9 +5,6 @@
   English | <a href="README.zh.md">中文</a>
 </p>
 
-The index is one JSON file in **format 1** — the format `dsh` reads itself — so any dsh 0.2.1+ can browse and
-install from it without a middle layer.
-
 ## Use it as an index source
 
 1. **Plugins → Discover → Manage index sources**

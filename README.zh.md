@@ -5,8 +5,6 @@
   中文 | <a href="README.md">English</a>
 </p>
 
-索引就是一个 **format 1** 的 JSON 文件——dsh 自己读的格式——所以任何 dsh 0.2.1+ 都能直接浏览、直接装，中间不需要任何服务。
-
 ## 当成索引源用
 
 1. **Plugins → Discover → 管理索引源**
