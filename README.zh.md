@@ -36,7 +36,14 @@ dsh plugin --profile web add github:vlln/dsh-share-link
 | [**PR 收件箱**](https://github.com/omdsh-dev/dsh-pr-inbox) `dsh-pr-inbox` | 侧栏里看与你相关的 GitHub PR：我提的 / 待我审 / 我合并的，复用本机 `gh` 登录。 | `github:omdsh-dev/dsh-pr-inbox` |
 | [**Preset 检查器**](https://github.com/omdsh-dev/dsh-preset-inspector) `dsh-preset-inspector` | 看清一个 agent preset 的每一行来自哪层补丁、哪个包、什么配置。 | `github:omdsh-dev/dsh-preset-inspector` |
 
-两个更早的插件已归档，因此**不在**索引里（仍可按包名安装，只是不再维护）：[`@vlln/dsh-navbar`](https://github.com/vlln/dsh-navbar)、[`@vlln/dsh-task-status`](https://github.com/vlln/dsh-task-status)。
+### 已归档
+
+仍可按包名安装，只是不再维护，因此不在索引里。
+
+| 插件 | 作用 | 安装 |
+|---|---|---|
+| [**导航条**](https://github.com/vlln/dsh-navbar) `@vlln/dsh-navbar` | 对话右缘的节点串：在 user 消息之间快速跳转。 | `@vlln/dsh-navbar` |
+| [**任务状态条**](https://github.com/vlln/dsh-task-status) `@vlln/dsh-task-status` | 后台任务状态条：每个任务的进度 + 实时输出 tail。 | `@vlln/dsh-task-status` |
 
 ## 这个仓库怎么运转
 

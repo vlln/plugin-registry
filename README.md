@@ -36,8 +36,14 @@ dsh plugin --profile web add github:vlln/dsh-share-link
 | [**PR Inbox**](https://github.com/omdsh-dev/dsh-pr-inbox) `dsh-pr-inbox` | A sidebar panel for the GitHub PRs that concern you: opened, to review, merged — over your local `gh` login. | `github:omdsh-dev/dsh-pr-inbox` |
 | [**Preset Inspector**](https://github.com/omdsh-dev/dsh-preset-inspector) `dsh-preset-inspector` | See where every line of an agent preset comes from: patch layer, package, config. | `github:omdsh-dev/dsh-preset-inspector` |
 
-Two older plugins are archived and therefore **not** in the index (they are still installable by name, just not
-maintained): [`@vlln/dsh-navbar`](https://github.com/vlln/dsh-navbar), [`@vlln/dsh-task-status`](https://github.com/vlln/dsh-task-status).
+### Archived
+
+Still installable by name, just no longer maintained — so they are not in the index.
+
+| Plugin | What it does | Install |
+|---|---|---|
+| [**Navbar**](https://github.com/vlln/dsh-navbar) `@vlln/dsh-navbar` | A node rail on the conversation's right edge: jump between user messages. | `@vlln/dsh-navbar` |
+| [**Task Status**](https://github.com/vlln/dsh-task-status) `@vlln/dsh-task-status` | A status bar for background jobs: per-task progress plus a live output tail. | `@vlln/dsh-task-status` |
 
 ## How this repo works
 
