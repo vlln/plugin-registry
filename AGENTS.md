@@ -13,7 +13,7 @@
 ```
 index.json                 # 生成物，客户端唯一读取的文件；不要手改
 plugins/<slug>.json        # 一个插件一个文件，只写展示层
-icons/*.svg                # 图标，index 里的 icon 用相对路径引用
+icons/*.svg|*.png         # 图标，index 里的 icon 用相对路径引用
 scripts/build-index.mjs    # 生成器：探测事实 → 合并 → 校验 → 写 index.json
 package.json / lock        # 只为生成器的依赖（@deepseek-ai/dsh-plugin-market-index）
 .github/workflows/index.yml# 每天 03:00 UTC 重建，index.json 真变了才提交
@@ -28,6 +28,8 @@ package.json / lock        # 只为生成器的依赖（@deepseek-ai/dsh-plugin-
    GITHUB_TOKEN=$(gh auth token) node scripts/build-index.mjs
    ```
 3. `git add plugins/<slug>.json icons/... index.json && git commit`。
+4. README.md / README.zh.md 的表格补一行，**插件名必须是仓库链接**
+   （`[**Title**](https://github.com/<owner>/<repo>)`）；归档的插件也要在“已归档”段落里给链接。
 
 ### `plugins/*.json` 的字段
 
@@ -38,7 +40,7 @@ package.json / lock        # 只为生成器的依赖（@deepseek-ai/dsh-plugin-
 | `source` | 是 | `"npm"`（发过 npm）或 `"git"`（只在仓库里） |
 | `title` | 建议 | `{ "en": "...", "zh": "..." }`，**必须有 `en`** |
 | `description` | 建议 | 同上；一句话说清「它能做什么」 |
-| `icon` | 可选 | `icons/<slug>.svg`（相对路径，按 index URL 解析）；没有就让它空着 |
+| `icon` | 可选 | `icons/<slug>.svg` 或 `.png`（相对路径，按 index URL 解析）；手绘 logo 用 SVG，角色类用立绘裁切的 PNG；没有就让它空着 |
 | `homepage` | 可选 | http(s) 绝对地址 |
 | `author` | 可选 | 显示用 |
 | `category` | 是 | 必须是生成器里 `CATEGORIES` 声明过的 id（`content` / `conversation` / `workspace` / `workflow` / `interface`）；要加新分类，改 `scripts/build-index.mjs` |

@@ -29,18 +29,18 @@ dsh plugin --profile web add github:vlln/dsh-share-link
 
 | Plugin | What it does | Install |
 |---|---|---|
-| **Share Link** `@vlln/dsh-share-link` | Publish a conversation or an artifact as a read-only public link; revoke anytime. | `github:vlln/dsh-share-link` |
-| **Video to Text** `dsh-video2text` | Video link → script: sidebar player, transcript, export; bundles the `video2text` skill. | `github:vlln/dsh-video2text` |
-| **Pancha** `dsh-pancha` | A directory as a board you can audit, annotate and act on — the agent labels, you decide. | `github:vlln/dsh-pancha` |
-| **Loop** `@vlln/dsh-loop` | Scheduled loops: `/loop` command, `loop` tool and a live activity bar. | `@vlln/dsh-loop` |
-| **Auto Fork** `@vlln/dsh-autofork` | When the agent is busy, fork the session: the new instruction runs now, the old turn reports back later. | `github:vlln/dsh-autofork` |
-| **Whale Girl** `whale-girl` | A desktop pet for the DSH Web GUI. | `whale-girl` |
-| **Evolution Engineering** `@vlln/evo-engineering` | Improve any artifact in rounds: standard, iterate, independent review, rollback. | `github:vlln/evo-engineering` |
-| **PR Inbox** `dsh-pr-inbox` | A sidebar panel for the GitHub PRs that concern you: opened, to review, merged — over your local `gh` login. | `github:omdsh-dev/dsh-pr-inbox` |
-| **Preset Inspector** `dsh-preset-inspector` | See where every line of an agent preset comes from: patch layer, package, config. | `github:omdsh-dev/dsh-preset-inspector` |
+| [**Share Link**](https://github.com/vlln/dsh-share-link) `@vlln/dsh-share-link` | Publish a conversation or an artifact as a read-only public link; revoke anytime. | `github:vlln/dsh-share-link` |
+| [**Video to Text**](https://github.com/vlln/dsh-video2text) `dsh-video2text` | Video link → script: sidebar player, transcript, export; bundles the `video2text` skill. | `github:vlln/dsh-video2text` |
+| [**Pancha**](https://github.com/vlln/dsh-pancha) `dsh-pancha` | A directory as a board you can audit, annotate and act on — the agent labels, you decide. | `github:vlln/dsh-pancha` |
+| [**Loop**](https://github.com/vlln/dsh-loop) `@vlln/dsh-loop` | Scheduled loops: `/loop` command, `loop` tool and a live activity bar. | `@vlln/dsh-loop` |
+| [**Auto Fork**](https://github.com/vlln/dsh-autofork) `@vlln/dsh-autofork` | When the agent is busy, fork the session: the new instruction runs now, the old turn reports back later. | `github:vlln/dsh-autofork` |
+| [**Whale Girl**](https://github.com/vlln/whale-girl) `whale-girl` | A desktop pet for the DSH Web GUI. | `whale-girl` |
+| [**Evolution Engineering**](https://github.com/vlln/evo-engineering) `@vlln/evo-engineering` | Improve any artifact in rounds: standard, iterate, independent review, rollback. | `github:vlln/evo-engineering` |
+| [**PR Inbox**](https://github.com/omdsh-dev/dsh-pr-inbox) `dsh-pr-inbox` | A sidebar panel for the GitHub PRs that concern you: opened, to review, merged — over your local `gh` login. | `github:omdsh-dev/dsh-pr-inbox` |
+| [**Preset Inspector**](https://github.com/omdsh-dev/dsh-preset-inspector) `dsh-preset-inspector` | See where every line of an agent preset comes from: patch layer, package, config. | `github:omdsh-dev/dsh-preset-inspector` |
 
 Two older plugins are archived and therefore **not** in the index (they are still installable by name, just not
-maintained): `@vlln/dsh-navbar`, `@vlln/dsh-task-status`.
+maintained): [`@vlln/dsh-navbar`](https://github.com/vlln/dsh-navbar), [`@vlln/dsh-task-status`](https://github.com/vlln/dsh-task-status).
 
 ## How this repo works
 

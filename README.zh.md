@@ -28,17 +28,17 @@ dsh plugin --profile web add github:vlln/dsh-share-link
 
 | 插件 | 作用 | 安装 |
 |---|---|---|
-| **分享链接** `@vlln/dsh-share-link` | 把一段对话或一个产物发布成只读公网链接，随时可撤销。 | `github:vlln/dsh-share-link` |
-| **视频转文案** `dsh-video2text` | 视频链接转文案：侧栏播放器 + 逐字稿 + 导出，自带 `video2text` skill。 | `github:vlln/dsh-video2text` |
-| **盘查** `dsh-pancha` | 把目录变成一张可审查、可批注、可执行的盘面——Agent 标注，你决定。 | `github:vlln/dsh-pancha` |
-| **定时循环** `@vlln/dsh-loop` | `/loop` 命令 + `loop` 工具 + 活动状态条，让任务按自己的节奏反复跑。 | `@vlln/dsh-loop` |
-| **自动分叉** `@vlln/dsh-autofork` | Agent 忙时自动分叉会话：新指令立刻响应，旧会话跑完再回注。 | `github:vlln/dsh-autofork` |
-| **鲸鱼少女** `whale-girl` | DSH Web GUI 里的桌面宠物。 | `whale-girl` |
-| **进化工程** `@vlln/evo-engineering` | 任意产物一轮轮改得更好：定标准、迭代、独立评审、可回滚。 | `github:vlln/evo-engineering` |
-| **PR 收件箱** `dsh-pr-inbox` | 侧栏里看与你相关的 GitHub PR：我提的 / 待我审 / 我合并的，复用本机 `gh` 登录。 | `github:omdsh-dev/dsh-pr-inbox` |
-| **Preset 检查器** `dsh-preset-inspector` | 看清一个 agent preset 的每一行来自哪层补丁、哪个包、什么配置。 | `github:omdsh-dev/dsh-preset-inspector` |
+| [**分享链接**](https://github.com/vlln/dsh-share-link) `@vlln/dsh-share-link` | 把一段对话或一个产物发布成只读公网链接，随时可撤销。 | `github:vlln/dsh-share-link` |
+| [**视频转文案**](https://github.com/vlln/dsh-video2text) `dsh-video2text` | 视频链接转文案：侧栏播放器 + 逐字稿 + 导出，自带 `video2text` skill。 | `github:vlln/dsh-video2text` |
+| [**盘查**](https://github.com/vlln/dsh-pancha) `dsh-pancha` | 把目录变成一张可审查、可批注、可执行的盘面——Agent 标注，你决定。 | `github:vlln/dsh-pancha` |
+| [**定时循环**](https://github.com/vlln/dsh-loop) `@vlln/dsh-loop` | `/loop` 命令 + `loop` 工具 + 活动状态条，让任务按自己的节奏反复跑。 | `@vlln/dsh-loop` |
+| [**自动分叉**](https://github.com/vlln/dsh-autofork) `@vlln/dsh-autofork` | Agent 忙时自动分叉会话：新指令立刻响应，旧会话跑完再回注。 | `github:vlln/dsh-autofork` |
+| [**鲸鱼少女**](https://github.com/vlln/whale-girl) `whale-girl` | DSH Web GUI 里的桌面宠物。 | `whale-girl` |
+| [**进化工程**](https://github.com/vlln/evo-engineering) `@vlln/evo-engineering` | 任意产物一轮轮改得更好：定标准、迭代、独立评审、可回滚。 | `github:vlln/evo-engineering` |
+| [**PR 收件箱**](https://github.com/omdsh-dev/dsh-pr-inbox) `dsh-pr-inbox` | 侧栏里看与你相关的 GitHub PR：我提的 / 待我审 / 我合并的，复用本机 `gh` 登录。 | `github:omdsh-dev/dsh-pr-inbox` |
+| [**Preset 检查器**](https://github.com/omdsh-dev/dsh-preset-inspector) `dsh-preset-inspector` | 看清一个 agent preset 的每一行来自哪层补丁、哪个包、什么配置。 | `github:omdsh-dev/dsh-preset-inspector` |
 
-两个更早的插件已归档，因此**不在**索引里（仍可按包名安装，只是不再维护）：`@vlln/dsh-navbar`、`@vlln/dsh-task-status`。
+两个更早的插件已归档，因此**不在**索引里（仍可按包名安装，只是不再维护）：[`@vlln/dsh-navbar`](https://github.com/vlln/dsh-navbar)、[`@vlln/dsh-task-status`](https://github.com/vlln/dsh-task-status)。
 
 ## 这个仓库怎么运转
 
