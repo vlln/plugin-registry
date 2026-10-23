@@ -286,12 +286,12 @@
       },
       "versions": [
         {
-          "version": "0.1.1",
-          "publishTimestamp": 1792589313,
+          "version": "0.7.1",
+          "publishTimestamp": 1792688571,
           "source": {
             "type": "git",
             "url": "https://github.com/vlln/dsh-share-link",
-            "commit": "e51eb428fe8d3969144d52c1c395d47775202ad7"
+            "commit": "3133b84932fb254303abc03f2626f15f91d04136"
           },
           "engines": {
             "dsh": ">=0.2.0"
@@ -330,11 +330,11 @@
       "versions": [
         {
           "version": "0.1.0",
-          "publishTimestamp": 1792551195,
+          "publishTimestamp": 1792692005,
           "source": {
             "type": "git",
             "url": "https://github.com/vlln/dsh-video2text",
-            "commit": "6e0d625e7d29b0cf4863608ac56f04d22fca183e"
+            "commit": "184bd52d6f6582bb1273063c216424215d2f92b2"
           }
         }
       ]
