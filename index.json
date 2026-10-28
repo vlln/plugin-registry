@@ -286,12 +286,12 @@
       },
       "versions": [
         {
-          "version": "0.7.1",
-          "publishTimestamp": 1792688571,
+          "version": "0.7.2",
+          "publishTimestamp": 1793168672,
           "source": {
             "type": "git",
             "url": "https://github.com/vlln/dsh-share-link",
-            "commit": "3133b84932fb254303abc03f2626f15f91d04136"
+            "commit": "3f6419382b2fe63eb11a8e0636a48a7b7281dc4f"
           },
           "engines": {
             "dsh": ">=0.2.0"
