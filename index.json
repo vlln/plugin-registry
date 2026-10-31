@@ -74,12 +74,12 @@
       },
       "versions": [
         {
-          "version": "0.15.0",
-          "publishTimestamp": 1792066928,
+          "version": "0.16.0",
+          "publishTimestamp": 1793362157,
           "source": {
             "type": "git",
             "url": "https://github.com/vlln/dsh-autofork",
-            "commit": "66f5e4265b84e48b7e5966fcea4dccd7789e9501"
+            "commit": "6c7f83cbde1f87d3902d66a23996eabed5a04857"
           }
         }
       ]
@@ -113,6 +113,16 @@
         "sortKeys": {}
       },
       "versions": [
+        {
+          "version": "0.4.4",
+          "publishTimestamp": 1793363079,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.0-rc.1"
+          }
+        },
         {
           "version": "0.4.1",
           "publishTimestamp": 1788959575,
@@ -166,11 +176,11 @@
       "versions": [
         {
           "version": "3.0.2",
-          "publishTimestamp": 1792494636,
+          "publishTimestamp": 1793362156,
           "source": {
             "type": "git",
             "url": "https://github.com/vlln/dsh-pancha",
-            "commit": "d7ffdc0f101e1bfce25d27c63683f3e7609c1ad7"
+            "commit": "229a6ca3cae15d5a085c3fda08f78c561740bae3"
           }
         }
       ]
@@ -287,11 +297,11 @@
       "versions": [
         {
           "version": "0.7.2",
-          "publishTimestamp": 1793168672,
+          "publishTimestamp": 1793362156,
           "source": {
             "type": "git",
             "url": "https://github.com/vlln/dsh-share-link",
-            "commit": "3f6419382b2fe63eb11a8e0636a48a7b7281dc4f"
+            "commit": "0fa92f9fd1e8d7100eee5748e02e3efa7a41321e"
           },
           "engines": {
             "dsh": ">=0.2.0"
@@ -330,11 +340,11 @@
       "versions": [
         {
           "version": "0.2.0",
-          "publishTimestamp": 1792833346,
+          "publishTimestamp": 1793362156,
           "source": {
             "type": "git",
             "url": "https://github.com/vlln/dsh-video2text",
-            "commit": "9c701e23a70738fb0464caecad50765af5825b9f"
+            "commit": "fb4ecfac75283d66dab6497df645f1efc647b653"
           }
         }
       ]
@@ -408,6 +418,13 @@
         "sortKeys": {}
       },
       "versions": [
+        {
+          "version": "0.2.4",
+          "publishTimestamp": 1793363051,
+          "source": {
+            "type": "npm"
+          }
+        },
         {
           "version": "0.1.0",
           "publishTimestamp": 1787158008,
