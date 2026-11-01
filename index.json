@@ -339,12 +339,12 @@
       },
       "versions": [
         {
-          "version": "0.2.0",
-          "publishTimestamp": 1793362156,
+          "version": "0.2.1",
+          "publishTimestamp": 1793439140,
           "source": {
             "type": "git",
             "url": "https://github.com/vlln/dsh-video2text",
-            "commit": "fb4ecfac75283d66dab6497df645f1efc647b653"
+            "commit": "05ff505b861a69f1676a0e239922b0aa606bff75"
           }
         }
       ]
