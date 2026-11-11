@@ -1,0 +1,25 @@
+{
+  "name": "@vlln/dsh-home",
+  "repo": "vlln/dsh-home",
+  "source": "npm",
+  "title": {
+    "en": "Home",
+    "zh": "首页桌面"
+  },
+  "description": {
+    "en": "Turn DSH's blank home page into an arrangeable desktop: recent sessions across working directories, session states, 19 built-in widgets and time stats.",
+    "zh": "把 DSH 的空白首页换成一张可编排桌面：跨工作目录的最近会话、会话状态、19 张内置卡片与时间统计，支持自定义小组件。"
+  },
+  "author": "vlln",
+  "icon": "icons/dsh-home.svg",
+  "homepage": "https://github.com/vlln/dsh-home#readme",
+  "category": "interface",
+  "keywords": [
+    "home",
+    "dashboard",
+    "sessions",
+    "widgets",
+    "workspace",
+    "time"
+  ]
+}

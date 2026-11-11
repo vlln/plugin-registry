@@ -1,0 +1,25 @@
+{
+  "name": "@vlln/dsh-listen",
+  "repo": "vlln/dsh-listen",
+  "source": "npm",
+  "title": {
+    "en": "Listen",
+    "zh": "听声音"
+  },
+  "description": {
+    "en": "Give a text-only agent ears: the listen tool returns transcript, signal images and numeric audio evidence instead of a black-box answer.",
+    "zh": "给纯文本 Agent 装上耳朵：listen 工具返回逐字稿、信号图与可核对的音频数值证据，而不是一个黑盒答案。"
+  },
+  "author": "vlln",
+  "icon": "icons/dsh-listen.svg",
+  "homepage": "https://github.com/vlln/dsh-listen#readme",
+  "category": "workflow",
+  "keywords": [
+    "audio",
+    "speech",
+    "transcript",
+    "listen",
+    "dsp",
+    "tool"
+  ]
+}

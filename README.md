@@ -19,18 +19,22 @@
 Or install by hand with the same specs the index lists:
 
 ```sh
-dsh plugin --profile web add github:vlln/dsh-share-link
+dsh plugin --profile web add @vlln/dsh-share-link
 ```
 
 ## What's inside
 
 | Plugin | What it does | Install |
 |---|---|---|
-| [**Share Link**](https://github.com/vlln/dsh-share-link) `@vlln/dsh-share-link` | Publish a conversation or an artifact as a read-only public link; revoke anytime. | `github:vlln/dsh-share-link` |
-| [**Video to Text**](https://github.com/vlln/dsh-video2text) `dsh-video2text` | Video link → script: sidebar player, transcript, export; bundles the `video2text` skill. | `github:vlln/dsh-video2text` |
-| [**Pancha**](https://github.com/vlln/dsh-pancha) `dsh-pancha` | A directory as a board you can audit, annotate and act on — the agent labels, you decide. | `github:vlln/dsh-pancha` |
+| [**Share Link**](https://github.com/vlln/dsh-share-link) `@vlln/dsh-share-link` | Publish a conversation or an artifact as a read-only public link; revoke anytime. | `@vlln/dsh-share-link` |
+| [**Video to Text**](https://github.com/vlln/dsh-video2text) `dsh-video2text` | Video link → script: sidebar player, transcript, export; bundles the `video2text` skill. | `dsh-video2text` |
+| [**Pancha**](https://github.com/vlln/dsh-pancha) `dsh-pancha` | A directory as a board you can audit, annotate and act on — the agent labels, you decide. | `dsh-pancha` |
 | [**Loop**](https://github.com/vlln/dsh-loop) `@vlln/dsh-loop` | Scheduled loops: `/loop` command, `loop` tool and a live activity bar. | `@vlln/dsh-loop` |
-| [**Auto Fork**](https://github.com/vlln/dsh-autofork) `@vlln/dsh-autofork` | When the agent is busy, fork the session: the new instruction runs now, the old turn reports back later. | `github:vlln/dsh-autofork` |
+| [**Auto Fork**](https://github.com/vlln/dsh-autofork) `@vlln/dsh-autofork` | When the agent is busy, fork the session: the new instruction runs now, the old turn reports back later. | `@vlln/dsh-autofork` |
+| [**Motion**](https://github.com/vlln/dsh-motion) `@vlln/dsh-motion` | Make animations with the agent: scenes as editable code, timeline preview and annotation beside the chat, frame-accurate MP4 export. | `@vlln/dsh-motion` |
+| [**Listen**](https://github.com/vlln/dsh-listen) `@vlln/dsh-listen` | Give a text-only agent ears: a `listen` tool returning transcript, signal images and numeric audio evidence. | `@vlln/dsh-listen` |
+| [**Home**](https://github.com/vlln/dsh-home) `@vlln/dsh-home` | Turn DSH's blank home page into an arrangeable desktop: recent sessions, session states, widgets and time stats. | `@vlln/dsh-home` |
+| [**Skills Manager**](https://github.com/MichengAI/dsh-skills-manager) `@michengai/dsh-skills-manager` | Load and safely manage local and project Agent Skills: unified views, GitHub install, update preview, backups. | `@michengai/dsh-skills-manager` |
 | [**Whale Girl**](https://github.com/vlln/whale-girl) `whale-girl` | A desktop pet for the DSH Web GUI. | `whale-girl` |
 | [**Evolution Engineering**](https://github.com/vlln/evo-engineering) `@vlln/evo-engineering` | Improve any artifact in rounds: standard, iterate, independent review, rollback. | `github:vlln/evo-engineering` |
 | [**PR Inbox**](https://github.com/omdsh-dev/dsh-pr-inbox) `dsh-pr-inbox` | A sidebar panel for the GitHub PRs that concern you: opened, to review, merged — over your local `gh` login. | `github:omdsh-dev/dsh-pr-inbox` |

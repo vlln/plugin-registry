@@ -1,7 +1,7 @@
 {
   "name": "dsh-video2text",
   "repo": "vlln/dsh-video2text",
-  "source": "git",
+  "source": "npm",
   "title": { "en": "Video to Text", "zh": "视频转文案" },
   "description": {
     "en": "Turn a video link into a script: sidebar workspace with player, transcript and export, plus a bundled video2text skill.",

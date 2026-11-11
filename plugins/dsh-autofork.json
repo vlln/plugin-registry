@@ -1,7 +1,7 @@
 {
   "name": "@vlln/dsh-autofork",
   "repo": "vlln/dsh-autofork",
-  "source": "git",
+  "source": "npm",
   "title": { "en": "Auto Fork", "zh": "自动分叉" },
   "description": {
     "en": "When the agent is busy, fork the session: your new instruction runs immediately while the old turn finishes in the background and reports back.",

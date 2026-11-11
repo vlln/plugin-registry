@@ -1,7 +1,7 @@
 {
   "name": "@vlln/dsh-share-link",
   "repo": "vlln/dsh-share-link",
-  "source": "git",
+  "source": "npm",
   "title": { "en": "Share Link", "zh": "分享链接" },
   "description": {
     "en": "Publish a conversation or an artifact as a read-only public link — no dsh needed on the reader's side, revoke anytime.",

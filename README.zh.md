@@ -19,18 +19,22 @@
 也可以按索引里同样的 spec 手装：
 
 ```sh
-dsh plugin --profile web add github:vlln/dsh-share-link
+dsh plugin --profile web add @vlln/dsh-share-link
 ```
 
 ## 收录了什么
 
 | 插件 | 作用 | 安装 |
 |---|---|---|
-| [**分享链接**](https://github.com/vlln/dsh-share-link) `@vlln/dsh-share-link` | 把一段对话或一个产物发布成只读公网链接，随时可撤销。 | `github:vlln/dsh-share-link` |
-| [**视频转文案**](https://github.com/vlln/dsh-video2text) `dsh-video2text` | 视频链接转文案：侧栏播放器 + 逐字稿 + 导出，自带 `video2text` skill。 | `github:vlln/dsh-video2text` |
-| [**盘查**](https://github.com/vlln/dsh-pancha) `dsh-pancha` | 把目录变成一张可审查、可批注、可执行的盘面——Agent 标注，你决定。 | `github:vlln/dsh-pancha` |
+| [**分享链接**](https://github.com/vlln/dsh-share-link) `@vlln/dsh-share-link` | 把一段对话或一个产物发布成只读公网链接，随时可撤销。 | `@vlln/dsh-share-link` |
+| [**视频转文案**](https://github.com/vlln/dsh-video2text) `dsh-video2text` | 视频链接转文案：侧栏播放器 + 逐字稿 + 导出，自带 `video2text` skill。 | `dsh-video2text` |
+| [**盘查**](https://github.com/vlln/dsh-pancha) `dsh-pancha` | 把目录变成一张可审查、可批注、可执行的盘面——Agent 标注，你决定。 | `dsh-pancha` |
 | [**定时循环**](https://github.com/vlln/dsh-loop) `@vlln/dsh-loop` | `/loop` 命令 + `loop` 工具 + 活动状态条，让任务按自己的节奏反复跑。 | `@vlln/dsh-loop` |
-| [**自动分叉**](https://github.com/vlln/dsh-autofork) `@vlln/dsh-autofork` | Agent 忙时自动分叉会话：新指令立刻响应，旧会话跑完再回注。 | `github:vlln/dsh-autofork` |
+| [**自动分叉**](https://github.com/vlln/dsh-autofork) `@vlln/dsh-autofork` | Agent 忙时自动分叉会话：新指令立刻响应，旧会话跑完再回注。 | `@vlln/dsh-autofork` |
+| [**动画制作**](https://github.com/vlln/dsh-motion) `@vlln/dsh-motion` | 和 Agent 一起做动画：场景写成可改的代码，对话旁预览时间轴、框选批注，导出逐帧精确的 MP4。 | `@vlln/dsh-motion` |
+| [**听声音**](https://github.com/vlln/dsh-listen) `@vlln/dsh-listen` | 给纯文本 Agent 装上耳朵：`listen` 工具返回逐字稿、信号图与可核对的音频数值证据。 | `@vlln/dsh-listen` |
+| [**首页桌面**](https://github.com/vlln/dsh-home) `@vlln/dsh-home` | 把 DSH 的空白首页换成可编排桌面：最近会话、会话状态、内置卡片与时间统计。 | `@vlln/dsh-home` |
+| [**技能管理器**](https://github.com/MichengAI/dsh-skills-manager) `@michengai/dsh-skills-manager` | 统一加载并安全管理本机与项目 Agent Skills：统一视图、GitHub 安装、更新预览与备份回退。 | `@michengai/dsh-skills-manager` |
 | [**鲸鱼少女**](https://github.com/vlln/whale-girl) `whale-girl` | DSH Web GUI 里的桌面宠物。 | `whale-girl` |
 | [**进化工程**](https://github.com/vlln/evo-engineering) `@vlln/evo-engineering` | 任意产物一轮轮改得更好：定标准、迭代、独立评审、可回滚。 | `github:vlln/evo-engineering` |
 | [**PR 收件箱**](https://github.com/omdsh-dev/dsh-pr-inbox) `dsh-pr-inbox` | 侧栏里看与你相关的 GitHub PR：我提的 / 待我审 / 我合并的，复用本机 `gh` 登录。 | `github:omdsh-dev/dsh-pr-inbox` |

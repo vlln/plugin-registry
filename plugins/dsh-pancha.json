@@ -1,7 +1,7 @@
 {
   "name": "dsh-pancha",
   "repo": "vlln/dsh-pancha",
-  "source": "git",
+  "source": "npm",
   "title": { "en": "Pancha", "zh": "盘查" },
   "description": {
     "en": "Turn a directory into a board you can audit, annotate and act on: the agent labels, you decide.",

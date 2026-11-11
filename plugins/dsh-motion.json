@@ -1,0 +1,26 @@
+{
+  "name": "@vlln/dsh-motion",
+  "repo": "vlln/dsh-motion",
+  "source": "npm",
+  "title": {
+    "en": "Motion",
+    "zh": "动画制作"
+  },
+  "description": {
+    "en": "Make animations with the agent: scenes live as editable code in your workspace — preview the timeline next to the chat, annotate the frame, export a frame-accurate MP4.",
+    "zh": "和 Agent 一起做动画：场景作为可改的代码留在工作区，对话旁预览时间轴、框选批注，导出逐帧精确的 MP4。"
+  },
+  "author": "vlln",
+  "icon": "icons/dsh-motion.svg",
+  "homepage": "https://github.com/vlln/dsh-motion#readme",
+  "category": "content",
+  "keywords": [
+    "motion",
+    "animation",
+    "video",
+    "mp4",
+    "render",
+    "timeline",
+    "scene"
+  ]
+}

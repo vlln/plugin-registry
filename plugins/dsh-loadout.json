@@ -1,0 +1,25 @@
+{
+  "name": "@michengai/dsh-skills-manager",
+  "repo": "MichengAI/dsh-skills-manager",
+  "source": "npm",
+  "title": {
+    "en": "Skills Manager",
+    "zh": "技能管理器"
+  },
+  "description": {
+    "en": "Load and safely manage local and project Agent Skills in DSH: unified views, install from GitHub, preview updates and restore backups.",
+    "zh": "在 DSH 里统一加载并安全管理本机与项目 Agent Skills：统一视图、从 GitHub 安装、更新预览与备份回退。"
+  },
+  "author": "MichengAI",
+  "icon": "icons/dsh-loadout.svg",
+  "homepage": "https://github.com/MichengAI/dsh-skills-manager#readme",
+  "category": "workflow",
+  "keywords": [
+    "skills",
+    "skill",
+    "manager",
+    "install",
+    "backup",
+    "cordis"
+  ]
+}

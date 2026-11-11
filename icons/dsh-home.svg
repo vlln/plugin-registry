@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" fill="none">
+  <defs>
+    <linearGradient id="dshHomeTile" x1="8" y1="8.5" x2="19" y2="18.5" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5B7CFF"/>
+      <stop offset="1" stop-color="#3D5BF0"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8.5" width="11" height="10" rx="3" fill="url(#dshHomeTile)"/>
+  <rect x="21.5" y="8.5" width="6.5" height="4.25" rx="2" fill="#9FB4E4"/>
+  <rect x="21.5" y="15.25" width="6.5" height="3.25" rx="1.6" fill="#9FB4E4"/>
+  <rect x="8" y="21" width="20" height="6.5" rx="3" fill="#C3D0E9"/>
+  <circle cx="11.2" cy="24.25" r="1.35" fill="#5B7CFF"/>
+</svg>
