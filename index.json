@@ -191,6 +191,284 @@
       ]
     },
     {
+      "name": "@vlln/dsh-loop",
+      "title": {
+        "en": "Loop",
+        "zh": "定时循环"
+      },
+      "description": {
+        "en": "Scheduled loops: a /loop command, a loop tool and a live activity bar, so a task reruns on its own cadence.",
+        "zh": "定时循环：/loop 命令 + loop 工具 + 活动状态条，让任务按自己的节奏反复跑。"
+      },
+      "icon": "icons/dsh-loop.svg",
+      "author": "vlln",
+      "homepage": "https://github.com/vlln/dsh-loop#readme",
+      "repository": {
+        "url": "https://github.com/vlln/dsh-loop"
+      },
+      "metadata": {
+        "category": "workflow",
+        "keywords": [
+          "loop",
+          "schedule",
+          "cron",
+          "timer",
+          "automation"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.4.4",
+          "publishTimestamp": 1793363079,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.0-rc.1"
+          }
+        },
+        {
+          "version": "0.4.1",
+          "publishTimestamp": 1788959575,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.1.0-rc.5"
+          }
+        },
+        {
+          "version": "0.3.0",
+          "publishTimestamp": 1787158048,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.1.0-rc.5"
+          }
+        }
+      ]
+    },
+    {
+      "name": "@vlln/dsh-motion",
+      "title": {
+        "en": "Motion",
+        "zh": "动画制作"
+      },
+      "description": {
+        "en": "Make animations with the agent: scenes live as editable code in your workspace — preview the timeline next to the chat, annotate the frame, export a frame-accurate MP4.",
+        "zh": "和 Agent 一起做动画：场景作为可改的代码留在工作区，对话旁预览时间轴、框选批注，导出逐帧精确的 MP4。"
+      },
+      "icon": "icons/dsh-motion.svg",
+      "author": "vlln",
+      "homepage": "https://github.com/vlln/dsh-motion#readme",
+      "repository": {
+        "url": "https://github.com/vlln/dsh-motion"
+      },
+      "metadata": {
+        "category": "content",
+        "keywords": [
+          "motion",
+          "animation",
+          "video",
+          "mp4",
+          "render",
+          "timeline",
+          "scene"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.2.0",
+          "publishTimestamp": 1793363101,
+          "source": {
+            "type": "npm"
+          }
+        },
+        {
+          "version": "0.0.0-stage",
+          "publishTimestamp": 1793362972,
+          "source": {
+            "type": "npm"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dsh-pancha",
+      "title": {
+        "en": "Pancha",
+        "zh": "盘查"
+      },
+      "description": {
+        "en": "Turn a directory into a board you can audit, annotate and act on: the agent labels, you decide.",
+        "zh": "把磁盘变成一张可审查、可批注、可执行的盘面：Agent 标注，你来做决定。"
+      },
+      "icon": "icons/dsh-pancha.svg",
+      "author": "vlln",
+      "homepage": "https://github.com/vlln/dsh-pancha#readme",
+      "repository": {
+        "url": "https://github.com/vlln/dsh-pancha"
+      },
+      "metadata": {
+        "category": "workspace",
+        "keywords": [
+          "disk",
+          "audit",
+          "annotation",
+          "cleanup",
+          "files"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "3.0.2",
+          "publishTimestamp": 1793363135,
+          "source": {
+            "type": "npm"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dsh-pr-inbox",
+      "title": {
+        "en": "PR Inbox",
+        "zh": "PR 收件箱"
+      },
+      "description": {
+        "en": "A sidebar PR panel bound to the current workspace: the PRs you opened, must review and merged, rendered natively over your local gh login — read-only.",
+        "zh": "侧边栏 PR 面板：自动绑定当前工作区的项目，按「我提的 / 待我审 / 我合并的」三桶渲染 GitHub PR，复用本机 gh 登录，只读。"
+      },
+      "icon": "icons/dsh-pr-inbox.svg",
+      "author": "vlln",
+      "homepage": "https://github.com/omdsh-dev/dsh-pr-inbox#readme",
+      "repository": {
+        "url": "https://github.com/omdsh-dev/dsh-pr-inbox"
+      },
+      "metadata": {
+        "category": "workspace",
+        "keywords": [
+          "github",
+          "pull request",
+          "review",
+          "sidebar",
+          "gh"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.1.1",
+          "publishTimestamp": 1792230858,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/omdsh-dev/dsh-pr-inbox",
+            "commit": "7b2a166d6f21029eb3744806999cbe177f7aa35b"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dsh-preset-inspector",
+      "title": {
+        "en": "Preset Inspector",
+        "zh": "Preset 检查器"
+      },
+      "description": {
+        "en": "See where every line of an agent preset comes from: which patch layer, which package, which config.",
+        "zh": "Agent preset 检查器：看清一个 preset 的每一行来自哪一层补丁、是什么包、配置是什么。"
+      },
+      "icon": "icons/dsh-preset-inspector.svg",
+      "author": "vlln",
+      "homepage": "https://github.com/omdsh-dev/dsh-preset-inspector#readme",
+      "repository": {
+        "url": "https://github.com/omdsh-dev/dsh-preset-inspector"
+      },
+      "metadata": {
+        "category": "workflow",
+        "keywords": [
+          "preset",
+          "agent",
+          "debug",
+          "inspector",
+          "plugin"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.20.0",
+          "publishTimestamp": 1792236731,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/omdsh-dev/dsh-preset-inspector",
+            "commit": "98d9cd5d459f99084894612df66710866d191956"
+          }
+        }
+      ]
+    },
+    {
+      "name": "@vlln/dsh-share-link",
+      "title": {
+        "en": "Share Link",
+        "zh": "分享链接"
+      },
+      "description": {
+        "en": "Publish a conversation or an artifact as a read-only public link — no dsh needed on the reader's side, revoke anytime.",
+        "zh": "把一段对话或一个产物发布成只读公网链接：对方无需安装 dsh，随时可撤销。"
+      },
+      "icon": "icons/dsh-share-link.svg",
+      "author": "vlln",
+      "homepage": "https://github.com/vlln/dsh-share-link#readme",
+      "repository": {
+        "url": "https://github.com/vlln/dsh-share-link"
+      },
+      "metadata": {
+        "category": "content",
+        "keywords": [
+          "share",
+          "publish",
+          "link",
+          "snapshot",
+          "cloudflared",
+          "surge"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.7.6",
+          "publishTimestamp": 1793635790,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.0"
+          }
+        },
+        {
+          "version": "0.7.2",
+          "publishTimestamp": 1793362564,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.0"
+          }
+        }
+      ]
+    },
+    {
       "name": "@michengai/dsh-skills-manager",
       "title": {
         "en": "Skills Manager",
@@ -200,7 +478,7 @@
         "en": "Load and safely manage local and project Agent Skills in DSH: unified views, install from GitHub, preview updates and restore backups.",
         "zh": "在 DSH 里统一加载并安全管理本机与项目 Agent Skills：统一视图、从 GitHub 安装、更新预览与备份回退。"
       },
-      "icon": "icons/dsh-loadout.svg",
+      "icon": "icons/dsh-skills-manager.svg",
       "author": "MichengAI",
       "homepage": "https://github.com/MichengAI/dsh-skills-manager#readme",
       "repository": {
@@ -1042,284 +1320,6 @@
       ]
     },
     {
-      "name": "@vlln/dsh-loop",
-      "title": {
-        "en": "Loop",
-        "zh": "定时循环"
-      },
-      "description": {
-        "en": "Scheduled loops: a /loop command, a loop tool and a live activity bar, so a task reruns on its own cadence.",
-        "zh": "定时循环：/loop 命令 + loop 工具 + 活动状态条，让任务按自己的节奏反复跑。"
-      },
-      "icon": "icons/dsh-loop.svg",
-      "author": "vlln",
-      "homepage": "https://github.com/vlln/dsh-loop#readme",
-      "repository": {
-        "url": "https://github.com/vlln/dsh-loop"
-      },
-      "metadata": {
-        "category": "workflow",
-        "keywords": [
-          "loop",
-          "schedule",
-          "cron",
-          "timer",
-          "automation"
-        ],
-        "labels": [],
-        "sortKeys": {}
-      },
-      "versions": [
-        {
-          "version": "0.4.4",
-          "publishTimestamp": 1793363079,
-          "source": {
-            "type": "npm"
-          },
-          "engines": {
-            "dsh": ">=0.2.0-rc.1"
-          }
-        },
-        {
-          "version": "0.4.1",
-          "publishTimestamp": 1788959575,
-          "source": {
-            "type": "npm"
-          },
-          "engines": {
-            "dsh": ">=0.1.0-rc.5"
-          }
-        },
-        {
-          "version": "0.3.0",
-          "publishTimestamp": 1787158048,
-          "source": {
-            "type": "npm"
-          },
-          "engines": {
-            "dsh": ">=0.1.0-rc.5"
-          }
-        }
-      ]
-    },
-    {
-      "name": "@vlln/dsh-motion",
-      "title": {
-        "en": "Motion",
-        "zh": "动画制作"
-      },
-      "description": {
-        "en": "Make animations with the agent: scenes live as editable code in your workspace — preview the timeline next to the chat, annotate the frame, export a frame-accurate MP4.",
-        "zh": "和 Agent 一起做动画：场景作为可改的代码留在工作区，对话旁预览时间轴、框选批注，导出逐帧精确的 MP4。"
-      },
-      "icon": "icons/dsh-motion.svg",
-      "author": "vlln",
-      "homepage": "https://github.com/vlln/dsh-motion#readme",
-      "repository": {
-        "url": "https://github.com/vlln/dsh-motion"
-      },
-      "metadata": {
-        "category": "content",
-        "keywords": [
-          "motion",
-          "animation",
-          "video",
-          "mp4",
-          "render",
-          "timeline",
-          "scene"
-        ],
-        "labels": [],
-        "sortKeys": {}
-      },
-      "versions": [
-        {
-          "version": "0.2.0",
-          "publishTimestamp": 1793363101,
-          "source": {
-            "type": "npm"
-          }
-        },
-        {
-          "version": "0.0.0-stage",
-          "publishTimestamp": 1793362972,
-          "source": {
-            "type": "npm"
-          }
-        }
-      ]
-    },
-    {
-      "name": "dsh-pancha",
-      "title": {
-        "en": "Pancha",
-        "zh": "盘查"
-      },
-      "description": {
-        "en": "Turn a directory into a board you can audit, annotate and act on: the agent labels, you decide.",
-        "zh": "把磁盘变成一张可审查、可批注、可执行的盘面：Agent 标注，你来做决定。"
-      },
-      "icon": "icons/dsh-pancha.svg",
-      "author": "vlln",
-      "homepage": "https://github.com/vlln/dsh-pancha#readme",
-      "repository": {
-        "url": "https://github.com/vlln/dsh-pancha"
-      },
-      "metadata": {
-        "category": "workspace",
-        "keywords": [
-          "disk",
-          "audit",
-          "annotation",
-          "cleanup",
-          "files"
-        ],
-        "labels": [],
-        "sortKeys": {}
-      },
-      "versions": [
-        {
-          "version": "3.0.2",
-          "publishTimestamp": 1793363135,
-          "source": {
-            "type": "npm"
-          }
-        }
-      ]
-    },
-    {
-      "name": "dsh-pr-inbox",
-      "title": {
-        "en": "PR Inbox",
-        "zh": "PR 收件箱"
-      },
-      "description": {
-        "en": "A sidebar PR panel bound to the current workspace: the PRs you opened, must review and merged, rendered natively over your local gh login — read-only.",
-        "zh": "侧边栏 PR 面板：自动绑定当前工作区的项目，按「我提的 / 待我审 / 我合并的」三桶渲染 GitHub PR，复用本机 gh 登录，只读。"
-      },
-      "icon": "icons/dsh-pr-inbox.svg",
-      "author": "vlln",
-      "homepage": "https://github.com/omdsh-dev/dsh-pr-inbox#readme",
-      "repository": {
-        "url": "https://github.com/omdsh-dev/dsh-pr-inbox"
-      },
-      "metadata": {
-        "category": "workspace",
-        "keywords": [
-          "github",
-          "pull request",
-          "review",
-          "sidebar",
-          "gh"
-        ],
-        "labels": [],
-        "sortKeys": {}
-      },
-      "versions": [
-        {
-          "version": "0.1.1",
-          "publishTimestamp": 1792230858,
-          "source": {
-            "type": "git",
-            "url": "https://github.com/omdsh-dev/dsh-pr-inbox",
-            "commit": "7b2a166d6f21029eb3744806999cbe177f7aa35b"
-          }
-        }
-      ]
-    },
-    {
-      "name": "dsh-preset-inspector",
-      "title": {
-        "en": "Preset Inspector",
-        "zh": "Preset 检查器"
-      },
-      "description": {
-        "en": "See where every line of an agent preset comes from: which patch layer, which package, which config.",
-        "zh": "Agent preset 检查器：看清一个 preset 的每一行来自哪一层补丁、是什么包、配置是什么。"
-      },
-      "icon": "icons/dsh-preset-inspector.svg",
-      "author": "vlln",
-      "homepage": "https://github.com/omdsh-dev/dsh-preset-inspector#readme",
-      "repository": {
-        "url": "https://github.com/omdsh-dev/dsh-preset-inspector"
-      },
-      "metadata": {
-        "category": "workflow",
-        "keywords": [
-          "preset",
-          "agent",
-          "debug",
-          "inspector",
-          "plugin"
-        ],
-        "labels": [],
-        "sortKeys": {}
-      },
-      "versions": [
-        {
-          "version": "0.20.0",
-          "publishTimestamp": 1792236731,
-          "source": {
-            "type": "git",
-            "url": "https://github.com/omdsh-dev/dsh-preset-inspector",
-            "commit": "98d9cd5d459f99084894612df66710866d191956"
-          }
-        }
-      ]
-    },
-    {
-      "name": "@vlln/dsh-share-link",
-      "title": {
-        "en": "Share Link",
-        "zh": "分享链接"
-      },
-      "description": {
-        "en": "Publish a conversation or an artifact as a read-only public link — no dsh needed on the reader's side, revoke anytime.",
-        "zh": "把一段对话或一个产物发布成只读公网链接：对方无需安装 dsh，随时可撤销。"
-      },
-      "icon": "icons/dsh-share-link.svg",
-      "author": "vlln",
-      "homepage": "https://github.com/vlln/dsh-share-link#readme",
-      "repository": {
-        "url": "https://github.com/vlln/dsh-share-link"
-      },
-      "metadata": {
-        "category": "content",
-        "keywords": [
-          "share",
-          "publish",
-          "link",
-          "snapshot",
-          "cloudflared",
-          "surge"
-        ],
-        "labels": [],
-        "sortKeys": {}
-      },
-      "versions": [
-        {
-          "version": "0.7.6",
-          "publishTimestamp": 1793635790,
-          "source": {
-            "type": "npm"
-          },
-          "engines": {
-            "dsh": ">=0.2.0"
-          }
-        },
-        {
-          "version": "0.7.2",
-          "publishTimestamp": 1793362564,
-          "source": {
-            "type": "npm"
-          },
-          "engines": {
-            "dsh": ">=0.2.0"
-          }
-        }
-      ]
-    },
-    {
       "name": "dsh-video2text",
       "title": {
         "en": "Video to Text",
@@ -1402,11 +1402,14 @@
       "versions": [
         {
           "version": "0.1.1",
-          "publishTimestamp": 1792592447,
+          "publishTimestamp": 1794414126,
           "source": {
             "type": "git",
             "url": "https://github.com/vlln/evo-engineering",
-            "commit": "a0da9564a3f6129094730309107fef0836b96d81"
+            "commit": "b3834ab07e4f448d90a889a88669a0d313526597"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.1 <0.3.0-0"
           }
         }
       ]
