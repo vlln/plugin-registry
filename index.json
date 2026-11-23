@@ -83,6 +83,113 @@
       ]
     },
     {
+      "name": "dsh-better-trajectory",
+      "title": {
+        "en": "Better Trajectory",
+        "zh": "Better Trajectory"
+      },
+      "description": {
+        "en": "A super-set of the native trajectory: one composable query (role / kind / model / step), one four-tab inspector, and the raw session log verbatim.",
+        "zh": "原生轨迹的超集：一条可组合的查询（角色 / 类型 / 模型 / 步骤）、统一的四页签详情，以及逐字显示的原始日志。"
+      },
+      "icon": "icons/dsh-better-trajectory.svg",
+      "author": "vlln",
+      "homepage": "https://github.com/vlln/dsh-better-trajectory#readme",
+      "repository": {
+        "url": "https://github.com/vlln/dsh-better-trajectory"
+      },
+      "metadata": {
+        "category": "conversation",
+        "keywords": [
+          "trajectory",
+          "debug",
+          "session",
+          "log",
+          "inspector"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.3.6",
+          "publishTimestamp": 1794981154,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.1 <0.3.0-0"
+          }
+        },
+        {
+          "version": "0.3.5",
+          "publishTimestamp": 1794974841,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.1 <0.3.0-0"
+          }
+        },
+        {
+          "version": "0.0.0-stage",
+          "publishTimestamp": 1794974764,
+          "source": {
+            "type": "npm"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dsh-compute-env",
+      "title": {
+        "en": "Compute Env",
+        "zh": "计算环境"
+      },
+      "description": {
+        "en": "Pick where a session runs before it starts — Local, OCI container or remote SSH host: commands, file I/O and skills land on the chosen environment, with live CPU / memory / disk monitoring.",
+        "zh": "启动会话前选择 Local / OCI 容器 / SSH 远端运行环境：命令、文件读写与 Skill 都落到所选环境，并实时监测 CPU、内存与磁盘负载。"
+      },
+      "icon": "icons/dsh-compute-env.svg",
+      "author": "vlln",
+      "homepage": "https://github.com/vlln/dsh-compute-env#readme",
+      "repository": {
+        "url": "https://github.com/vlln/dsh-compute-env"
+      },
+      "metadata": {
+        "category": "workflow",
+        "keywords": [
+          "compute",
+          "environment",
+          "oci",
+          "container",
+          "ssh",
+          "remote"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.4.0",
+          "publishTimestamp": 1795360497,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.2"
+          }
+        },
+        {
+          "version": "0.0.0-stage",
+          "publishTimestamp": 1795360310,
+          "source": {
+            "type": "npm"
+          }
+        }
+      ]
+    },
+    {
       "name": "@vlln/dsh-home",
       "title": {
         "en": "Home",
@@ -299,6 +406,65 @@
       ]
     },
     {
+      "name": "dsh-overview",
+      "title": {
+        "en": "Overview",
+        "zh": "会话总览"
+      },
+      "description": {
+        "en": "A session overview container: todos, sub-agents, background jobs, input materials and key outputs in one place — with extension slots for other plugins.",
+        "zh": "通用会话总览容器：集中收口待办、子智能体、后台任务、输入材料与关键产出，并向其他插件开放扩展插槽。"
+      },
+      "icon": "icons/dsh-overview.svg",
+      "author": "vlln",
+      "homepage": "https://github.com/vlln/dsh-overview#readme",
+      "repository": {
+        "url": "https://github.com/vlln/dsh-overview"
+      },
+      "metadata": {
+        "category": "workspace",
+        "keywords": [
+          "overview",
+          "dashboard",
+          "todos",
+          "subagents",
+          "container",
+          "slots"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.1.1",
+          "publishTimestamp": 1795095354,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.1.0-rc.5"
+          }
+        },
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1795081128,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.1.0-rc.5"
+          }
+        },
+        {
+          "version": "0.0.0-stage",
+          "publishTimestamp": 1795081031,
+          "source": {
+            "type": "npm"
+          }
+        }
+      ]
+    },
+    {
       "name": "dsh-pancha",
       "title": {
         "en": "Pancha",
@@ -498,6 +664,16 @@
         "sortKeys": {}
       },
       "versions": [
+        {
+          "version": "1.5.2",
+          "publishTimestamp": 1795435840,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.1 <0.3.0-0"
+          }
+        },
         {
           "version": "1.5.1",
           "publishTimestamp": 1795403987,

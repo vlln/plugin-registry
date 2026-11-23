@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" fill="none">
+  <title>Better Trajectory</title>
+  <defs>
+    <linearGradient id="bt-path" x1="7" y1="28" x2="30" y2="9" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#52CED8"/>
+      <stop offset="1" stop-color="#617BEB"/>
+    </linearGradient>
+  </defs>
+  <path d="M8 27.5c5.2 0 5.2-7.7 10.4-7.7s5.2-8.8 10.4-8.8" stroke="url(#bt-path)" stroke-width="2.4" stroke-linecap="round"/>
+  <circle cx="8" cy="27.5" r="2.5" fill="#52CED8"/>
+  <circle cx="18.4" cy="19.8" r="2.5" fill="#F06A6A"/>
+  <circle cx="28.8" cy="11" r="2.5" fill="#617BEB"/>
+</svg>

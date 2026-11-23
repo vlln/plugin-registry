@@ -1,0 +1,24 @@
+{
+  "name": "dsh-better-trajectory",
+  "repo": "vlln/dsh-better-trajectory",
+  "source": "npm",
+  "title": {
+    "en": "Better Trajectory",
+    "zh": "Better Trajectory"
+  },
+  "description": {
+    "en": "A super-set of the native trajectory: one composable query (role / kind / model / step), one four-tab inspector, and the raw session log verbatim.",
+    "zh": "原生轨迹的超集：一条可组合的查询（角色 / 类型 / 模型 / 步骤）、统一的四页签详情，以及逐字显示的原始日志。"
+  },
+  "author": "vlln",
+  "icon": "icons/dsh-better-trajectory.svg",
+  "homepage": "https://github.com/vlln/dsh-better-trajectory#readme",
+  "category": "conversation",
+  "keywords": [
+    "trajectory",
+    "debug",
+    "session",
+    "log",
+    "inspector"
+  ]
+}

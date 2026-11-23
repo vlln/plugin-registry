@@ -35,6 +35,9 @@ dsh plugin --profile web add @vlln/dsh-share-link
 | [**Listen**](https://github.com/vlln/dsh-listen) `@vlln/dsh-listen` | Give a text-only agent ears: a `listen` tool returning transcript, signal images and numeric audio evidence. | `@vlln/dsh-listen` |
 | [**Home**](https://github.com/vlln/dsh-home) `@vlln/dsh-home` | Turn DSH's blank home page into an arrangeable desktop: recent sessions, session states, widgets and time stats. | `@vlln/dsh-home` |
 | [**Skills Manager**](https://github.com/MichengAI/dsh-skills-manager) `@michengai/dsh-skills-manager` | Load and safely manage local and project Agent Skills: unified views, GitHub install, update preview, backups. | `@michengai/dsh-skills-manager` |
+| [**Better Trajectory**](https://github.com/vlln/dsh-better-trajectory) `dsh-better-trajectory` | A super-set of the native trajectory: one composable query, one four-tab inspector, and the raw session log verbatim. | `dsh-better-trajectory` |
+| [**Overview**](https://github.com/vlln/dsh-overview) `dsh-overview` | A session overview container: todos, sub-agents, background jobs, inputs and key outputs — with extension slots for other plugins. | `dsh-overview` |
+| [**Compute Env**](https://github.com/vlln/dsh-compute-env) `dsh-compute-env` | Pick where a session runs before it starts: Local, OCI container or remote SSH host, with live CPU / memory / disk monitoring. | `dsh-compute-env` |
 | [**Whale Girl**](https://github.com/vlln/whale-girl) `whale-girl` | A desktop pet for the DSH Web GUI. | `whale-girl` |
 | [**Evolution Engineering**](https://github.com/vlln/evo-engineering) `@vlln/evo-engineering` | Improve any artifact in rounds: standard, iterate, independent review, rollback. | `github:vlln/evo-engineering` |
 | [**PR Inbox**](https://github.com/omdsh-dev/dsh-pr-inbox) `dsh-pr-inbox` | A sidebar panel for the GitHub PRs that concern you: opened, to review, merged — over your local `gh` login. | `github:omdsh-dev/dsh-pr-inbox` |

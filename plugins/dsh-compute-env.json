@@ -1,0 +1,25 @@
+{
+  "name": "dsh-compute-env",
+  "repo": "vlln/dsh-compute-env",
+  "source": "npm",
+  "title": {
+    "en": "Compute Env",
+    "zh": "计算环境"
+  },
+  "description": {
+    "en": "Pick where a session runs before it starts — Local, OCI container or remote SSH host: commands, file I/O and skills land on the chosen environment, with live CPU / memory / disk monitoring.",
+    "zh": "启动会话前选择 Local / OCI 容器 / SSH 远端运行环境：命令、文件读写与 Skill 都落到所选环境，并实时监测 CPU、内存与磁盘负载。"
+  },
+  "author": "vlln",
+  "icon": "icons/dsh-compute-env.svg",
+  "homepage": "https://github.com/vlln/dsh-compute-env#readme",
+  "category": "workflow",
+  "keywords": [
+    "compute",
+    "environment",
+    "oci",
+    "container",
+    "ssh",
+    "remote"
+  ]
+}

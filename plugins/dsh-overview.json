@@ -1,0 +1,25 @@
+{
+  "name": "dsh-overview",
+  "repo": "vlln/dsh-overview",
+  "source": "npm",
+  "title": {
+    "en": "Overview",
+    "zh": "会话总览"
+  },
+  "description": {
+    "en": "A session overview container: todos, sub-agents, background jobs, input materials and key outputs in one place — with extension slots for other plugins.",
+    "zh": "通用会话总览容器：集中收口待办、子智能体、后台任务、输入材料与关键产出，并向其他插件开放扩展插槽。"
+  },
+  "author": "vlln",
+  "icon": "icons/dsh-overview.svg",
+  "homepage": "https://github.com/vlln/dsh-overview#readme",
+  "category": "workspace",
+  "keywords": [
+    "overview",
+    "dashboard",
+    "todos",
+    "subagents",
+    "container",
+    "slots"
+  ]
+}

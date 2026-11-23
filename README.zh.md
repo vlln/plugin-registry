@@ -35,6 +35,9 @@ dsh plugin --profile web add @vlln/dsh-share-link
 | [**听声音**](https://github.com/vlln/dsh-listen) `@vlln/dsh-listen` | 给纯文本 Agent 装上耳朵：`listen` 工具返回逐字稿、信号图与可核对的音频数值证据。 | `@vlln/dsh-listen` |
 | [**首页桌面**](https://github.com/vlln/dsh-home) `@vlln/dsh-home` | 把 DSH 的空白首页换成可编排桌面：最近会话、会话状态、内置卡片与时间统计。 | `@vlln/dsh-home` |
 | [**技能管理器**](https://github.com/MichengAI/dsh-skills-manager) `@michengai/dsh-skills-manager` | 统一加载并安全管理本机与项目 Agent Skills：统一视图、GitHub 安装、更新预览与备份回退。 | `@michengai/dsh-skills-manager` |
+| [**Better Trajectory**](https://github.com/vlln/dsh-better-trajectory) `dsh-better-trajectory` | 原生轨迹的超集：一条可组合的查询、统一的四页签详情，以及逐字显示的原始日志。 | `dsh-better-trajectory` |
+| [**会话总览**](https://github.com/vlln/dsh-overview) `dsh-overview` | 集中收口待办、子智能体、后台任务、输入材料与关键产出，并向其他插件开放扩展插槽。 | `dsh-overview` |
+| [**计算环境**](https://github.com/vlln/dsh-compute-env) `dsh-compute-env` | 启动会话前选择 Local / OCI 容器 / SSH 远端运行环境，命令、文件读写与 Skill 都落到所选环境，实时监测负载。 | `dsh-compute-env` |
 | [**鲸鱼少女**](https://github.com/vlln/whale-girl) `whale-girl` | DSH Web GUI 里的桌面宠物。 | `whale-girl` |
 | [**进化工程**](https://github.com/vlln/evo-engineering) `@vlln/evo-engineering` | 任意产物一轮轮改得更好：定标准、迭代、独立评审、可回滚。 | `github:vlln/evo-engineering` |
 | [**PR 收件箱**](https://github.com/omdsh-dev/dsh-pr-inbox) `dsh-pr-inbox` | 侧栏里看与你相关的 GitHub PR：我提的 / 待我审 / 我合并的，复用本机 `gh` 登录。 | `github:omdsh-dev/dsh-pr-inbox` |
