@@ -665,6 +665,36 @@
       },
       "versions": [
         {
+          "version": "1.5.5",
+          "publishTimestamp": 1795520189,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.1 <0.3.0-0"
+          }
+        },
+        {
+          "version": "1.5.4",
+          "publishTimestamp": 1795501866,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.1 <0.3.0-0"
+          }
+        },
+        {
+          "version": "1.5.3",
+          "publishTimestamp": 1795444284,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.1 <0.3.0-0"
+          }
+        },
+        {
           "version": "1.5.2",
           "publishTimestamp": 1795435840,
           "source": {
